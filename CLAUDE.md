@@ -32,7 +32,13 @@ uv run python scripts/my_script.py
 ## Configuration
 
 Machine-specific paths and settings live in `.env` (not tracked). Copy and adapt for each machine.
-Use [`python-dotenv`](https://github.com/theskumar/python-dotenv) or `uv run` (which loads `.env` automatically) to consume it.
+Load it at the top of scripts or interactive sessions:
+
+```python
+from dotenv import load_dotenv; load_dotenv()
+```
+
+`uv run` also loads `.env` automatically for non-interactive use.
 
 ## Code philosophy
 
