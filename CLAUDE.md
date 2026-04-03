@@ -13,7 +13,8 @@ xenium-hne-fusion/
 ├── results/                 # Outputs and model artifacts (not tracked)
 ├── figures/                 # Generated figures (not tracked)
 ├── pyproject.toml           # uv-managed project config
-└── uv.lock                  # Locked dependency graph (committed)
+├── uv.lock                  # Locked dependency graph (committed)
+└── .env                     # Machine-specific config (not tracked)
 ```
 
 ## Environment
@@ -27,6 +28,11 @@ uv add --dev <pkg>       # add a dev dependency
 uv run pytest            # run tests
 uv run python scripts/my_script.py
 ```
+
+## Configuration
+
+Machine-specific paths and settings live in `.env` (not tracked). Copy and adapt for each machine.
+Use [`python-dotenv`](https://github.com/theskumar/python-dotenv) or `uv run` (which loads `.env` automatically) to consume it.
 
 ## Code philosophy
 
