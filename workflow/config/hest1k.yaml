@@ -1,0 +1,13 @@
+metadata_csv: data/00_download/hest1k/HEST_v1_3_0.csv
+download_dir: data/00_download/hest1k
+raw_dir: data/01_raw/datasets/hest1k
+processed_dir: data/02_processed/datasets/hest1k
+
+tile_sizes: [256, 512]
+tile_mpp: 0.5
+
+filter:
+  species: "Homo sapiens"
+  organ: null        # e.g. "breast" or ["breast", "lung"]
+  disease_type: null # e.g. "cancer"
+  sample_ids: null   # explicit list overrides all filters above
