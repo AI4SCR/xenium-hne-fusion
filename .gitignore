@@ -1,0 +1,146 @@
+# Project-specific: keep directory stubs, ignore contents
+data/*
+results/*
+figures/*
+!data/.gitkeep
+!results/.gitkeep
+!figures/.gitkeep
+
+# Data files
+*.parquet
+*.pdf
+*.png
+*.jpg
+*.svg
+*.tif
+*.tiff
+*.txt
+*.tsv
+*.csv
+*.xlsx
+*.xls
+*.json
+*.xml
+# *.yaml
+*.pickle
+*.pkl
+*.pt
+*.zarr
+*.rds
+*.rdata
+*.h5
+*.h5ad
+*.lndb
+*.soma
+*.dill
+*.sif
+*.tdb
+*.bpcells
+
+# Compressed files
+*.zip
+*.gz
+*.bz2
+*.xz
+*.tar
+*.rar
+
+# Files matching "." followed by numbers
+*.[0-9]*
+
+# HPC job outputs
+*.err
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+MANIFEST
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+.installed.cfg
+__pypackages__/
+
+# Testing / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# uv / pixi
+.pixi
+
+# Jupyter
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Workflow tools
+*.snakemake
+.nextflow
+nextflow_test/work
+
+# Documentation
+docs/_build/
+/site
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+cython_debug/
+
+# IDEs
+.idea/
+.spyderproject
+.spyproject
+.ropeproject
+
+# OS
+.DS_Store
+scribble/
+
+# ML experiment tracking
+wandb/
+checkpoints/
+
+# Claude
+.claude/
