@@ -11,6 +11,8 @@ dependencies = [
     "loguru>=0.7.3",
     "pyarrow>=23.0.1",
     "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
+    "tiffslide>=3.0.0",
     "torch>=2.11.0",
 ]
 
