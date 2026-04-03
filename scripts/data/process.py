@@ -1,4 +1,4 @@
-"""Extract patches and transcript tensors for a single sample × tile config."""
+"""Extract patches and transcript subsets for a single sample × tile config."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import geopandas as gpd
 from jsonargparse import auto_cli
 
-from xenium_hne_fusion.processing import extract_patches, get_gene_index, patchify_transcripts
+from xenium_hne_fusion.processing import extract_patches, patchify_transcripts
 
 
 def main(
@@ -18,9 +18,8 @@ def main(
     predicate: str = "within",
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
-    gene_index = get_gene_index(transcripts_path)
     extract_patches(wsi_path, tiles, output_dir, mpp)
-    patchify_transcripts(tiles, transcripts_path, output_dir, gene_index, predicate)
+    patchify_transcripts(tiles, transcripts_path, output_dir / "transcripts", predicate)
 
 
 if __name__ == "__main__":

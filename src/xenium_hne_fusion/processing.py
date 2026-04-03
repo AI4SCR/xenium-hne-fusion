@@ -1,26 +1,16 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import torch
 from loguru import logger
 from wsidata import open_wsi
-
-
-def get_gene_index(transcripts_path: Path) -> list[str]:
-    """
-    Return sorted unique gene names from transcripts parquet without loading full file.
-    Defines the gene dimension for all transcripts.pt tensors of a sample.
-    """
-    pf = pq.ParquetFile(transcripts_path)
-    genes = set()
-    for batch in pf.iter_batches(columns=["feature_name"]):
-        genes.update(batch.column("feature_name").to_pylist())
-    return sorted(genes)
 
 
 def extract_patches(
@@ -57,48 +47,56 @@ def extract_patches(
     logger.info("Patch extraction done")
 
 
-def patchify_transcripts(
-    tiles: gpd.GeoDataFrame,
-    transcripts_path: Path,
-    output_dir: Path,
-    gene_index: list[str],
-    predicate: str = "within",
-) -> None:
+def patchify_transcripts(tiles, transcripts_path: Path, save_dir: Path, predicate: str = "within") -> None:
+    # NOTE: this will only create parquet files for tiles that have transcripts!
+
+    transcripts = pq.ParquetFile(transcripts_path)
+
+    logger.info(
+        f"Patchify transcripts (num_tiles={len(tiles)}, num_transcripts={transcripts.metadata.num_rows})..."
+    )
+
+    chunk_size = 1_000_000
+    num_chunks = transcripts.metadata.num_rows // chunk_size + 1
+    for j, batch in enumerate(
+        transcripts.iter_batches(
+            batch_size=chunk_size,
+            columns=["transcript_id", "cell_id", "feature_name", "geometry"],
+        ),
+        start=1,
+    ):
+        logger.info(f"Processing chunk {j}/{num_chunks}")
+        chunk = gpd.GeoDataFrame.from_arrow(batch)
+
+        # NOTE: alternative predicates: 'intersects'.
+        # TODO: I am double checking how many transcripts we lose that fall on the border
+        joined = gpd.sjoin(chunk, tiles, how="inner", predicate=predicate)
+        joined = joined.drop(columns=["index_right"]).to_arrow()
+
+        ds.write_dataset(
+            data=joined,
+            base_dir=str(save_dir),
+            format="parquet",
+            basename_template=f"part-{{i}}-chunk={j}.parquet",
+            partitioning=["tile_id"],
+            partitioning_flavor="hive",
+            existing_data_behavior="overwrite_or_ignore",
+        )
+
+        del chunk, joined
+        gc.collect()
+
+
+def get_patchified_transcripts(tile_id: int, transcripts_dir: Path) -> gpd.GeoDataFrame | None:
     """
-    Assign transcripts to tiles via chunked spatial join, save per-tile count tensors.
+    Load transcripts for a single tile from the hive-partitioned dataset.
 
-    Transcripts are joined using he_x/he_y (H&E pixel coords).
-    Output: <output_dir>/<tile_id>/transcripts.pt — int32 tensor of shape (n_genes,).
-    Tiles with zero transcripts get a zero tensor.
+    Returns None if the tile has no transcripts.
+    Reconstructs geometry from WKB so the result is a proper GeoDataFrame.
     """
-    gene_to_idx = {g: i for i, g in enumerate(gene_index)}
-    n_genes = len(gene_index)
-    counts = np.zeros((len(tiles), n_genes), dtype=np.int32)
-    tile_id_to_row = {tid: i for i, tid in enumerate(tiles.tile_id)}
+    tile_dir = transcripts_dir / f"tile_id={tile_id}"
+    if not tile_dir.exists():
+        return None
 
-    pf = pq.ParquetFile(transcripts_path)
-    n_chunks = pf.metadata.num_rows // 1_000_000 + 1
-    logger.info(f"Patchifying {pf.metadata.num_rows:,} transcripts across {len(tiles)} tiles ({n_chunks} chunks)")
-
-    for j, batch in enumerate(pf.iter_batches(batch_size=1_000_000, columns=["feature_name", "he_x", "he_y"]), 1):
-        logger.info(f"Chunk {j}/{n_chunks}")
-        df = batch.to_pandas()
-        chunk = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.he_x, df.he_y), crs=tiles.crs)
-
-        joined = gpd.sjoin(chunk, tiles[["tile_id", "geometry"]], how="inner", predicate=predicate)
-        if joined.empty:
-            continue
-
-        for (tile_id, gene), grp in joined.groupby(["tile_id", "feature_name"]):
-            row = tile_id_to_row.get(tile_id)
-            col = gene_to_idx.get(gene)
-            if row is not None and col is not None:
-                counts[row, col] += len(grp)
-
-    logger.info("Writing per-tile transcript tensors")
-    for i, tid in enumerate(tiles.tile_id):
-        tile_dir = output_dir / str(tid)
-        tile_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(torch.from_numpy(counts[i]), tile_dir / "transcripts.pt")
-
-    logger.info("Transcript patchification done")
+    df = pd.read_parquet(tile_dir)
+    return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
