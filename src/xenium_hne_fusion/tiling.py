@@ -2,18 +2,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import geopandas as gpd
+import lazyslide as zs
+from loguru import logger
+from spatialdata.models import ShapesModel
+from wsidata import open_wsi
+
 
 def detect_tissues(wsi_path: Path, output_parquet: Path) -> None:
     """
-    Segment tissue regions in a WSI using HESTTissueSegmentation (DeepLabV3).
-
-    GPU-heavy. Operates at 1–2 µm/px; model weights downloaded automatically on first run.
+    Segment tissue regions using lazyslide threshold-based detection.
 
     Output parquet columns:
-        tissue_id (int)
-        geometry  (Shapely Polygon, coordinates in WSI pixel space)
+        tissue_id (int), geometry (Shapely Polygon, WSI pixel coords)
     """
-    ...
+    logger.info(f"Detecting tissues: {wsi_path.name}")
+    wsi = open_wsi(wsi_path)
+    zs.pp.find_tissues(wsi)
+    tissues: gpd.GeoDataFrame = wsi["tissues"]
+    logger.info(f"Found {len(tissues)} tissue region(s)")
+    output_parquet.parent.mkdir(parents=True, exist_ok=True)
+    tissues.to_parquet(output_parquet)
 
 
 def tile_tissues(
@@ -27,18 +36,22 @@ def tile_tissues(
     """
     Generate a tile grid over detected tissue regions.
 
-    CPU-only. Reads tissue polygons from tissues_parquet and tiles each region
-    using lazyslide, resampled to the target mpp.
-
-    Output parquet columns:
-        tile_id   (int)
-        tissue_id (int)
-        geometry  (Shapely Polygon, WSI pixel coords)
-        x_px      (int, top-left x in WSI pixel coords)
-        y_px      (int, top-left y in WSI pixel coords)
-        width_px  (int, always == tile_px after resampling)
-        height_px (int, always == tile_px after resampling)
-
-    Output filename convention: {tile_px}_{stride_px}.parquet
+    CPU-only. Output parquet columns:
+        tile_id, tissue_id, geometry (WSI pixel coords),
+        x_px, y_px, width_px, height_px
     """
-    ...
+    logger.info(f"Tiling {wsi_path.name} — tile_px={tile_px}, stride_px={stride_px}, mpp={mpp}")
+    wsi = open_wsi(wsi_path)
+    wsi["tissues"] = ShapesModel.parse(gpd.read_parquet(tissues_parquet))
+    zs.pp.tile_tissues(wsi, tile_px=tile_px, stride_px=stride_px, mpp=mpp)
+
+    tiles: gpd.GeoDataFrame = wsi["tiles"].copy()
+    bounds = tiles.geometry.bounds  # minx, miny, maxx, maxy
+    tiles["x_px"] = bounds["minx"].astype(int)
+    tiles["y_px"] = bounds["miny"].astype(int)
+    tiles["width_px"] = (bounds["maxx"] - bounds["minx"]).astype(int)
+    tiles["height_px"] = (bounds["maxy"] - bounds["miny"]).astype(int)
+
+    logger.info(f"Generated {len(tiles)} tiles")
+    output_parquet.parent.mkdir(parents=True, exist_ok=True)
+    tiles.to_parquet(output_parquet)

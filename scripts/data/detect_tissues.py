@@ -1,4 +1,4 @@
-"""Run tissue detection for a single sample."""
+"""Detect tissue regions for a single sample."""
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""Extract patches and transcript count tensors for a single sample × tile config."""
+"""Extract patches and transcript tensors for a single sample × tile config."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,11 +6,7 @@ from pathlib import Path
 import geopandas as gpd
 from jsonargparse import auto_cli
 
-from xenium_hne_fusion.processing import (
-    extract_patches,
-    get_gene_index,
-    patchify_transcripts,
-)
+from xenium_hne_fusion.processing import extract_patches, get_gene_index, patchify_transcripts
 
 
 def main(
