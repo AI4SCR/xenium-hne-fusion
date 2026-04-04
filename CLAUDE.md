@@ -17,6 +17,12 @@ xenium-hne-fusion/
 └── .env                     # Machine-specific config (not tracked)
 ```
 
+## Terminology
+
+- **Tile**: rectangular WSI region cropped at a fixed mpp (e.g. 0.5 µm/px). The unit of data.
+- **Patch**: a single ViT token — a sub-region of a tile (e.g. 16 × 16 px at the tile's resolution).
+- Pipeline: WSI → **tile** (`extract_tiles`) → transform + **patch** tokens (`process_tiles`)
+
 ## Environment
 
 Managed with [uv](https://github.com/astral-sh/uv).

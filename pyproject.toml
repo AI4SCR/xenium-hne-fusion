@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Xenium and H&E image fusion"
 requires-python = ">=3.12"
 dependencies = [
+    "ai4bmr-learn",
     "geopandas>=1.1.3",
-    "huggingface-hub>=1.9.0",
+    "glom>=25.12.0",
+    "huggingface-hub>=0.30",
     "jsonargparse>=4.47.0",
     "lazyslide>=0.10.0",
     "loguru>=0.7.3",
@@ -14,6 +16,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "tiffslide>=3.0.0",
     "torch>=2.11.0",
+    "transformers>=4.47",
 ]
 
 [dependency-groups]
@@ -30,3 +33,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/xenium_hne_fusion"]
+
+[tool.uv.sources]
+ai4bmr-learn = { path = "../ai4bmr-learn", editable = true }

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import lazyslide as zs
+import numpy as np
 from loguru import logger
 from spatialdata.models import ShapesModel
 from wsidata import open_wsi
@@ -55,3 +56,88 @@ def tile_tissues(
     logger.info(f"Generated {len(tiles)} tiles")
     output_parquet.parent.mkdir(parents=True, exist_ok=True)
     tiles.to_parquet(output_parquet)
+
+
+def save_wsi_thumbnail(wsi_path: Path, output_path: Path, max_size: int = 2048) -> None:
+    """Save a downsampled WSI thumbnail as PNG for quick inspection."""
+    from PIL import Image
+
+    wsi = open_wsi(wsi_path)
+    arr = wsi.reader.get_thumbnail(max_size)  # (H, W, 3) uint8
+    h, w = arr.shape[:2]
+    logger.info(f"Thumbnail size: {w}×{h}")
+    img = Image.fromarray(arr)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(output_path)
+    logger.info(f"Thumbnail saved to {output_path}")
+
+
+def save_transcript_overview(
+    wsi_path: Path,
+    transcripts_path: Path,
+    output_path: Path,
+    n: int = 10_000,
+    max_size: int = 2048,
+    seed: int = 0,
+) -> None:
+    """Plot n random transcripts on the WSI thumbnail. Stream-sample from parquet to control memory."""
+    import matplotlib.pyplot as plt
+    import pyarrow.parquet as pq
+    from PIL import Image
+
+    rng = np.random.default_rng(seed)
+
+    # --- build thumbnail ---
+    wsi = open_wsi(wsi_path)
+    arr = wsi.reader.get_thumbnail(max_size)  # (H, W, 3) uint8
+    thumb_h, thumb_w = arr.shape[:2]
+    props = wsi.reader.properties
+    wsi_h, wsi_w = props.level_shape[0]  # full-res (height, width)
+    scale_x = thumb_w / wsi_w
+    scale_y = thumb_h / wsi_h
+
+    logger.info(f"Thumbnail size: {thumb_w}×{thumb_h}")
+    thumb = Image.fromarray(arr)
+
+    # --- stream-sample transcripts ---
+    pf = pq.ParquetFile(transcripts_path)
+    row_groups = pf.metadata.num_row_groups
+    total_rows = pf.metadata.num_rows
+    logger.info(f"Sampling {n} transcripts from {total_rows} total rows across {row_groups} row groups")
+
+    n = min(n, total_rows)
+    collected: list = []
+    n_collected = 0
+
+    order = rng.permutation(row_groups)
+    for rg_idx in order:
+        if n_collected >= n:
+            break
+        needed = n - n_collected
+        table = pf.read_row_group(rg_idx, columns=["he_x", "he_y"])
+        size = len(table)
+        if size <= needed:
+            collected.append(table.to_pydict())
+            n_collected += size
+        else:
+            idx = rng.choice(size, size=needed, replace=False)
+            collected.append(table.take(idx).to_pydict())
+            n_collected += needed
+
+    xs = np.concatenate([np.asarray(d["he_x"]) for d in collected])
+    ys = np.concatenate([np.asarray(d["he_y"]) for d in collected])
+    xs = xs * scale_x
+    ys = ys * scale_y
+    logger.info(f"Collected {len(xs)} transcripts for overlay")
+
+    # --- plot ---
+    dpi = 150
+    fig, ax = plt.subplots(figsize=(thumb_w / dpi, thumb_h / dpi), dpi=dpi)
+    ax.imshow(thumb)
+    ax.scatter(xs, ys, s=0.5, c="red", linewidths=0, alpha=0.4, rasterized=True)
+    ax.axis("off")
+    fig.tight_layout(pad=0)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, bbox_inches="tight", pad_inches=0, dpi=dpi)
+    plt.close(fig)
+    logger.info(f"Transcript overview saved to {output_path}")

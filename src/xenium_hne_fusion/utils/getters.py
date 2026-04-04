@@ -18,8 +18,8 @@ class FilterConfig:
 @dataclass
 class PipelineConfig:
     metadata_csv: Path
-    download_dir: Path
     raw_dir: Path
+    structured_dir: Path
     processed_dir: Path
     tile_sizes: list[int]
     tile_mpp: float
@@ -32,8 +32,8 @@ def load_config(path: Path) -> PipelineConfig:
     f = data.get("filter", {}) or {}
     return PipelineConfig(
         metadata_csv=Path(data["metadata_csv"]),
-        download_dir=Path(data["download_dir"]),
         raw_dir=Path(data["raw_dir"]),
+        structured_dir=Path(data["structured_dir"]),
         processed_dir=Path(data["processed_dir"]),
         tile_sizes=data["tile_sizes"],
         tile_mpp=data["tile_mpp"],

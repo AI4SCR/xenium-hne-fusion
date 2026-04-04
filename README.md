@@ -53,15 +53,15 @@ xenium-hne-fusion/
 
 ```
 data/
-├── 00_download/hest1k/<sample_id>/      # raw HEST files (HuggingFace snapshot)
-│   ├── wsis/                            # pyramidal TIFFs
-│   └── transcripts/                     # Xenium transcript parquet
+├── 00_raw/hest1k/<sample_id>/               # raw HEST files (HuggingFace snapshot)
+│   ├── wsis/                                # pyramidal TIFFs
+│   └── transcripts/                         # Xenium transcript parquet
 │
-├── 01_raw/datasets/hest1k/<sample_id>/  # symlinks into 00_download + derived
-│   ├── wsi.tiff                         # symlink → wsis/<file>.tiff
-│   ├── transcripts.parquet              # symlink → transcripts/transcripts.parquet
+├── 01_structured/datasets/hest1k/<sample_id>/  # symlinks into 00_raw + derived
+│   ├── wsi.tiff                             # symlink → wsis/<file>.tiff
+│   ├── transcripts.parquet                  # symlink → transcripts/transcripts.parquet
 │   └── tiles/
-│       └── {tile_px}_{stride_px}.parquet  # GeoDataFrame: tile polygons + pixel bbox
+│       └── {tile_px}_{stride_px}.parquet    # GeoDataFrame: tile polygons + pixel bbox
 │
 └── 02_processed/datasets/hest1k/<sample_id>/{tile_px}_{stride_px}/<tile_id>/
     ├── patch.pt          # uint8 CHW torch tensor  (3 × tile_px × tile_px)
@@ -86,13 +86,13 @@ uv run scripts/data/download.py --config workflow/config/hest1k.yaml
 Or interactively:
 
 ```python
-from xenium_hne_fusion.download import download_sample, create_raw_symlinks
+from xenium_hne_fusion.download import download_sample, create_structured_symlinks
 from pathlib import Path
 
-download_sample("TENX95", download_dir=Path("data/00_download/hest1k"))
-create_raw_symlinks("TENX95",
-    download_dir=Path("data/00_download/hest1k"),
-    raw_dir=Path("data/01_raw/datasets/hest1k"))
+download_sample("TENX95", raw_dir=Path("data/00_raw/hest1k"))
+create_structured_symlinks("TENX95",
+    raw_dir=Path("data/00_raw/hest1k"),
+    structured_dir=Path("data/01_structured/datasets/hest1k"))
 ```
 
 ### 2 — Tissue detection  *(GPU)*
@@ -102,8 +102,8 @@ Model weights are downloaded automatically on first run.
 
 ```bash
 uv run scripts/data/detect_tissues.py \
-    --wsi_path data/01_raw/datasets/hest1k/TENX95/wsi.tiff \
-    --output_parquet data/01_raw/datasets/hest1k/TENX95/tissues.parquet
+    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
+    --output_parquet data/01_structured/datasets/hest1k/TENX95/tissues.parquet
 ```
 
 Output: GeoDataFrame parquet with `tissue_id` and `geometry` (Shapely Polygons in WSI pixel coords).
@@ -114,9 +114,9 @@ Generate a tile grid over detected tissue regions at a target resolution.
 
 ```bash
 uv run scripts/data/tile.py \
-    --wsi_path data/01_raw/datasets/hest1k/TENX95/wsi.tiff \
-    --tissues_parquet data/01_raw/datasets/hest1k/TENX95/tissues.parquet \
-    --output_parquet data/01_raw/datasets/hest1k/TENX95/tiles/256_256.parquet \
+    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
+    --tissues_parquet data/01_structured/datasets/hest1k/TENX95/tissues.parquet \
+    --output_parquet data/01_structured/datasets/hest1k/TENX95/tiles/256_256.parquet \
     --tile_px 256 --stride_px 256 --mpp 0.5
 ```
 
@@ -128,9 +128,9 @@ Extract patches and per-tile transcript count tensors.
 
 ```bash
 uv run scripts/data/process.py \
-    --wsi_path data/01_raw/datasets/hest1k/TENX95/wsi.tiff \
-    --tiles_parquet data/01_raw/datasets/hest1k/TENX95/tiles/256_256.parquet \
-    --transcripts_path data/01_raw/datasets/hest1k/TENX95/transcripts.parquet \
+    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
+    --tiles_parquet data/01_structured/datasets/hest1k/TENX95/tiles/256_256.parquet \
+    --transcripts_path data/01_structured/datasets/hest1k/TENX95/transcripts.parquet \
     --output_dir data/02_processed/datasets/hest1k/TENX95/256_256 \
     --mpp 0.5
 ```
@@ -143,9 +143,9 @@ Sample filtering is controlled by a YAML config:
 
 ```yaml
 # workflow/config/hest1k.yaml
-metadata_csv: data/00_download/hest1k/HEST_v1_3_0.csv
-download_dir: data/00_download/hest1k
-raw_dir: data/01_raw/datasets/hest1k
+metadata_csv: data/00_raw/hest1k/HEST_v1_3_0.csv
+raw_dir: data/00_raw/hest1k
+structured_dir: data/01_structured/datasets/hest1k
 processed_dir: data/02_processed/datasets/hest1k
 
 tile_sizes: [256, 512]
