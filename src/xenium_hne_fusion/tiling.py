@@ -109,12 +109,16 @@ def save_transcript_overview(
     collected: list = []
     n_collected = 0
 
+    schema_cols = pf.schema_arrow.names
+    x_col = next(c for c in ["he_x", "x"] if c in schema_cols)
+    y_col = next(c for c in ["he_y", "y"] if c in schema_cols)
+
     order = rng.permutation(row_groups)
     for rg_idx in order:
         if n_collected >= n:
             break
         needed = n - n_collected
-        table = pf.read_row_group(rg_idx, columns=["he_x", "he_y"])
+        table = pf.read_row_group(rg_idx, columns=[x_col, y_col])
         size = len(table)
         if size <= needed:
             collected.append(table.to_pydict())
@@ -124,8 +128,8 @@ def save_transcript_overview(
             collected.append(table.take(idx).to_pydict())
             n_collected += needed
 
-    xs = np.concatenate([np.asarray(d["he_x"]) for d in collected])
-    ys = np.concatenate([np.asarray(d["he_y"]) for d in collected])
+    xs = np.concatenate([np.asarray(d[x_col]) for d in collected])
+    ys = np.concatenate([np.asarray(d[y_col]) for d in collected])
     xs = xs * scale_x
     ys = ys * scale_y
     logger.info(f"Collected {len(xs)} transcripts for overlay")

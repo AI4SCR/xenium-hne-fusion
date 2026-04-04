@@ -14,10 +14,14 @@ def test_save_transcript_overview_streams_row_groups(monkeypatch, tmp_path: Path
         num_row_groups = 3
         num_rows = 30
 
+    class FakeSchema:
+        names = ['he_x', 'he_y']
+
     class FakeParquetFile:
         def __init__(self, path: Path):
             self.path = path
             self.metadata = FakeMetadata()
+            self.schema_arrow = FakeSchema()
 
         def read(self, *args, **kwargs):
             raise AssertionError('save_transcript_overview should not load the full parquet file')

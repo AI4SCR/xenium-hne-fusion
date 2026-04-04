@@ -19,7 +19,7 @@ def test_create_structured_symlinks_creates_sample_visualizations(monkeypatch, t
     def fake_save_sample_overview(wsi_path: Path, transcripts_path: Path, output_dir: Path, n: int = 10_000, max_size: int = 2048):
         calls.append((wsi_path, transcripts_path, output_dir, n, max_size))
 
-    monkeypatch.setattr('xenium_hne_fusion.download.save_sample_overview', fake_save_sample_overview)
+    monkeypatch.setattr('xenium_hne_fusion.structure.save_sample_overview', fake_save_sample_overview)
 
     create_structured_symlinks('TENX95', raw_dir, structured_dir)
 
