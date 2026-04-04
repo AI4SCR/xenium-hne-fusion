@@ -1,0 +1,21 @@
+backbone:
+  morph_encoder_name: null
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: null
+  global_pool: null
+  expr_token_pool: avg
+
+data:
+  batch_size: 512
+  expr_pool: token
+
+lit:
+  lr_head: 1e-4
+
+trainer:
+  max_epochs: 35
+  accumulate_grad_batches: 1

@@ -92,12 +92,22 @@ class Config:
     @classmethod
     def from_yaml(cls, path: Path) -> 'Config':
         import yaml
-        from jsonargparse import ArgumentParser
-        parser = ArgumentParser(error_handler=None)
-        parser.add_class_arguments(cls, 'cfg')
         data = yaml.safe_load(path.read_text()) or {}
-        if 'cfg' not in data:
-            data = {'cfg': data}
-        ns = parser.parse_object(data)
-        ns = parser.instantiate_classes(ns)
-        return ns.cfg
+        return _merge_dataclass(cls, data)
+
+
+def _merge_dataclass(cls, data: dict):
+    """Recursively construct a dataclass from a dict, using field defaults for missing keys."""
+    import dataclasses
+    import typing
+    hints = typing.get_type_hints(cls)
+    kwargs = {}
+    for f in dataclasses.fields(cls):
+        if f.name not in data:
+            continue
+        val = data[f.name]
+        hint = hints.get(f.name)
+        if hint is not None and isinstance(hint, type) and dataclasses.is_dataclass(hint):
+            val = _merge_dataclass(hint, val or {})
+        kwargs[f.name] = val
+    return cls(**kwargs)

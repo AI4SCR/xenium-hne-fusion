@@ -24,9 +24,12 @@ dependencies = [
     { name = "opencv-python" },
     { name = "openslide-bin" },
     { name = "openslide-python" },
+    { name = "pandas" },
     { name = "pillow" },
+    { name = "pyarrow" },
     { name = "torch" },
     { name = "torchinfo" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -41,10 +44,13 @@ requires-dist = [
     { name = "opencv-python" },
     { name = "openslide-bin" },
     { name = "openslide-python" },
+    { name = "pandas" },
     { name = "pillow" },
+    { name = "pyarrow" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "torch" },
     { name = "torchinfo" },
+    { name = "tqdm" },
 ]
 provides-extras = ["dev"]
 

@@ -37,14 +37,27 @@ uv run python scripts/my_script.py
 
 ## Configuration
 
-Machine-specific paths and settings live in `.env` (not tracked). Copy and adapt for each machine.
-Load it at the top of scripts or interactive sessions:
+Machine-specific paths live in `.env` (not tracked). `uv run` loads it automatically;
+for interactive sessions add `from dotenv import load_dotenv; load_dotenv()` at the top.
 
-```python
-from dotenv import load_dotenv; load_dotenv()
+Required `.env` variables:
+
+```bash
+HF_TOKEN=hf_...             # HuggingFace token for gated datasets
+
+# HEST1k
+HEST1K_DOWNLOAD_DIR=data/00_download/hest1k
+HEST1K_RAW_DIR=data/01_raw/datasets/hest1k
+HEST1K_PROCESSED_DIR=data/02_processed/datasets/hest1k
+
+# BEAT (internal dataset — machine-specific paths)
+BEAT_RAW_DIR=
+BEAT_PROCESSED_DIR=
 ```
 
-`uv run` also loads `.env` automatically for non-interactive use.
+Dataset-invariant settings (tile size, sample filter) live in `configs/data/<dataset>.yaml`.
+Model architecture and training hyperparams live in `configs/train/<variant>.yaml`.
+Never hardcode paths in versioned YAMLs.
 
 ## Code philosophy
 

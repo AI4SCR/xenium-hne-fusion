@@ -1,0 +1,17 @@
+backbone:
+  morph_encoder_name: vit_small_patch16_224
+  expr_encoder_name: null
+  fusion_strategy: null
+  global_pool: token
+  freeze_morph_encoder: false
+
+data:
+  batch_size: 512
+
+lit:
+  lr_head: 1e-4
+  lr_backbone: 1e-5
+
+trainer:
+  max_epochs: 35
+  accumulate_grad_batches: 1

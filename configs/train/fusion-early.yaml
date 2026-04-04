@@ -1,0 +1,23 @@
+backbone:
+  morph_encoder_name: vit_small_patch16_224
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: add
+  fusion_stage: early
+  use_proj: true
+  global_pool: token
+
+data:
+  batch_size: 256
+  expr_pool: token
+
+lit:
+  lr_head: 1e-4
+  lr_backbone: 1e-5
+
+trainer:
+  max_epochs: 35
+  accumulate_grad_batches: 2
