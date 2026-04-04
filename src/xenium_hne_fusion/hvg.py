@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+import yaml
+from anndata import AnnData
+from loguru import logger
+from scipy import sparse
+
+from xenium_hne_fusion.metadata import load_items_dataframe
+
+
+@dataclass
+class HvgRecipe:
+    panel_name: str
+    n_top_genes: int
+    items_name: str = 'default'
+    split_name: str = 'default'
+    kernel_size: int = 16
+    flavor: str = 'seurat_v3'
+
+
+def load_hvg_recipe(path: Path) -> HvgRecipe:
+    data = yaml.safe_load(path.read_text()) or {}
+    return HvgRecipe(
+        panel_name=data['panel_name'],
+        n_top_genes=data['n_top_genes'],
+        items_name=data.get('items_name', 'default'),
+        split_name=data.get('split_name', 'default'),
+        kernel_size=data.get('kernel_size', 16),
+        flavor=data.get('flavor', 'seurat_v3'),
+    )
+
+
+def load_fit_items(items_path: Path, split_metadata_path: Path) -> pd.DataFrame:
+    items = load_items_dataframe(items_path)
+    split_metadata = pd.read_parquet(split_metadata_path)
+    fit_ids = set(split_metadata.index[split_metadata['split'] == 'fit'])
+    fit_items = items[items['id'].isin(fit_ids)].copy()
+    assert len(fit_items) > 0, f'No fit items found for {items_path} and {split_metadata_path}'
+    return fit_items
+
+
+def get_common_genes(fit_items: pd.DataFrame, kernel_size: int) -> list[str]:
+    sample_ids = fit_items['sample_id'].drop_duplicates().tolist()
+    sample_gene_orders = {sample_id: _load_sample_gene_order(fit_items, sample_id, kernel_size) for sample_id in sample_ids}
+
+    common_genes = set(sample_gene_orders[sample_ids[0]])
+    for sample_id in sample_ids[1:]:
+        common_genes &= set(sample_gene_orders[sample_id])
+
+    canonical_order = [gene for gene in sample_gene_orders[sample_ids[0]] if gene in common_genes]
+    assert canonical_order, 'No common genes found across selected fit samples'
+    return canonical_order
+
+
+def build_tile_level_matrix(
+    fit_items: pd.DataFrame,
+    genes: list[str],
+    kernel_size: int,
+) -> tuple[sparse.csr_matrix, pd.DataFrame]:
+    rows = []
+    obs_rows = []
+
+    for item in fit_items.itertuples(index=False):
+        expr_path = Path(item.tile_dir) / f'expr-kernel_size={kernel_size}.parquet'
+        expr = pd.read_parquet(expr_path)
+        expr = expr.reindex(columns=genes, fill_value=0)
+        summed = expr.sum(axis=0).to_numpy(dtype=np.float32, copy=False)
+        rows.append(sparse.csr_matrix(summed[np.newaxis, :]))
+        obs_rows.append({'id': item.id, 'sample_id': item.sample_id, 'tile_id': item.tile_id})
+
+    matrix = sparse.vstack(rows, format='csr')
+    obs = pd.DataFrame(obs_rows).set_index('id', drop=True)
+    return matrix, obs
+
+
+def build_hvg_anndata(
+    fit_items: pd.DataFrame,
+    kernel_size: int,
+) -> AnnData:
+    genes = get_common_genes(fit_items, kernel_size)
+    matrix, obs = build_tile_level_matrix(fit_items, genes, kernel_size)
+    var = pd.DataFrame(index=pd.Index(genes, name='gene'))
+    return AnnData(X=matrix, obs=obs, var=var)
+
+
+def select_highly_variable_genes(adata: AnnData, *, n_top_genes: int, flavor: str) -> list[str]:
+    import scanpy as sc
+
+    assert n_top_genes > 0, 'n_top_genes must be positive'
+    assert n_top_genes <= adata.n_vars, f'n_top_genes={n_top_genes} exceeds available genes={adata.n_vars}'
+
+    sc.pp.highly_variable_genes(
+        adata,
+        n_top_genes=n_top_genes,
+        flavor=flavor,
+        inplace=True,
+    )
+    hvg_mask = adata.var['highly_variable'].fillna(False).astype(bool)
+    return adata.var_names[hvg_mask].tolist()
+
+
+def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], overwrite: bool = False) -> Path:
+    if output_path.exists():
+        assert overwrite, f'Panel already exists: {output_path}'
+
+    hvg_set = set(hvg_genes)
+    target_panel = [gene for gene in genes if gene in hvg_set]
+    source_panel = [gene for gene in genes if gene not in hvg_set]
+
+    assert target_panel, 'No HVGs selected'
+    assert set(source_panel).isdisjoint(set(target_panel))
+    assert len(source_panel) + len(target_panel) == len(genes)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        yaml.safe_dump(
+            {'source_panel': source_panel, 'target_panel': target_panel},
+            sort_keys=False,
+        )
+    )
+    logger.info(f'Saved HVG panel → {output_path}')
+    return output_path
+
+
+def create_hvg_panel(
+    *,
+    items_path: Path,
+    split_metadata_path: Path,
+    output_path: Path,
+    kernel_size: int,
+    n_top_genes: int,
+    flavor: str = 'seurat_v3',
+    overwrite: bool = False,
+) -> Path:
+    fit_items = load_fit_items(items_path, split_metadata_path)
+    adata = build_hvg_anndata(fit_items, kernel_size)
+    hvg_genes = select_highly_variable_genes(adata, n_top_genes=n_top_genes, flavor=flavor)
+    return save_hvg_panel(output_path, adata.var_names.tolist(), hvg_genes, overwrite=overwrite)
+
+
+def _load_sample_gene_order(fit_items: pd.DataFrame, sample_id: str, kernel_size: int) -> list[str]:
+    sample_items = fit_items[fit_items['sample_id'] == sample_id]
+    assert len(sample_items) > 0, f'No items found for sample_id={sample_id}'
+
+    expr_path = Path(sample_items.iloc[0]['tile_dir']) / f'expr-kernel_size={kernel_size}.parquet'
+    schema = pq.read_schema(expr_path)
+    return [name for name in schema.names if name != 'token_index']
