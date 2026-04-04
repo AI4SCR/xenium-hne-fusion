@@ -23,25 +23,31 @@ def _load_script(path: str, module_name: str):
     return module
 
 
-def test_build_tile_level_matrix_sums_tokens_and_preserves_gene_order(tmp_path: Path):
-    tile_dir = tmp_path / 'S1' / '256_256' / '0'
+def _write_transcripts_parquet(tile_dir: Path, genes: list[str], observed_genes: list[str]) -> None:
     tile_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
-        [
-            {'A': 1, 'B': 0, 'C': 2},
-            {'A': 3, 'B': 4, 'C': 0},
-        ],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(tile_dir / 'expr-kernel_size=16.parquet')
+        {
+            'feature_name': pd.Categorical(
+                observed_genes,
+                categories=genes,
+                ordered=False,
+            )
+        }
+    ).to_parquet(tile_dir / 'transcripts.parquet')
+
+
+def test_build_tile_level_matrix_counts_tile_transcripts_and_preserves_gene_order(tmp_path: Path):
+    tile_dir = tmp_path / 'S1' / '256_256' / '0'
+    _write_transcripts_parquet(tile_dir, ['A', 'B', 'C'], ['A', 'C', 'C', 'A', 'A', 'B'])
 
     fit_items = pd.DataFrame(
         [{'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_dir)}]
     )
-    matrix, obs = build_tile_level_matrix(fit_items, ['A', 'B', 'C'], kernel_size=16)
+    matrix, obs = build_tile_level_matrix(fit_items, ['A', 'B', 'C'])
 
     assert obs.index.tolist() == ['S1_0']
     assert matrix.shape == (1, 3)
-    assert matrix.toarray().tolist() == [[4.0, 4.0, 2.0]]
+    assert matrix.toarray().tolist() == [[3.0, 1.0, 2.0]]
 
 
 def test_load_fit_items_filters_to_fit_split(tmp_path: Path):
@@ -69,11 +75,8 @@ def test_load_fit_items_filters_to_fit_split(tmp_path: Path):
 def test_get_common_genes_uses_intersection_across_samples(tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S2' / '256_256' / '0'
-    tile_a.mkdir(parents=True, exist_ok=True)
-    tile_b.mkdir(parents=True, exist_ok=True)
-
-    pd.DataFrame(columns=['A', 'B', 'C'], index=pd.Index([], name='token_index')).to_parquet(tile_a / 'expr-kernel_size=16.parquet')
-    pd.DataFrame(columns=['B', 'C', 'D'], index=pd.Index([], name='token_index')).to_parquet(tile_b / 'expr-kernel_size=16.parquet')
+    _write_transcripts_parquet(tile_a, ['A', 'B', 'C'], ['A'])
+    _write_transcripts_parquet(tile_b, ['B', 'C', 'D'], ['B'])
 
     fit_items = pd.DataFrame(
         [
@@ -82,23 +85,14 @@ def test_get_common_genes_uses_intersection_across_samples(tmp_path: Path):
         ]
     )
 
-    assert get_common_genes(fit_items, kernel_size=16) == ['B', 'C']
+    assert get_common_genes(fit_items) == ['B', 'C']
 
 
 def test_create_hvg_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S1' / '256_256' / '1'
-    tile_a.mkdir(parents=True, exist_ok=True)
-    tile_b.mkdir(parents=True, exist_ok=True)
-
-    pd.DataFrame(
-        [{'A': 1, 'B': 0, 'C': 2}, {'A': 0, 'B': 1, 'C': 1}],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(tile_a / 'expr-kernel_size=16.parquet')
-    pd.DataFrame(
-        [{'A': 0, 'B': 3, 'C': 0}, {'A': 1, 'B': 1, 'C': 0}],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(tile_b / 'expr-kernel_size=16.parquet')
+    _write_transcripts_parquet(tile_a, ['A', 'B', 'C'], ['A', 'C', 'C', 'B'])
+    _write_transcripts_parquet(tile_b, ['A', 'B', 'C'], ['B', 'B', 'B', 'A'])
 
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
@@ -125,7 +119,6 @@ def test_create_hvg_panel_writes_target_hvgs_and_source_remainder(monkeypatch: p
         items_path=items_path,
         split_metadata_path=split_path,
         output_path=output_path,
-        kernel_size=16,
         n_top_genes=2,
         overwrite=True,
     )
@@ -139,20 +132,17 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     data_dir = tmp_path / 'data'
     raw_dir = tmp_path / 'raw' / 'hest1k'
     output_dir = data_dir / '03_output' / 'hest1k'
-    expr_dir = data_dir / '02_processed' / 'hest1k' / 'TENX95' / '256_256' / '0'
+    tile_dir = data_dir / '02_processed' / 'hest1k' / 'TENX95' / '256_256' / '0'
     recipe_path = tmp_path / 'default.yaml'
     config_path = tmp_path / 'hest1k.yaml'
 
-    expr_dir.mkdir(parents=True, exist_ok=True)
+    tile_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'splits').mkdir(parents=True, exist_ok=True)
 
-    pd.DataFrame(
-        [{'A': 1, 'B': 2}, {'A': 0, 'B': 3}],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(expr_dir / 'expr-kernel_size=16.parquet')
+    _write_transcripts_parquet(tile_dir, ['A', 'B'], ['A', 'B', 'B', 'B'])
     (output_dir / 'items' / 'default.json').write_text(
-        json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(expr_dir)}])
+        json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
     )
     pd.DataFrame(
         {'split': ['fit']},
@@ -163,7 +153,6 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
         'panel_name: hvg-default\n'
         'items_name: default\n'
         'split_name: default\n'
-        'kernel_size: 16\n'
         'n_top_genes: 1\n'
         'flavor: seurat_v3\n'
     )
@@ -196,17 +185,8 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
 def test_build_hvg_anndata_uses_one_row_per_tile(tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S1' / '256_256' / '1'
-    tile_a.mkdir(parents=True, exist_ok=True)
-    tile_b.mkdir(parents=True, exist_ok=True)
-
-    pd.DataFrame(
-        [{'A': 1, 'B': 0}, {'A': 2, 'B': 1}],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(tile_a / 'expr-kernel_size=16.parquet')
-    pd.DataFrame(
-        [{'A': 0, 'B': 4}, {'A': 1, 'B': 1}],
-        index=pd.Index([0, 1], name='token_index'),
-    ).to_parquet(tile_b / 'expr-kernel_size=16.parquet')
+    _write_transcripts_parquet(tile_a, ['A', 'B'], ['A', 'A', 'B'])
+    _write_transcripts_parquet(tile_b, ['A', 'B'], ['B', 'B', 'B', 'B', 'A'])
 
     fit_items = pd.DataFrame(
         [
@@ -215,7 +195,7 @@ def test_build_hvg_anndata_uses_one_row_per_tile(tmp_path: Path):
         ]
     )
 
-    adata = build_hvg_anndata(fit_items, kernel_size=16)
+    adata = build_hvg_anndata(fit_items)
 
     assert adata.n_obs == 2
     assert adata.obs_names.tolist() == ['S1_0', 'S1_1']

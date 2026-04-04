@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pyarrow.parquet as pq
 import yaml
 from anndata import AnnData
 from loguru import logger
@@ -20,7 +19,6 @@ class HvgRecipe:
     n_top_genes: int
     items_name: str = 'default'
     split_name: str = 'default'
-    kernel_size: int = 16
     flavor: str = 'seurat_v3'
 
 
@@ -31,7 +29,6 @@ def load_hvg_recipe(path: Path) -> HvgRecipe:
         n_top_genes=data['n_top_genes'],
         items_name=data.get('items_name', 'default'),
         split_name=data.get('split_name', 'default'),
-        kernel_size=data.get('kernel_size', 16),
         flavor=data.get('flavor', 'seurat_v3'),
     )
 
@@ -45,9 +42,9 @@ def load_fit_items(items_path: Path, split_metadata_path: Path) -> pd.DataFrame:
     return fit_items
 
 
-def get_common_genes(fit_items: pd.DataFrame, kernel_size: int) -> list[str]:
+def get_common_genes(fit_items: pd.DataFrame) -> list[str]:
     sample_ids = fit_items['sample_id'].drop_duplicates().tolist()
-    sample_gene_orders = {sample_id: _load_sample_gene_order(fit_items, sample_id, kernel_size) for sample_id in sample_ids}
+    sample_gene_orders = {sample_id: _load_sample_gene_order(fit_items, sample_id) for sample_id in sample_ids}
 
     common_genes = set(sample_gene_orders[sample_ids[0]])
     for sample_id in sample_ids[1:]:
@@ -61,16 +58,13 @@ def get_common_genes(fit_items: pd.DataFrame, kernel_size: int) -> list[str]:
 def build_tile_level_matrix(
     fit_items: pd.DataFrame,
     genes: list[str],
-    kernel_size: int,
 ) -> tuple[sparse.csr_matrix, pd.DataFrame]:
     rows = []
     obs_rows = []
 
     for item in fit_items.itertuples(index=False):
-        expr_path = Path(item.tile_dir) / f'expr-kernel_size={kernel_size}.parquet'
-        expr = pd.read_parquet(expr_path)
-        expr = expr.reindex(columns=genes, fill_value=0)
-        summed = expr.sum(axis=0).to_numpy(dtype=np.float32, copy=False)
+        counts = load_tile_gene_counts(Path(item.tile_dir) / 'transcripts.parquet', genes)
+        summed = counts.to_numpy(dtype=np.float32, copy=False)
         rows.append(sparse.csr_matrix(summed[np.newaxis, :]))
         obs_rows.append({'id': item.id, 'sample_id': item.sample_id, 'tile_id': item.tile_id})
 
@@ -81,10 +75,9 @@ def build_tile_level_matrix(
 
 def build_hvg_anndata(
     fit_items: pd.DataFrame,
-    kernel_size: int,
 ) -> AnnData:
-    genes = get_common_genes(fit_items, kernel_size)
-    matrix, obs = build_tile_level_matrix(fit_items, genes, kernel_size)
+    genes = get_common_genes(fit_items)
+    matrix, obs = build_tile_level_matrix(fit_items, genes)
     var = pd.DataFrame(index=pd.Index(genes, name='gene'))
     return AnnData(X=matrix, obs=obs, var=var)
 
@@ -133,21 +126,38 @@ def create_hvg_panel(
     items_path: Path,
     split_metadata_path: Path,
     output_path: Path,
-    kernel_size: int,
     n_top_genes: int,
     flavor: str = 'seurat_v3',
     overwrite: bool = False,
 ) -> Path:
     fit_items = load_fit_items(items_path, split_metadata_path)
-    adata = build_hvg_anndata(fit_items, kernel_size)
+    adata = build_hvg_anndata(fit_items)
     hvg_genes = select_highly_variable_genes(adata, n_top_genes=n_top_genes, flavor=flavor)
     return save_hvg_panel(output_path, adata.var_names.tolist(), hvg_genes, overwrite=overwrite)
 
 
-def _load_sample_gene_order(fit_items: pd.DataFrame, sample_id: str, kernel_size: int) -> list[str]:
+def _load_sample_gene_order(fit_items: pd.DataFrame, sample_id: str) -> list[str]:
     sample_items = fit_items[fit_items['sample_id'] == sample_id]
     assert len(sample_items) > 0, f'No items found for sample_id={sample_id}'
 
-    expr_path = Path(sample_items.iloc[0]['tile_dir']) / f'expr-kernel_size={kernel_size}.parquet'
-    schema = pq.read_schema(expr_path)
-    return [name for name in schema.names if name != 'token_index']
+    transcripts_path = Path(sample_items.iloc[0]['tile_dir']) / 'transcripts.parquet'
+    return load_transcript_gene_categories(transcripts_path)
+
+
+def load_transcript_gene_categories(transcripts_path: Path) -> list[str]:
+    transcripts = pd.read_parquet(transcripts_path, columns=['feature_name'])
+    feature_name = transcripts['feature_name']
+    assert isinstance(feature_name.dtype, pd.CategoricalDtype), (
+        f'Expected categorical feature_name in {transcripts_path}, got {feature_name.dtype}'
+    )
+    return feature_name.cat.categories.tolist()
+
+
+def load_tile_gene_counts(transcripts_path: Path, genes: list[str]) -> pd.Series:
+    transcripts = pd.read_parquet(transcripts_path, columns=['feature_name'])
+    feature_name = transcripts['feature_name']
+    assert isinstance(feature_name.dtype, pd.CategoricalDtype), (
+        f'Expected categorical feature_name in {transcripts_path}, got {feature_name.dtype}'
+    )
+    counts = feature_name.value_counts(sort=False)
+    return counts.reindex(genes, fill_value=0)

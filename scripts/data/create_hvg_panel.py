@@ -35,7 +35,6 @@ def main(
         items_path=items_path,
         split_metadata_path=split_metadata_path,
         output_path=output_path,
-        kernel_size=recipe.kernel_size,
         n_top_genes=recipe.n_top_genes,
         flavor=recipe.flavor,
         overwrite=overwrite,

@@ -1,6 +1,5 @@
 panel_name: hvg-default
 items_name: default
 split_name: default
-kernel_size: 16
 n_top_genes: 128
 flavor: seurat_v3
