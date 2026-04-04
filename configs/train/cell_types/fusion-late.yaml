@@ -23,8 +23,8 @@ data:
   panel_path: default.yaml
 
 lit:
-  lr_head: 1e-4
-  lr_backbone: 1e-5
+  lr_head: 1.0e-4
+  lr_backbone: 1.0e-5
 
 wandb:
   project: debug

@@ -264,17 +264,17 @@ def train(cfg: Config, debug: bool | None = None):
                 ds_fit=ds_fit,
                 ds_val=ds_val)
 
-from pathlib import Path
-config_path = Path('configs/train/fusion-early.yaml')
-# config_path = Path(config_path)
-cfg = Config.from_yaml(config_path)
-fast_dev_run = cfg.debug = debug = True
-# cfg.data.name = 'hest1k'
-# cfg.data.metadata_path = Path('/absolute/path/to/metadata.parquet')
-# train(cfg, debug=True)
+if __name__ == "__main__":
+    from pathlib import Path
+    from jsonargparse import auto_cli
 
-# %%
-# if __name__ == "__main__":
-#     from jsonargparse import auto_cli
-#
-#     auto_cli(train, as_positional=False)
+    def main(cfg: Path, debug: bool = False) -> None:
+        """Train cell type prediction model.
+
+        Args:
+            cfg: Path to training config YAML.
+            debug: Enable fast-dev-run debug mode (2 batches, batch_size=2).
+        """
+        train(Config.from_yaml(cfg), debug=debug)
+
+    auto_cli(main, as_positional=False)

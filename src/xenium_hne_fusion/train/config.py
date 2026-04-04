@@ -113,6 +113,10 @@ def _merge_dataclass(cls, data: dict):
             val = _merge_dataclass(hint, val or {})
         elif hint is not None and _is_path_hint(hint) and val is not None:
             val = Path(val)
+        elif val is not None and _is_scalar_hint(hint, float):
+            val = float(val)
+        elif val is not None and _is_scalar_hint(hint, int):
+            val = int(val)
         kwargs[f.name] = val
     return cls(**kwargs)
 
@@ -123,3 +127,12 @@ def _is_path_hint(hint: Any) -> bool:
     if hint is Path:
         return True
     return Path in typing.get_args(hint)
+
+
+def _is_scalar_hint(hint: Any, scalar: type) -> bool:
+    """Return True if hint resolves to scalar (or Optional[scalar])."""
+    import typing
+
+    if hint is scalar:
+        return True
+    return scalar in typing.get_args(hint) and type(None) in typing.get_args(hint)

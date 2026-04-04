@@ -30,6 +30,7 @@ class TileDataset(Items):
     def __init__(self, *,
                  kernel_size: int = 16,
                  panel: list[str] | None = None,
+                 target_panel: list[str] | None = None,
                  include_image: bool = True,
                  include_expr: bool = True,
                  image_transform: Callable | None = None,
@@ -39,6 +40,7 @@ class TileDataset(Items):
         super().__init__(**kwargs)
         self.kernel_size = kernel_size
         self.panel = panel
+        self.target_panel = target_panel
         self.include_image = include_image
         self.include_expr = include_expr
         self.image_transform = image_transform
@@ -58,15 +60,19 @@ class TileDataset(Items):
             if self.include_image:
                 modalities['image'] = torch.load(tile_dir / 'tile.pt', weights_only=True)
 
-            if self.include_expr:
+            if self.include_expr or self.target_panel is not None:
+                expr_raw = pd.read_parquet(tile_dir / f'expr-kernel_size={self.kernel_size}.parquet')
 
-                expr = pd.read_parquet(tile_dir / f'expr-kernel_size={self.kernel_size}.parquet')
-                if self.panel is not None:
-                    expr = expr[self.panel]
+            if self.include_expr:
+                expr = expr_raw[self.panel] if self.panel is not None else expr_raw
                 expr_t = torch.tensor(expr.values, dtype=torch.float32)
                 if self.expr_pool == 'tile':
                     expr_t = expr_t.mean(dim=0)
                 modalities['expr_tokens'] = expr_t
+
+            if self.target_panel is not None:
+                target_t = torch.tensor(expr_raw[self.target_panel].values, dtype=torch.float32)
+                item['target'] = target_t.mean(dim=0)  # avg-pool to (n_target_genes,)
 
             item['modalities'] = modalities
 
@@ -77,6 +83,10 @@ class TileDataset(Items):
             item['modalities']['expr_tokens'] = self.expr_transform(item['modalities']['expr_tokens'])
 
         if self.metadata is not None:
-            item['metadata'] = self.metadata.loc[iid].to_dict()
+            import numpy as np
+            item['metadata'] = {
+                k: v.item() if isinstance(v, np.generic) else v
+                for k, v in self.metadata.loc[iid].items()
+            }
 
         return item

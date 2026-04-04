@@ -89,6 +89,15 @@ class RegressionLit(L.LightningModule):
             }
         )
 
+    def transfer_batch_to_device(self, batch, device, dataloader_idx):
+        """Cast float64 tensors to float32 before device transfer (MPS has no float64 support)."""
+        from lightning_utilities.core.apply_func import apply_to_collection
+        batch = apply_to_collection(
+            batch, dtype=torch.Tensor,
+            function=lambda t: t.to(torch.float32) if t.dtype == torch.float64 else t,
+        )
+        return super().transfer_batch_to_device(batch, device, dataloader_idx)
+
     def reduce_log_reset(self, metrics: MetricCollection) -> None:
         scores = metrics.compute()
         metrics.reset()

@@ -38,12 +38,12 @@ def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | N
 
     return expr_encoder, expr_transform, expr_encoder_dim
 
-def get_morph_encoder_and_transform(*, morph_encoder_name: str, **kws):
+def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 224, **kws):
     if morph_encoder_name is not None and morph_encoder_name in timm.list_models():
         morph_encoder = timm.create_model(
             model_name=morph_encoder_name,
             pretrained=True,
-            img_size=224,
+            img_size=img_size,
             in_chans=3,
             num_classes=0,
             global_pool='',  # disable pooling and handle with global_pool in FusionModel
@@ -55,6 +55,7 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, **kws):
         assert all(map(lambda x: x == 0.5, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
         assert all(map(lambda x: x == 0.5, normalize.std)), f"Expected std 0.5, got {normalize.std}"
 
+        # No spatial resize — tiles are assumed to be img_size × img_size already.
         image_transform = v2.Compose(
             [
                 v2.ToImage(),
