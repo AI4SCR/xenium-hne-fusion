@@ -1,3 +1,6 @@
+head:
+  num_hidden_layers: 0
+
 backbone:
   morph_encoder_name: vit_small_patch16_224
   expr_encoder_name: mlp
@@ -13,13 +16,21 @@ backbone:
   expr_token_pool: avg
 
 data:
+  name: hest1k
   batch_size: 256
   expr_pool: token
+  metadata_path: splits/default.parquet
+  panel_path: default.yaml
 
 lit:
   lr_head: 1e-4
   lr_backbone: 1e-5
 
+wandb:
+  project: debug
+
 trainer:
+  max_time: 00:01:45:00
   max_epochs: 35
   accumulate_grad_batches: 2
+  gradient_clip_val: 1.0

@@ -10,13 +10,19 @@ dependencies = [
     "huggingface-hub>=0.30",
     "jsonargparse>=4.47.0",
     "lazyslide>=0.10.0",
+    "lightning",
     "loguru>=0.7.3",
+    "pandas",
     "pyarrow>=23.0.1",
     "python-dotenv>=1.2.2",
     "pyyaml>=6.0.3",
+    "timm",
     "tiffslide>=3.0.0",
     "torch>=2.11.0",
+    "torchmetrics",
+    "torchvision",
     "transformers>=4.47",
+    "wandb",
 ]
 
 [dependency-groups]

@@ -22,7 +22,7 @@ def main(
     tiles = gpd.read_parquet(tiles_parquet)
     extract_tiles(wsi_path, tiles, output_dir, mpp)
     tile_transcripts(tiles, transcripts_path, output_dir / "transcripts", predicate)
-    process_tiles(tiles, output_dir / "transcripts", output_dir, img_size, kernel_size)
+    process_tiles(tiles, output_dir / "transcripts", output_dir, transcripts_path, img_size, kernel_size)
 
 
 if __name__ == "__main__":

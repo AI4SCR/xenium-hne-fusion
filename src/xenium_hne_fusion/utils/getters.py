@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
+
 
 @dataclass
 class FilterConfig:
@@ -18,9 +20,32 @@ class FilterConfig:
 
 @dataclass
 class DatasetConfig:
+    name: str
     tile_px: int
     stride_px: int
     tile_mpp: float
+    filter: FilterConfig = field(default_factory=FilterConfig)
+
+
+@dataclass(frozen=True)
+class ManagedPaths:
+    data_dir: Path
+    structured_dir: Path
+    processed_dir: Path
+    output_dir: Path
+
+
+@dataclass
+class PipelineConfig:
+    dataset: str
+    name: str
+    tile_px: int
+    stride_px: int
+    tile_mpp: float
+    raw_dir: Path
+    structured_dir: Path
+    processed_dir: Path
+    output_dir: Path
     filter: FilterConfig = field(default_factory=FilterConfig)
 
 
@@ -29,6 +54,7 @@ def load_dataset_config(path: Path) -> DatasetConfig:
     data = yaml.safe_load(path.read_text())
     f = data.get('filter', {}) or {}
     return DatasetConfig(
+        name=data['name'],
         tile_px=data['tile_px'],
         stride_px=data['stride_px'],
         tile_mpp=data['tile_mpp'],
@@ -41,22 +67,49 @@ def load_dataset_config(path: Path) -> DatasetConfig:
     )
 
 
-def get_dataset_paths(dataset: str) -> tuple[Path, Path, Path]:
-    """
-    Resolve (download_dir, raw_dir, processed_dir) for a dataset from env vars.
+def get_dataset_config_path(dataset: str) -> Path:
+    return Path('configs/data') / f'{dataset}.yaml'
 
-    Expected env vars:
-        {DATASET}_DOWNLOAD_DIR
-        {DATASET}_RAW_DIR
-        {DATASET}_PROCESSED_DIR
 
-    where DATASET is the uppercase dataset name, e.g. HEST1K or BEAT.
-    """
+def get_data_dir() -> Path:
+    """Resolve the shared repo-managed data root from $DATA_DIR."""
+    return _require_env_path('DATA_DIR')
+
+
+def get_managed_paths(name: str) -> ManagedPaths:
+    data_dir = get_data_dir()
+    return ManagedPaths(
+        data_dir=data_dir,
+        structured_dir=data_dir / '01_structured' / name,
+        processed_dir=data_dir / '02_processed' / name,
+        output_dir=data_dir / '03_output' / name,
+    )
+
+
+def load_pipeline_config(dataset: str, config_path: Path | None = None) -> PipelineConfig:
+    config_path = config_path or get_dataset_config_path(dataset)
+    cfg = load_dataset_config(config_path)
+    managed = get_managed_paths(cfg.name)
+    raw_dir = _require_env_path(f'{dataset.upper()}_RAW_DIR')
+    return PipelineConfig(
+        dataset=dataset,
+        name=cfg.name,
+        tile_px=cfg.tile_px,
+        stride_px=cfg.stride_px,
+        tile_mpp=cfg.tile_mpp,
+        filter=cfg.filter,
+        raw_dir=raw_dir,
+        structured_dir=managed.structured_dir,
+        processed_dir=managed.processed_dir,
+        output_dir=managed.output_dir,
+    )
+
+
+def resolve_dataset_paths(dataset: str, name: str) -> tuple[Path, Path, Path, Path]:
     key = dataset.upper()
-    download_dir = _require_env(f'{key}_DOWNLOAD_DIR')
-    raw_dir = _require_env(f'{key}_RAW_DIR')
-    processed_dir = _require_env(f'{key}_PROCESSED_DIR')
-    return Path(download_dir), Path(raw_dir), Path(processed_dir)
+    raw_dir = _require_env_path(f'{key}_RAW_DIR')
+    managed = get_managed_paths(name)
+    return raw_dir, managed.structured_dir, managed.processed_dir, managed.output_dir
 
 
 def _require_env(var: str) -> str:
@@ -65,7 +118,11 @@ def _require_env(var: str) -> str:
     return val
 
 
-def resolve_samples(cfg: DatasetConfig, metadata_csv: Path) -> list[str]:
+def _require_env_path(var: str) -> Path:
+    return Path(_require_env(var)).expanduser().resolve()
+
+
+def resolve_samples(cfg: DatasetConfig, metadata_path: Path) -> list[str]:
     """
     Filter metadata CSV by cfg.filter spec.
 
@@ -77,8 +134,12 @@ def resolve_samples(cfg: DatasetConfig, metadata_csv: Path) -> list[str]:
     if cfg.filter.sample_ids is not None:
         return sorted(cfg.filter.sample_ids)
 
-    meta = pd.read_csv(metadata_csv)
-    mask = meta.platform == 'Xenium'
+    meta = normalize_sample_metadata(read_metadata_table(metadata_path))
+    mask = pd.Series(True, index=meta.index)
+
+    platform_col = 'platform' if 'platform' in meta.columns else 'st_technology' if 'st_technology' in meta.columns else None
+    if platform_col is not None:
+        mask &= meta[platform_col] == 'Xenium'
 
     if cfg.filter.species:
         mask &= meta.species == cfg.filter.species
@@ -86,9 +147,10 @@ def resolve_samples(cfg: DatasetConfig, metadata_csv: Path) -> list[str]:
         organs = [cfg.filter.organ] if isinstance(cfg.filter.organ, str) else cfg.filter.organ
         mask &= meta.organ.isin(organs)
     if cfg.filter.disease_type:
-        mask &= meta.disease_type == cfg.filter.disease_type
+        disease_col = 'disease_type' if 'disease_type' in meta.columns else 'disease_state'
+        mask &= meta[disease_col] == cfg.filter.disease_type
 
-    samples = sorted(meta.loc[mask, 'id'].tolist())
+    samples = sorted(meta.loc[mask, 'sample_id'].tolist())
     if not samples:
         raise ValueError(f'No Xenium samples match filter: {cfg.filter}')
     return samples

@@ -11,19 +11,19 @@ from ai4bmr_learn.datasets.items import Items
 
 class TileDataset(Items):
     """
-    Dataset for per-tile H&E image + expression token data.
+    Per-tile H&E image + expression token dataset.
 
-    Each item must have a 'tile_dir' key pointing to:
+    Each item must have a 'tile_dir' key pointing to a directory containing:
         tile.pt                          # uint8 CHW tensor
         expr-kernel_size={k}.parquet     # (n_tokens × n_genes) DataFrame
 
     Args:
-        kernel_size: sub-tile kernel size used when building the expr parquet.
-        panel: gene columns to select (all if None).
+        kernel_size: sub-tile size used when computing expression tokens.
+        panel: gene subset to select from expr columns (all if None).
         include_image: load tile.pt.
         include_expr: load expr parquet.
-        image_transform: applied to uint8 CHW image tensor.
-        expr_transform: applied to float expr tensor (after optional pooling).
+        image_transform: applied to uint8 CHW tensor.
+        expr_transform: applied to float expr tensor after optional pooling.
         expr_pool: 'token' keeps (n_tokens, n_genes); 'tile' avg-pools to (n_genes,).
     """
 
@@ -59,10 +59,11 @@ class TileDataset(Items):
                 modalities['image'] = torch.load(tile_dir / 'tile.pt', weights_only=True)
 
             if self.include_expr:
+
                 expr = pd.read_parquet(tile_dir / f'expr-kernel_size={self.kernel_size}.parquet')
                 if self.panel is not None:
                     expr = expr[self.panel]
-                expr_t = torch.from_numpy(expr.values).float()
+                expr_t = torch.tensor(expr.values, dtype=torch.float32)
                 if self.expr_pool == 'tile':
                     expr_t = expr_t.mean(dim=0)
                 modalities['expr_tokens'] = expr_t

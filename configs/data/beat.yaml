@@ -1,3 +1,4 @@
+name: beat
 tile_px: 512
 stride_px: 256
 tile_mpp: 0.5

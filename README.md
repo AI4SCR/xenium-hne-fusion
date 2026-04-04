@@ -14,7 +14,7 @@ cd xenium-hne-fusion
 uv sync                   # creates .venv and installs all deps
 ```
 
-Machine-specific paths (data drives, scratch dirs) go in `.env`:
+Machine-specific paths (raw dataset roots) go in `.env`:
 
 ```bash
 cp .env.example .env      # edit paths for your machine
@@ -30,42 +30,56 @@ from dotenv import load_dotenv; load_dotenv()
 
 ```
 xenium-hne-fusion/
-├── src/xenium_hne_fusion/          # importable package
-│   ├── utils/
-│   │   ├── getters.py              # config loading, sample filtering
-│   │   └── geometry.py             # coordinate transforms for point geometries
-│   ├── download.py                 # HEST download + raw symlinks
-│   ├── tiling.py                   # tissue detection (GPU) + tiling (CPU)
-│   └── processing.py               # patch extraction + transcript count tensors
-│
-├── scripts/
-│   ├── 0-data-processing/          # data pipeline entry points
-│   ├── 1-transcript-prediction/    # train/eval for transcript prediction task
-│   └── 2-cell-type-prediction/     # train/eval for cell type prediction task
-│
+├── src/xenium_hne_fusion/      # importable package
+├── scripts/data/               # data pipeline entry points
+├── scripts/train/              # training entry points
 ├── tests/
-├── data/                           # not tracked — see layout below
-├── results/                        # not tracked
-└── figures/                        # not tracked
+├── data/                       # not tracked — see layout below
+├── results/                    # not tracked
+└── figures/                    # not tracked
 ```
 
 ## Data layout
 
 ```
 data/
-├── 00_raw/hest1k/<sample_id>/               # raw HEST files (HuggingFace snapshot)
-│   ├── wsis/                                # pyramidal TIFFs
-│   └── transcripts/                         # Xenium transcript parquet
+├── 00_raw/hest1k/                       # raw HEST files (HuggingFace snapshot)
+│   ├── HEST_v1_3_0.csv
+│   ├── wsis/
+│   └── transcripts/
 │
-├── 01_structured/datasets/hest1k/<sample_id>/  # symlinks into 00_raw + derived
-│   ├── wsi.tiff                             # symlink → wsis/<file>.tiff
-│   ├── transcripts.parquet                  # symlink → transcripts/transcripts.parquet
-│   └── tiles/
-│       └── {tile_px}_{stride_px}.parquet    # GeoDataFrame: tile polygons + pixel bbox
+├── 01_structured/hest1k/
+│   ├── metadata.csv                      # raw metadata symlink
+│   └── <sample_id>/                      # canonical per-sample view
+│       ├── wsi.tiff                      # symlink → 00_raw/.../wsis/<file>
+│       ├── transcripts.parquet           # symlink → 00_raw/.../transcripts/<file>
+│       ├── wsi.png                       # sample thumbnail
+│       ├── transcripts.png               # 10k streamed transcript overlay
+│       ├── tissues.parquet
+│       └── tiles/
+│           └── {tile_px}_{stride_px}.parquet
 │
-└── 02_processed/datasets/hest1k/<sample_id>/{tile_px}_{stride_px}/<tile_id>/
-    ├── patch.pt          # uint8 CHW torch tensor  (3 × tile_px × tile_px)
-    └── transcripts.pt    # int32 1-D tensor         (n_genes,) — counts per gene
+├── 02_processed/hest1k/
+│   ├── metadata.parquet                  # cleaned sample-level metadata
+│   └── <sample_id>/{tile_px}_{stride_px}/<tile_id>/
+│       ├── tile.pt
+│       ├── transcripts.parquet
+│       ├── expr-kernel_size=16.parquet
+│       ├── tile.png
+│       ├── transcripts.png
+│       └── transcripts_top5_feats.png
+│
+└── 03_output/hest1k/                     # dataset-scoped derived outputs
+    ├── items/
+    │   └── default.json                 # default item set; add filtered variants here later
+    ├── panels/
+    │   └── default.yaml                 # placeholder source_panel/target_panel YAML
+    ├── splits/
+    │   ├── <split_name>.parquet         # canonical tile-level metadata for training
+    │   └── <split_name>/                # full split set saved via ai4bmr_learn.save_splits
+    ├── cache/
+    ├── logs/
+    └── checkpoints/
 ```
 
 > **HPC note**: at full scale (~65 samples × 10k tiles × 2 tile configs) this produces ~2.6M
@@ -73,82 +87,127 @@ data/
 
 ## Pipeline
 
-The pipeline has four steps, each with a corresponding script and library function.
+The pipeline has six steps. Sample metadata stays sample-level in `01_structured` and
+`02_processed`, while split metadata becomes tile-level under `03_output`.
 
 ### 1 — Download
 
-Download HEST-1k samples matching a filter and create raw symlinks.
+Download HEST-1k samples matching a dataset config and create structured symlinks.
+This also creates:
+- `01_structured/<name>/metadata.csv`
+- `01_structured/<name>/<sample_id>/wsi.png`
+- `01_structured/<name>/<sample_id>/transcripts.png`
 
 ```bash
-uv run scripts/data/download.py --config workflow/config/hest1k.yaml
+uv run scripts/data/download.py --dataset hest1k
 ```
 
 Or interactively:
 
 ```python
-from xenium_hne_fusion.download import download_sample, create_structured_symlinks
+from xenium_hne_fusion.download import (
+    create_structured_symlinks,
+    download_hest_metadata,
+    download_sample,
+)
 from pathlib import Path
 
+download_hest_metadata(Path("data/00_raw/hest1k"))
 download_sample("TENX95", raw_dir=Path("data/00_raw/hest1k"))
 create_structured_symlinks("TENX95",
     raw_dir=Path("data/00_raw/hest1k"),
-    structured_dir=Path("data/01_structured/datasets/hest1k"))
+    structured_dir=Path("data/01_structured/hest1k"))
 ```
 
-### 2 — Tissue detection  *(GPU)*
+### 2 — Metadata cleaning
+
+Convert raw dataset metadata into canonical sample-level parquet:
+
+```bash
+uv run scripts/data/process_metadata.py --dataset hest1k
+```
+
+Output:
+- `data/02_processed/hest1k/metadata.parquet`
+- one row per `sample_id`
+
+### 3 — Tissue detection  *(GPU)*
 
 Segment tissue regions using HESTTissueSegmentation (DeepLabV3 fine-tuned on HEST-1k).
 Model weights are downloaded automatically on first run.
 
 ```bash
 uv run scripts/data/detect_tissues.py \
-    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
-    --output_parquet data/01_structured/datasets/hest1k/TENX95/tissues.parquet
+    --wsi_path data/01_structured/hest1k/TENX95/wsi.tiff \
+    --output_parquet data/01_structured/hest1k/TENX95/tissues.parquet
 ```
 
 Output: GeoDataFrame parquet with `tissue_id` and `geometry` (Shapely Polygons in WSI pixel coords).
 
-### 3 — Tiling  *(CPU)*
+### 4 — Tiling  *(CPU)*
 
 Generate a tile grid over detected tissue regions at a target resolution.
 
 ```bash
 uv run scripts/data/tile.py \
-    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
-    --tissues_parquet data/01_structured/datasets/hest1k/TENX95/tissues.parquet \
-    --output_parquet data/01_structured/datasets/hest1k/TENX95/tiles/256_256.parquet \
+    --wsi_path data/01_structured/hest1k/TENX95/wsi.tiff \
+    --tissues_parquet data/01_structured/hest1k/TENX95/tissues.parquet \
+    --output_parquet data/01_structured/hest1k/TENX95/tiles/256_256.parquet \
     --tile_px 256 --stride_px 256 --mpp 0.5
 ```
 
 Output: GeoDataFrame parquet with `tile_id`, `geometry`, `x_px`, `y_px`, `width_px`, `height_px`.
 
-### 4 — Processing
+### 5 — Processing
 
-Extract patches and per-tile transcript count tensors.
+Extract tile images, tile-level transcript subsets, and patch-token expression tables.
 
 ```bash
 uv run scripts/data/process.py \
-    --wsi_path data/01_structured/datasets/hest1k/TENX95/wsi.tiff \
-    --tiles_parquet data/01_structured/datasets/hest1k/TENX95/tiles/256_256.parquet \
-    --transcripts_path data/01_structured/datasets/hest1k/TENX95/transcripts.parquet \
-    --output_dir data/02_processed/datasets/hest1k/TENX95/256_256 \
+    --wsi_path data/01_structured/hest1k/TENX95/wsi.tiff \
+    --tiles_parquet data/01_structured/hest1k/TENX95/tiles/256_256.parquet \
+    --transcripts_path data/01_structured/hest1k/TENX95/transcripts.parquet \
+    --output_dir data/02_processed/hest1k/TENX95/256_256 \
     --mpp 0.5
 ```
 
-Output per tile: `patch.pt` (uint8 CHW tensor) and `transcripts.pt` (int32 count vector).
+Output per tile: `tile.pt`, `transcripts.parquet`, `expr-kernel_size=<k>.parquet`, and QC PNGs.
+
+### 6 — Items and split metadata
+
+Build item records:
+
+```bash
+uv run scripts/data/create_items.py --dataset hest1k
+```
+
+This also creates the output scaffold:
+- `03_output/<name>/items/default.json`
+- `03_output/<name>/panels/default.yaml`
+
+Then join items with sample-level metadata and cache tile-level splits:
+
+```bash
+uv run scripts/data/create_splits.py --dataset hest1k
+```
+
+The split parquet is tile-level. Its index is item `id`, and each tile row keeps:
+- tile fields such as `sample_id`, `tile_id`, `tile_dir`
+- copied sample-level metadata columns
+- the generated `split` column used by `TileDataset`
+
+`create_splits.py` uses `ai4bmr_learn.data.splits.save_splits`, keeps the full saved fold set under
+`03_output/<name>/splits/<split_name>/`, and copies the canonical `outer=0-inner=0` split to
+`03_output/<name>/splits/<split_name>.parquet` for direct training use.
 
 ## Configuration
 
-Sample filtering is controlled by a YAML config:
+Sample filtering and dataset naming are controlled by a YAML config:
 
 ```yaml
-# workflow/config/hest1k.yaml
-metadata_csv: data/00_raw/hest1k/HEST_v1_3_0.csv
-raw_dir: data/00_raw/hest1k
-structured_dir: data/01_structured/datasets/hest1k
-processed_dir: data/02_processed/datasets/hest1k
-
-tile_sizes: [256, 512]
+name: hest1k
+tile_px: 256
+stride_px: 256
 tile_mpp: 0.5
 
 filter:
@@ -157,6 +216,33 @@ filter:
   disease_type: null    # e.g. "cancer"
   sample_ids: null      # explicit list overrides all filters above
 ```
+
+`.env` provides the machine-specific roots:
+
+```bash
+DATA_DIR=data
+HEST1K_RAW_DIR=data/00_raw/hest1k
+BEAT_RAW_DIR=/path/to/beat/raw
+```
+
+## Training
+
+Training configs stay model-focused. Dataset binding lives under `data.name`, and
+relative paths resolve under `DATA_DIR/03_output/<name>/`.
+
+```yaml
+data:
+  name: hest1k
+  metadata_path: splits/default.parquet  # tile-level split metadata
+  panel_path: default.yaml          # resolves to DATA_DIR/03_output/hest1k/panels/default.yaml
+  cache_dir: cache/cell-types       # resolves to DATA_DIR/03_output/hest1k/cache/cell-types
+```
+
+`metadata_path` should point to the canonical parquet at `03_output/<name>/splits/<split_name>.parquet`.
+`panel_path` is resolved relative to `03_output/<name>/panels/` and should point to a YAML with `source_panel` and `target_panel`.
+
+Split recipes live in `configs/splits/<dataset>.yaml`. They are applied on the tile-level
+table created by joining `items/default.json` with `02_processed/<name>/metadata.parquet` on `sample_id`.
 
 ## Development
 

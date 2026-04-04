@@ -36,13 +36,15 @@ class BackboneConfig:
 
 @dataclass
 class DataConfig:
+    name: str | None = None
     num_workers: int = 10
     batch_size: int = 256
     prefetch_factor: int | None = 4
     expr_pool: Literal['token', 'tile'] = 'token'
+    panel_path: Path | None = None
     source_panel: list[str] | None = None
     target_panel: list[str] | None = None
-    # resolved at runtime
+    # Relative paths resolve under DATA_DIR/03_output/<name>/.
     items_path: Path | None = None
     metadata_path: Path | None = None
     cache_dir: Path | None = None
@@ -109,5 +111,15 @@ def _merge_dataclass(cls, data: dict):
         hint = hints.get(f.name)
         if hint is not None and isinstance(hint, type) and dataclasses.is_dataclass(hint):
             val = _merge_dataclass(hint, val or {})
+        elif hint is not None and _is_path_hint(hint) and val is not None:
+            val = Path(val)
         kwargs[f.name] = val
     return cls(**kwargs)
+
+
+def _is_path_hint(hint: Any) -> bool:
+    import typing
+
+    if hint is Path:
+        return True
+    return Path in typing.get_args(hint)

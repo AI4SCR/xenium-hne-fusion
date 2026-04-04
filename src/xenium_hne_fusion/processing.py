@@ -13,6 +13,15 @@ from loguru import logger
 from shapely.geometry import box
 from wsidata import open_wsi
 
+BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES = (
+    "BLANK_",
+    "NegControlCodeword_",
+    "NegControlProbe_",
+    "UnassignedCodeword_",
+    "DeprecatedCodeword_",
+    "Intergenic_Region_",
+)
+
 
 def extract_tiles(
     wsi_path: Path,
@@ -50,19 +59,60 @@ def extract_tiles(
 
 def filter_transcripts(transcripts: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Remove control-probe transcripts by feature_name prefix."""
-    if isinstance(transcripts.feature_name.iloc[0], bytes):
-        transcripts = transcripts.copy()
-        transcripts["feature_name"] = transcripts.feature_name.str.decode("utf-8")
-    prefixes = (
-        "BLANK_",
-        "NegControlCodeword_",
-        "NegControlProbe_",
-        "UnassignedCodeword_",
-        "DeprecatedCodeword_",
-        "Intergenic_Region_",
-    )
-    mask = transcripts.feature_name.str.startswith(prefixes)
+    transcripts = transcripts.copy()
+    transcripts["feature_name"] = normalize_feature_names(transcripts["feature_name"])
+    mask = transcripts.feature_name.str.startswith(BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES)
     return transcripts[~mask]
+
+
+def normalize_feature_names(feature_names: pd.Series) -> pd.Series:
+    if len(feature_names) == 0:
+        return feature_names
+    if isinstance(feature_names.iloc[0], bytes):
+        return feature_names.str.decode("utf-8")
+    return feature_names
+
+
+def infer_feature_universe(
+    transcripts_path: Path,
+    *,
+    feature_universe_path: Path | None = None,
+    batch_size: int = 1_000_000,
+) -> list[str]:
+    if feature_universe_path is not None and feature_universe_path.exists():
+        return load_feature_universe(feature_universe_path)
+
+    transcripts = pq.ParquetFile(transcripts_path)
+    features: set[str] = set()
+
+    for batch in transcripts.iter_batches(batch_size=batch_size, columns=["feature_name"]):
+        chunk = batch.to_pandas()
+        feature_names = normalize_feature_names(chunk["feature_name"])
+        keep = ~feature_names.str.startswith(BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES)
+        features.update(feature_names.loc[keep].unique().tolist())
+
+    feature_universe = sorted(features)
+    assert feature_universe, f"No biological features found in {transcripts_path}"
+
+    if feature_universe_path is not None:
+        save_feature_universe(feature_universe, feature_universe_path)
+
+    return feature_universe
+
+
+def save_feature_universe(feature_universe: list[str], feature_universe_path: Path) -> None:
+    feature_universe_path.parent.mkdir(parents=True, exist_ok=True)
+    feature_universe_path.write_text("\n".join(feature_universe) + "\n")
+
+
+def load_feature_universe(feature_universe_path: Path) -> list[str]:
+    return [line for line in feature_universe_path.read_text().splitlines() if line]
+
+
+def set_feature_universe(feature_names: pd.Series, feature_universe: list[str]) -> pd.Series:
+    normalized = normalize_feature_names(feature_names)
+    categorical = pd.Categorical(normalized, categories=feature_universe, ordered=False)
+    return pd.Series(categorical, index=feature_names.index, name=feature_names.name)
 
 
 def tile_transcripts(tiles, transcripts_path: Path, save_dir: Path, predicate: str = "within") -> None:
@@ -136,6 +186,7 @@ def process_tiles(
     tiles: gpd.GeoDataFrame,
     transcripts_dir: Path,
     output_dir: Path,
+    raw_transcripts_path: Path,
     img_size: int = 256,
     kernel_size: int = 16,
 ) -> None:
@@ -145,6 +196,11 @@ def process_tiles(
     from ai4bmr_learn.plotting.xenium import visualize_points
 
     token_tiles = make_token_tiles(img_size, kernel_size)
+    feature_universe_path = output_dir.parent / "feature_universe.txt"
+    feature_universe = infer_feature_universe(
+        raw_transcripts_path,
+        feature_universe_path=feature_universe_path,
+    )
     logger.info(f"Processing {len(tiles)} tiles (img_size={img_size}, kernel_size={kernel_size})")
 
     for _, tile in tiles.iterrows():
@@ -157,9 +213,16 @@ def process_tiles(
 
         pts = transform_points(pts, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         pts = pts.drop(columns="index_right", errors="ignore")
+        pts["feature_name"] = set_feature_universe(pts["feature_name"], feature_universe)
         pts.to_parquet(tile_dir / "transcripts.parquet")
 
-        expr = compute_expr_tokens(pts, tiles=token_tiles, group_by="feature_name")
+        expr = compute_expr_tokens(
+            pts,
+            tiles=token_tiles,
+            feature_universe=feature_universe,
+            group_by="feature_name",
+        )
+        expr.columns = expr.columns.astype(str)
         expr.to_parquet(tile_dir / f"expr-kernel_size={kernel_size}.parquet")
 
         img = torch.load(tile_dir / "tile.pt").permute(1, 2, 0).numpy()
@@ -278,6 +341,7 @@ def generate_xenium_subsets(
 def compute_expr_tokens(
     points: gpd.GeoDataFrame,
     tiles: gpd.GeoDataFrame,
+    feature_universe: list[str],
     group_by: str = "feature_name",
     id_col: str = "transcript_id",
 ) -> pd.DataFrame:
@@ -303,8 +367,9 @@ def compute_expr_tokens(
     )
     assert len(subsets) == len(points)
 
-    subsets[group_by] = pd.Categorical(subsets[group_by])
+    subsets[group_by] = pd.Categorical(subsets[group_by], categories=feature_universe, ordered=False)
     tokens = expr_pool(subsets, num_tokens=len(tiles), group_by=group_by)
+    tokens = tokens.reindex(columns=feature_universe, fill_value=0)
     assert not tokens.isna().any().any(), "Expression data contains NaN values after pooling."
     return tokens
 

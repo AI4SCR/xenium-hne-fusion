@@ -141,3 +141,21 @@ def save_transcript_overview(
     fig.savefig(output_path, bbox_inches="tight", pad_inches=0, dpi=dpi)
     plt.close(fig)
     logger.info(f"Transcript overview saved to {output_path}")
+
+
+def save_sample_overview(
+    wsi_path: Path,
+    transcripts_path: Path,
+    output_dir: Path,
+    n: int = 10_000,
+    max_size: int = 2048,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    save_wsi_thumbnail(wsi_path, output_dir / "wsi.png", max_size=max_size)
+    save_transcript_overview(
+        wsi_path,
+        transcripts_path,
+        output_dir / "transcripts.png",
+        n=n,
+        max_size=max_size,
+    )
