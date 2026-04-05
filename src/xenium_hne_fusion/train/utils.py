@@ -23,7 +23,7 @@ def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
 
     output_dir = get_managed_paths(name).output_dir
     panels_dir = output_dir / 'panels'
-    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir, default=output_dir / 'items' / 'default.json')
+    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir, default=output_dir / 'items' / 'all.json')
     cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir)
     cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=panels_dir)
     cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir, default=output_dir / 'cache')

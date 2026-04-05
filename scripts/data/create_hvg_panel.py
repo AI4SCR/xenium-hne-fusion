@@ -1,5 +1,4 @@
 """Generate a tile-level Scanpy HVG panel from fit-split tiles."""
-from __future__ import annotations
 
 from pathlib import Path
 

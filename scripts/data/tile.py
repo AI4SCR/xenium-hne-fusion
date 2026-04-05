@@ -1,5 +1,4 @@
 """Tile tissue regions for a single sample."""
-from __future__ import annotations
 
 from pathlib import Path
 

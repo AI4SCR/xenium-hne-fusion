@@ -1,5 +1,4 @@
 """Clean dataset metadata into a canonical sample-level parquet."""
-from __future__ import annotations
 
 from pathlib import Path
 

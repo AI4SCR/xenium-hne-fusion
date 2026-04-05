@@ -106,7 +106,7 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     processed_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     pd.DataFrame(sample_rows).to_parquet(processed_dir / 'metadata.parquet', index=False)
-    (output_dir / 'items' / 'default.json').write_text(json.dumps(items))
+    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))

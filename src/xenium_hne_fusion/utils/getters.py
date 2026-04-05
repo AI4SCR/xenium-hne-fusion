@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
@@ -47,6 +46,26 @@ class PipelineConfig:
     processed_dir: Path
     output_dir: Path
     filter: FilterConfig = field(default_factory=FilterConfig)
+
+
+@dataclass
+class ItemsFilterConfig:
+    name: str
+    num_transcripts: int | None = None
+    num_unique_transcripts: int | None = None
+    num_cells: int | None = None
+    num_unique_cells: int | None = None
+
+
+def load_items_filter_config(path: Path) -> ItemsFilterConfig:
+    data = yaml.safe_load(path.read_text())
+    return ItemsFilterConfig(
+        name=data['name'],
+        num_transcripts=data.get('num_transcripts'),
+        num_unique_transcripts=data.get('num_unique_transcripts'),
+        num_cells=data.get('num_cells'),
+        num_unique_cells=data.get('num_unique_cells'),
+    )
 
 
 def load_dataset_config(path: Path) -> DatasetConfig:

@@ -44,7 +44,7 @@ def test_create_items_writes_dataset_scoped_output(monkeypatch: pytest.MonkeyPat
     module = _load_create_items_module()
     module.main('hest1k', config_path=config_path, overwrite=True)
 
-    items_path = data_dir / '03_output' / 'hest1k' / 'items' / 'default.json'
+    items_path = data_dir / '03_output' / 'hest1k' / 'items' / 'all.json'
     assert items_path.exists()
     assert (data_dir / '03_output' / 'hest1k' / 'panels' / 'default.yaml').exists()
 

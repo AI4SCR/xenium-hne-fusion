@@ -1,16 +1,15 @@
 """Extract tiles and transcript subsets for a single sample × tile config."""
-from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 import geopandas as gpd
+import pandas as pd
 from jsonargparse import auto_cli
-
 from loguru import logger
 
 from xenium_hne_fusion.processing import (
     extract_tiles,
-    load_feature_universe,
     process_cell_types,
     process_tiles,
     tile_cells,
@@ -27,9 +26,8 @@ def main(
     predicate: str = "within",
     img_size: int = 256,
     kernel_size: int = 16,
-    cells_path: Path | None = None,
+    cells_path: Optional[Path] = None,
     cell_type_col: str = "Level3_grouped",
-    cell_type_universe_path: Path | None = None,
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
     extract_tiles(wsi_path, tiles, output_dir, mpp)
@@ -39,10 +37,11 @@ def main(
     if cells_path is not None and not cells_path.exists():
         logger.warning(f"cells_path not found, skipping cell type processing: {cells_path}")
     elif cells_path is not None:
-        assert cell_type_universe_path is not None and cell_type_universe_path.exists(), (
-            f"--cell_type_universe_path is required when --cells_path is set. Got: {cell_type_universe_path}"
+        cells = pd.read_parquet(cells_path, columns=[cell_type_col])
+        assert hasattr(cells[cell_type_col].dtype, 'categories'), (
+            f"{cell_type_col!r} in {cells_path} must be Categorical"
         )
-        cell_type_universe = load_feature_universe(cell_type_universe_path)
+        cell_type_universe = cells[cell_type_col].cat.categories.tolist()
         tile_cells(tiles, cells_path, output_dir / "cells", predicate)
         process_cell_types(tiles, output_dir / "cells", output_dir, cell_type_universe, cell_type_col, img_size, kernel_size)
 

@@ -1,5 +1,4 @@
 """Generate tile-level split metadata by joining items with sample metadata."""
-from __future__ import annotations
 
 from pathlib import Path
 
@@ -29,7 +28,7 @@ def main(
     split_config_path = split_config_path or Path('configs/splits') / f'{dataset}.yaml'
     split_cfg = load_split_config(split_config_path)
 
-    items_path = items_path or (cfg.output_dir / 'items' / 'default.json')
+    items_path = items_path or (cfg.output_dir / 'items' / 'all.json')
     metadata_path = metadata_path or (cfg.processed_dir / 'metadata.parquet')
     output_path = cfg.output_dir / 'splits' / f'{split_cfg.split_name}.parquet'
 

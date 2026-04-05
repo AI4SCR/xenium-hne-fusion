@@ -1,5 +1,4 @@
 """Structure raw BEAT data into 01_structured canonical layout."""
-from __future__ import annotations
 
 from pathlib import Path
 
@@ -22,7 +21,10 @@ def main(dataset: str = "beat", config_path: Path | None = None) -> None:
     logger.info(f"Found {len(sample_dirs)} samples in {cfg.raw_dir}")
     for sample_dir in sample_dirs:
         sample_id = sample_dir.name
-        wsi_path = sample_dir / "region.tiff"
+        wsi_path = next(
+            (sample_dir / f for f in ("region.tiff", "region.tif") if (sample_dir / f).exists()),
+            sample_dir / "region.tiff",
+        )
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
         structure_sample(sample_id, wsi_path, tx_path, cfg.structured_dir)
 
