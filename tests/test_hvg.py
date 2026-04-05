@@ -141,7 +141,7 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     (output_dir / 'splits').mkdir(parents=True, exist_ok=True)
 
     _write_transcripts_parquet(tile_dir, ['A', 'B'], ['A', 'B', 'B', 'B'])
-    (output_dir / 'items' / 'default.json').write_text(
+    (output_dir / 'items' / 'all.json').write_text(
         json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
     )
     pd.DataFrame(

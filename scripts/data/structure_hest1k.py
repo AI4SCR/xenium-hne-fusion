@@ -1,5 +1,4 @@
 """Download HEST1k samples matching a config filter."""
-from __future__ import annotations
 
 from pathlib import Path
 

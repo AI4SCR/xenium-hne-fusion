@@ -74,14 +74,14 @@ DATA_DIR/03_output/<name>/splits/<split_name>.parquet  # canonical tile-level me
 DATA_DIR/03_output/<name>/splits/<split_name>/         # full split set from save_splits
 ```
 
-The split parquet is built by joining `items/default.json` with sample-level metadata on `sample_id`,
+The split parquet is built by joining `items/all.json` with sample-level metadata on `sample_id`,
 replicating sample annotations onto each tile row, then applying `save_splits(...)`.
 The canonical tile-level split parquet is the metadata file consumed by `TileDataset`.
 
 Dataset outputs reserve:
 
 ```bash
-DATA_DIR/03_output/<name>/items/default.json
+DATA_DIR/03_output/<name>/items/all.json
 DATA_DIR/03_output/<name>/panels/default.yaml
 ```
 

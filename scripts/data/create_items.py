@@ -1,8 +1,7 @@
 """Build items JSON for TileDataset from processed tile data.
 
-Output: DATA_DIR/03_output/<name>/items/default.json
+Output: DATA_DIR/03_output/<name>/items/all.json
 """
-from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -13,7 +12,7 @@ from tqdm import tqdm
 
 from xenium_hne_fusion.utils.getters import load_pipeline_config
 
-DEFAULT_ITEMS_NAME = 'default'
+DEFAULT_ITEMS_NAME = 'all'
 DEFAULT_PANEL_NAME = 'default'
 
 

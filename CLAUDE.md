@@ -35,6 +35,29 @@ uv run pytest            # run tests
 uv run python scripts/my_script.py
 ```
 
+## Running scripts from a git worktree
+
+When working in a git worktree (e.g. `.claude/worktrees/<branch>/`), `uv run` will fail
+if `pyproject.toml` has editable dependencies with relative paths that don't resolve from
+the worktree location (e.g. `ai4bmr-learn @ ../ai4bmr-learn`).
+
+**Fix:** use the main project's venv with the worktree's `src/` on `PYTHONPATH`:
+
+```bash
+# from inside the worktree directory
+PYTHONPATH=<worktree>/src <main_project>/.venv/bin/python scripts/data/my_script.py
+```
+
+Copy `.env` from the main project to the worktree so `load_dotenv()` picks it up:
+
+```bash
+cp <main_project>/.env <worktree>/.env
+```
+
+This pattern applies to any project that uses editable installs with relative paths —
+the installed package in the shared venv will point to the main branch; `PYTHONPATH`
+overrides it with the worktree's modified source.
+
 ## Configuration
 
 Machine-specific paths live in `.env` (not tracked). `uv run` loads it automatically;
@@ -74,14 +97,14 @@ DATA_DIR/03_output/<name>/splits/<split_name>.parquet  # canonical tile-level me
 DATA_DIR/03_output/<name>/splits/<split_name>/         # full split set from save_splits
 ```
 
-The split parquet is built by joining `items/default.json` with sample-level metadata on `sample_id`,
+The split parquet is built by joining `items/all.json` with sample-level metadata on `sample_id`,
 replicating sample annotations onto each tile row, then applying `save_splits(...)`.
 The canonical tile-level split parquet is the metadata file consumed by `TileDataset`.
 
 Dataset outputs reserve:
 
 ```bash
-DATA_DIR/03_output/<name>/items/default.json
+DATA_DIR/03_output/<name>/items/all.json
 DATA_DIR/03_output/<name>/panels/default.yaml
 ```
 

@@ -1,5 +1,4 @@
 """Save WSI thumbnail and transcript overview for quick inspection."""
-from __future__ import annotations
 
 from pathlib import Path
 

@@ -1,5 +1,4 @@
 """Shared utilities for structuring raw samples into 01_structured layout."""
-from __future__ import annotations
 
 from pathlib import Path
 

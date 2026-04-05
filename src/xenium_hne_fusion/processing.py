@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import gc
 from pathlib import Path
@@ -155,7 +154,7 @@ def tile_transcripts(tiles, transcripts_path: Path, save_dir: Path, predicate: s
         gc.collect()
 
 
-def get_patchified_transcripts(tile_id: int, transcripts_dir: Path) -> gpd.GeoDataFrame | None:
+def get_tiled_transcripts(tile_id: int, transcripts_dir: Path) -> gpd.GeoDataFrame | None:
     """
     Load transcripts for a single tile from the hive-partitioned dataset.
 
@@ -163,6 +162,20 @@ def get_patchified_transcripts(tile_id: int, transcripts_dir: Path) -> gpd.GeoDa
     Reconstructs geometry from WKB so the result is a proper GeoDataFrame.
     """
     tile_dir = transcripts_dir / f"tile_id={tile_id}"
+    if not tile_dir.exists():
+        return None
+
+    df = pd.read_parquet(tile_dir)
+    return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
+
+
+def get_tiled_cells(tile_id: int, cells_dir: Path) -> gpd.GeoDataFrame | None:
+    """Load cells for a single tile from the hive-partitioned dataset.
+
+    Returns None if the tile has no cells.
+    Reconstructs geometry from WKB so the result is a proper GeoDataFrame.
+    """
+    tile_dir = cells_dir / f"tile_id={tile_id}"
     if not tile_dir.exists():
         return None
 
@@ -207,7 +220,7 @@ def process_tiles(
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        pts = get_patchified_transcripts(tile_id, transcripts_dir)
+        pts = get_tiled_transcripts(tile_id, transcripts_dir)
         if pts is None:
             continue  # no transcripts in this tile
 
@@ -238,6 +251,67 @@ def process_tiles(
         imsave(tile_dir / "transcripts_top5_feats.png", viz)
 
     logger.info("Tile processing done")
+
+
+def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, save_dir: Path, predicate: str = "within") -> None:
+    """Spatially join cells with tiles and write a hive-partitioned dataset by tile_id.
+
+    Mirrors tile_transcripts() but for cell centroids. No chunking needed (cell counts << transcripts).
+    """
+    cells = gpd.read_parquet(cells_path)
+    logger.info(f"Tiling cells (num_tiles={len(tiles)}, num_cells={len(cells)})...")
+    joined = gpd.sjoin(cells, tiles, how="inner", predicate=predicate)
+    joined = joined.drop(columns=["index_right"]).to_arrow()
+    ds.write_dataset(
+        data=joined,
+        base_dir=str(save_dir),
+        format="parquet",
+        partitioning=["tile_id"],
+        partitioning_flavor="hive",
+        existing_data_behavior="overwrite_or_ignore",
+    )
+
+
+def process_cell_types(
+    tiles: gpd.GeoDataFrame,
+    cells_dir: Path,
+    output_dir: Path,
+    cell_type_universe: list[str],
+    cell_type_col: str = "Level3_grouped",
+    img_size: int = 256,
+    kernel_size: int = 16,
+) -> None:
+    """Compute per-tile cell type token counts and save as cell_types-kernel_size={k}.parquet.
+
+    Mirrors process_tiles() but aggregates cell type labels instead of gene expression.
+    Output shape: (n_tokens × len(cell_type_universe)).
+    """
+    token_tiles = make_token_tiles(img_size, kernel_size)
+    logger.info(f"Processing cell types for {len(tiles)} tiles (img_size={img_size}, kernel_size={kernel_size})")
+
+    for _, tile in tiles.iterrows():
+        tile_id = tile.tile_id
+        tile_dir = output_dir / str(tile_id)
+
+        cells = get_tiled_cells(tile_id, cells_dir)
+        if cells is None:
+            continue
+
+        cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
+        cells = cells.drop(columns="index_right", errors="ignore")
+        cells[cell_type_col] = pd.Categorical(cells[cell_type_col], categories=cell_type_universe)
+
+        expr = compute_expr_tokens(
+            cells,
+            tiles=token_tiles,
+            feature_universe=cell_type_universe,
+            group_by=cell_type_col,
+            id_col="original_cell_id",
+        )
+        expr.columns = expr.columns.astype(str)
+        expr.to_parquet(tile_dir / f"cell_types-kernel_size={kernel_size}.parquet")
+
+    logger.info("Cell type processing done")
 
 
 def transform_points(
