@@ -36,6 +36,7 @@ class TileDataset(Items):
                  image_transform: Callable | None = None,
                  expr_transform: Callable | None = None,
                  expr_pool: Literal['token', 'tile'] = 'token',
+                 cell_types_kernel_size: int | None = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.kernel_size = kernel_size
@@ -46,6 +47,7 @@ class TileDataset(Items):
         self.image_transform = image_transform
         self.expr_transform = expr_transform
         self.expr_pool = expr_pool
+        self.cell_types_kernel_size = cell_types_kernel_size
 
     def __getitem__(self, idx) -> dict:
         item = deepcopy(self.items[idx])
@@ -73,6 +75,10 @@ class TileDataset(Items):
             if self.target_panel is not None:
                 target_t = torch.tensor(expr_raw[self.target_panel].values, dtype=torch.float32)
                 item['target'] = target_t.mean(dim=0)  # avg-pool to (n_target_genes,)
+
+            if self.cell_types_kernel_size is not None:
+                ct = pd.read_parquet(tile_dir / f'cell_types-kernel_size={self.cell_types_kernel_size}.parquet')
+                item['target'] = torch.tensor(ct.values, dtype=torch.float32).mean(dim=0)
 
             item['modalities'] = modalities
 
