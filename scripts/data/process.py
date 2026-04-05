@@ -6,6 +6,8 @@ from pathlib import Path
 import geopandas as gpd
 from jsonargparse import auto_cli
 
+from loguru import logger
+
 from xenium_hne_fusion.processing import (
     extract_tiles,
     load_feature_universe,
@@ -34,7 +36,9 @@ def main(
     tile_transcripts(tiles, transcripts_path, output_dir / "transcripts", predicate)
     process_tiles(tiles, output_dir / "transcripts", output_dir, transcripts_path, img_size, kernel_size)
 
-    if cells_path is not None:
+    if cells_path is not None and not cells_path.exists():
+        logger.warning(f"cells_path not found, skipping cell type processing: {cells_path}")
+    elif cells_path is not None:
         assert cell_type_universe_path is not None and cell_type_universe_path.exists(), (
             f"--cell_type_universe_path is required when --cells_path is set. Got: {cell_type_universe_path}"
         )
