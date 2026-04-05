@@ -14,8 +14,9 @@ def main(
     tile_px: int = 256,
     stride_px: int = 256,
     mpp: float = 0.5,
+    slide_mpp: float | None = None,
 ) -> None:
-    tile_tissues(wsi_path, tissues_parquet, tile_px, stride_px, mpp, output_parquet)
+    tile_tissues(wsi_path, tissues_parquet, tile_px, stride_px, mpp, output_parquet, slide_mpp=slide_mpp)
 
 
 if __name__ == "__main__":

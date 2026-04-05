@@ -27,6 +27,7 @@ def extract_tiles(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
     mpp: float,
+    native_mpp: float | None = None,
 ) -> None:
     """
     Crop and save a tile.pt for each tile.
@@ -37,8 +38,9 @@ def extract_tiles(
     from PIL import Image
 
     wsi = open_wsi(wsi_path)
-    native_mpp = wsi.properties.mpp
+    native_mpp = native_mpp if native_mpp is not None else wsi.properties.mpp
     assert native_mpp is not None, "WSI has no mpp metadata"
+    native_mpp = float(native_mpp)
 
     logger.info(f"Extracting {len(tiles)} tiles (native mpp={native_mpp:.4f}, target mpp={mpp})")
     for _, tile in tiles.iterrows():

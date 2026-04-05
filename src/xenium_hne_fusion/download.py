@@ -52,13 +52,10 @@ def validate_hest_sample_mpp(
     metadata_path: Path,
     rel_tol: float = 0.10,
 ) -> None:
-    metadata = normalize_sample_metadata(read_metadata_table(metadata_path))
-    rows = metadata.loc[metadata["sample_id"] == sample_id]
-    if len(rows) != 1:
-        logger.warning(f"HEST MPP validation skipped for {sample_id}: expected 1 metadata row, found {len(rows)}")
+    row = get_hest_metadata_row(sample_id, metadata_path)
+    if row is None:
+        logger.warning(f"HEST MPP validation skipped for {sample_id}: expected 1 metadata row, found 0")
         return
-
-    row = rows.iloc[0]
     expected = row.get("pixel_size_um_embedded")
     estimated = row.get("pixel_size_um_estimated")
     if pd.isna(expected):
@@ -92,6 +89,23 @@ def validate_hest_sample_mpp(
             f"wsi_mpp={native_mpp:.6f}, pixel_size_um_embedded={expected:.6f}, "
             f"pixel_size_um_estimated={estimated_msg}, relative_error={relative_error:.1%}"
         )
+
+
+def get_hest_metadata_row(sample_id: str, metadata_path: Path) -> pd.Series | None:
+    metadata = normalize_sample_metadata(read_metadata_table(metadata_path))
+    rows = metadata.loc[metadata["sample_id"] == sample_id]
+    assert len(rows) <= 1, f"Expected at most 1 metadata row for {sample_id}, found {len(rows)}"
+    if len(rows) == 0:
+        return None
+    return rows.iloc[0]
+
+
+def get_hest_sample_mpp(sample_id: str, metadata_path: Path) -> float:
+    row = get_hest_metadata_row(sample_id, metadata_path)
+    assert row is not None, f"HEST metadata row not found for {sample_id}"
+    mpp = row.get("pixel_size_um_embedded")
+    assert not pd.isna(mpp), f"pixel_size_um_embedded missing for {sample_id}"
+    return float(mpp)
 
 
 def create_structured_symlinks(sample_id: str, raw_dir: Path, structured_dir: Path) -> None:

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -10,6 +11,7 @@ from shapely.geometry import Point
 from xenium_hne_fusion.processing import (
     compute_expr_tokens,
     expr_pool,
+    extract_tiles,
     infer_feature_universe,
     make_token_tiles,
     set_feature_universe,
@@ -119,3 +121,29 @@ def test_processed_sample_expr_columns_match_feature_universe_smoke():
     stored = pd.read_parquet(transcript_path)
     assert isinstance(stored["feature_name"].dtype, pd.CategoricalDtype)
     assert stored["feature_name"].cat.categories.tolist() == feature_universe
+
+
+def test_extract_tiles_uses_native_mpp_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    class FakeReader:
+        def get_region(self, x, y, w, h, level=0):
+            return np.zeros((h, w, 3), dtype=np.uint8)
+
+    class FakeProperties:
+        mpp = None
+
+    class FakeWsi:
+        reader = FakeReader()
+        properties = FakeProperties()
+
+    monkeypatch.setattr('xenium_hne_fusion.processing.open_wsi', lambda _: FakeWsi())
+
+    tiles = gpd.GeoDataFrame(
+        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
+        geometry=[Point(0, 0)],
+    )
+    output_dir = tmp_path / 'processed'
+
+    extract_tiles(tmp_path / 'wsi.tiff', tiles, output_dir, mpp=0.5, native_mpp=0.25)
+
+    tensor = __import__('torch').load(output_dir / '0' / 'tile.pt', weights_only=True)
+    assert tuple(tensor.shape) == (3, 50, 50)

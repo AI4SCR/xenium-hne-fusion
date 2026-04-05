@@ -23,6 +23,7 @@ def main(
     transcripts_path: Path,
     output_dir: Path,
     mpp: float = 0.5,
+    native_mpp: Optional[float] = None,
     predicate: str = "within",
     img_size: int = 256,
     kernel_size: int = 16,
@@ -30,7 +31,7 @@ def main(
     cell_type_col: str = "Level3_grouped",
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
-    extract_tiles(wsi_path, tiles, output_dir, mpp)
+    extract_tiles(wsi_path, tiles, output_dir, mpp, native_mpp=native_mpp)
     tile_transcripts(tiles, transcripts_path, output_dir / "transcripts", predicate)
     process_tiles(tiles, output_dir / "transcripts", output_dir, transcripts_path, img_size, kernel_size)
 

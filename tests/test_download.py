@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from xenium_hne_fusion.download import create_structured_symlinks, validate_hest_sample_mpp
+from xenium_hne_fusion.download import create_structured_symlinks, get_hest_sample_mpp, validate_hest_sample_mpp
 
 
 def _load_script(path: str, module_name: str):
@@ -165,6 +165,21 @@ def test_validate_hest_sample_mpp_warns_when_metadata_row_missing(monkeypatch: p
 
     assert len(warnings) == 1
     assert 'expected 1 metadata row, found 0' in warnings[0]
+
+
+def test_get_hest_sample_mpp_reads_embedded_value(tmp_path: Path):
+    metadata_path = tmp_path / 'HEST_v1_3_0.csv'
+    pd.DataFrame(
+        [
+            {
+                'id': 'NCBI783',
+                'pixel_size_um_embedded': 0.27398,
+                'pixel_size_um_estimated': 0.27396,
+            }
+        ]
+    ).to_csv(metadata_path, index=False)
+
+    assert get_hest_sample_mpp('NCBI783', metadata_path) == pytest.approx(0.27398)
 
 
 def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

@@ -32,6 +32,7 @@ def tile_tissues(
     stride_px: int,
     mpp: float,
     output_parquet: Path,
+    slide_mpp: float | None = None,
 ) -> None:
     """
     Generate a tile grid over detected tissue regions.
@@ -40,10 +41,12 @@ def tile_tissues(
         tile_id, tissue_id, geometry (WSI pixel coords),
         x_px, y_px, width_px, height_px
     """
-    logger.info(f"Tiling {wsi_path.name} — tile_px={tile_px}, stride_px={stride_px}, mpp={mpp}")
+    logger.info(
+        f"Tiling {wsi_path.name} — tile_px={tile_px}, stride_px={stride_px}, mpp={mpp}, slide_mpp={slide_mpp}"
+    )
     wsi = open_wsi(wsi_path)
     wsi["tissues"] = ShapesModel.parse(gpd.read_parquet(tissues_parquet))
-    zs.pp.tile_tissues(wsi, tile_px=tile_px, stride_px=stride_px, mpp=mpp)
+    zs.pp.tile_tissues(wsi, tile_px=tile_px, stride_px=stride_px, mpp=mpp, slide_mpp=slide_mpp)
 
     tiles: gpd.GeoDataFrame = wsi["tiles"].copy()
     bounds = tiles.geometry.bounds  # minx, miny, maxx, maxy
