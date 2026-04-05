@@ -71,7 +71,7 @@ data/
 │
 └── 03_output/hest1k/                     # dataset-scoped derived outputs
     ├── items/
-    │   └── default.json                 # default item set; add filtered variants here later
+    │   └── all.json                     # full item set (all complete tiles)
     ├── panels/
     │   └── default.yaml                 # placeholder source_panel/target_panel YAML
     ├── splits/
@@ -182,7 +182,7 @@ uv run scripts/data/create_items.py --dataset hest1k
 ```
 
 This also creates the output scaffold:
-- `03_output/<name>/items/default.json`
+- `03_output/<name>/items/all.json`
 - `03_output/<name>/panels/default.yaml`
 
 Then join items with sample-level metadata and cache tile-level splits:
@@ -242,7 +242,7 @@ data:
 `panel_path` is resolved relative to `03_output/<name>/panels/` and should point to a YAML with `source_panel` and `target_panel`.
 
 Split recipes live in `configs/splits/<dataset>.yaml`. They are applied on the tile-level
-table created by joining `items/default.json` with `02_processed/<name>/metadata.parquet` on `sample_id`.
+table created by joining `items/all.json` with `02_processed/<name>/metadata.parquet` on `sample_id`.
 
 ## Development
 
