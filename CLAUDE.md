@@ -113,6 +113,18 @@ You are an expert coding assistant for research code in computer vision, followi
 - **No over-engineering**: this is iterative research code. No extensive error handling, no speculative abstractions, no backwards-compat shims.
 - **No trailing summaries**: do not summarize what was just done at the end of a response.
 
+## Preferred tools
+
+Usually prefer these libraries in this project when they fit the task:
+
+- `loguru` for logging
+- `jsonargparse` for script CLIs and config-driven entrypoints
+- `pathlib` for path handling
+- `torch` for modeling and tensor code
+- `lightning` for training loops and experiment orchestration
+
+Prefer storing tabular data as parquet unless there is a clear reason to use another format.
+
 ## Review style
 
 - Provide comprehensive, direct code reviews.

@@ -13,6 +13,7 @@ from xenium_hne_fusion.download import (
     create_structured_symlinks,
     download_hest_metadata,
     download_sample,
+    validate_hest_sample_mpp,
 )
 from xenium_hne_fusion.utils.getters import load_pipeline_config, resolve_samples
 
@@ -24,6 +25,7 @@ def main(dataset: str, config_path: Path | None = None) -> None:
     samples = resolve_samples(cfg, metadata_csv)
     for sample_id in samples:
         download_sample(sample_id, cfg.raw_dir)
+        validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_csv)
         create_structured_symlinks(sample_id, cfg.raw_dir, cfg.structured_dir)
 
 

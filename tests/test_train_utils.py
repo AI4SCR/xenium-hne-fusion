@@ -60,12 +60,14 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
 ):
     monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
 
-    for path in Path('configs/train').glob('*.yaml'):
+    for path in Path('configs/train').rglob('*.yaml'):
         cfg = Config.from_yaml(path)
+        assert cfg.task is not None
         assert cfg.data.name is not None
         assert isinstance(cfg.data.metadata_path, Path)
         assert isinstance(cfg.data.panel_path, Path)
         assert cfg.head.num_hidden_layers == 0
+        assert cfg.lit.target_key is not None
         assert cfg.wandb.project == 'debug'
         assert cfg.trainer.max_time == '00:01:45:00'
         assert cfg.trainer.max_epochs == 35

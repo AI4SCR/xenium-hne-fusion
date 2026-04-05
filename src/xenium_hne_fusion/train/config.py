@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 @dataclass
 class HeadConfig:
+    output_dim: int | None = None
     hidden_dim: int = 32
     num_hidden_layers: int = 0
     dropout: float = 0.1
@@ -52,7 +53,7 @@ class DataConfig:
 
 @dataclass
 class LitConfig:
-    target_key: str = 'target'
+    target_key: str | None = None
     lr_head: float = 1e-4
     lr_backbone: float = 1e-5
     weight_decay: float = 1e-3
@@ -83,6 +84,7 @@ class WandbConfig:
 
 @dataclass
 class Config:
+    task: Literal['gene_prediction', 'cell_type_prediction'] | None = None
     debug: bool = False
     head: HeadConfig = field(default_factory=HeadConfig)
     backbone: BackboneConfig = field(default_factory=BackboneConfig)

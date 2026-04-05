@@ -90,3 +90,9 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
     cfg = load_dataset_config(config_path)
 
     assert resolve_samples(cfg, metadata_path) == ['TENX95']
+
+
+def test_repo_hest_config_pins_three_sample_ids():
+    cfg = load_dataset_config(Path('configs/data/hest1k.yaml'))
+
+    assert cfg.filter.sample_ids == ['NCBI783', 'NCBI856', 'TENX116']

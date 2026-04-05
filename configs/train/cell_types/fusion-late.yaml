@@ -1,4 +1,7 @@
+task: cell_type_prediction
+
 head:
+  output_dim: 39
   num_hidden_layers: 0
 
 backbone:
@@ -16,13 +19,14 @@ backbone:
   expr_token_pool: avg
 
 data:
-  name: hest1k
+  name: beat
   batch_size: 256
   expr_pool: token
   metadata_path: splits/default.parquet
   panel_path: default.yaml
 
 lit:
+  target_key: metadata.cell_type_target
   lr_head: 1.0e-4
   lr_backbone: 1.0e-5
 
