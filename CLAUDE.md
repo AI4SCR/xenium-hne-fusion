@@ -35,6 +35,13 @@ uv run pytest            # run tests
 uv run python scripts/my_script.py
 ```
 
+### Local dependency and search scope
+
+- The editable `ai4bmr-learn` dependency lives at `/Users/adrianomartinelli/projects/ai4bmr-learn`.
+- When worktree-relative dependency resolution breaks, inspect that path directly instead of searching broadly.
+- Never search `/Users/adrianomartinelli/`.
+- Restrict searches to the current workspace or to an explicit, known dependency path that is directly relevant to the task.
+
 ## Running scripts from a git worktree
 
 When working in a git worktree (e.g. `.claude/worktrees/<branch>/`), `uv run` will fail
