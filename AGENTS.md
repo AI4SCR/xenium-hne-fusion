@@ -27,6 +27,14 @@ xenium-hne-fusion/
 
 Managed with [uv](https://github.com/astral-sh/uv).
 
+### Bash tool PATH
+The Bash tool runs with a minimal `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`). Homebrew tools
+(e.g. `gh`, `jq`) are not on this path — call them by their full path:
+
+```bash
+/opt/homebrew/bin/gh pr create ...
+```
+
 ```bash
 uv sync                  # install all deps incl. dev
 uv add <pkg>             # add a runtime dependency

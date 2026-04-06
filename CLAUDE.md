@@ -55,6 +55,13 @@ ln -s <main_project>/.env <worktree>/.env
 ln -s <main_project>/data <worktree>/data
 ```
 
+The Bash tool runs with a minimal `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`). Homebrew tools
+(e.g. `gh`, `jq`) are not on this path — call them by their full path:
+
+```bash
+/opt/homebrew/bin/gh pr create ...
+```
+
 This pattern applies to any project that uses editable installs with relative paths —
 the installed package in the shared venv will point to the main branch; `PYTHONPATH`
 overrides it with the worktree's modified source.
