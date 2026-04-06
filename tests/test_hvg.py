@@ -171,11 +171,12 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr('scanpy.pp.highly_variable_genes', fake_hvg)
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
     module = _load_script('scripts/data/create_hvg_panel.py', 'create_hvg_panel_script')
     module.main('hest1k', recipe_path=recipe_path, config_path=config_path, overwrite=True)
 
-    panel_path = output_dir / 'panels' / 'hvg-default.yaml'
+    panel_path = tmp_path / 'panels' / 'hest1k' / 'hvg-default.yaml'
     assert panel_path.exists()
     panel = __import__('yaml').safe_load(panel_path.read_text())
     assert panel['source_panel'] == ['A']

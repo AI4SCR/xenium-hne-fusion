@@ -31,6 +31,7 @@ from dotenv import load_dotenv; load_dotenv()
 ```
 xenium-hne-fusion/
 ├── src/xenium_hne_fusion/      # importable package
+├── panels/                     # generated panel artifacts
 ├── scripts/data/               # data pipeline entry points
 ├── scripts/train/              # training entry points
 ├── tests/
@@ -72,8 +73,6 @@ data/
 └── 03_output/hest1k/                     # dataset-scoped derived outputs
     ├── items/
     │   └── all.json                     # full item set (all complete tiles)
-    ├── panels/
-    │   └── default.yaml                 # placeholder source_panel/target_panel YAML
     ├── splits/
     │   ├── <split_name>.parquet         # canonical tile-level metadata for training
     │   └── <split_name>/                # full split set saved via ai4bmr_learn.save_splits
@@ -181,9 +180,8 @@ Build item records:
 uv run scripts/data/create_items.py --dataset hest1k
 ```
 
-This also creates the output scaffold:
+This creates:
 - `03_output/<name>/items/all.json`
-- `03_output/<name>/panels/default.yaml`
 
 Then join items with sample-level metadata and cache tile-level splits:
 
@@ -228,18 +226,20 @@ BEAT_RAW_DIR=/path/to/beat/raw
 ## Training
 
 Training configs stay model-focused. Dataset binding lives under `data.name`, and
-relative paths resolve under `DATA_DIR/03_output/<name>/`.
+relative paths resolve under `DATA_DIR/03_output/<name>/` except for panel artifacts, which live under the repo root `panels/<name>/`.
 
 ```yaml
 data:
   name: hest1k
   metadata_path: splits/default.parquet  # tile-level split metadata
-  panel_path: default.yaml          # resolves to DATA_DIR/03_output/hest1k/panels/default.yaml
+  panel_path: default.yaml          # resolves to panels/hest1k/default.yaml
   cache_dir: cache/cell-types       # resolves to DATA_DIR/03_output/hest1k/cache/cell-types
 ```
 
 `metadata_path` should point to the canonical parquet at `03_output/<name>/splits/<split_name>.parquet`.
-`panel_path` is resolved relative to `03_output/<name>/panels/` and should point to a YAML with `source_panel` and `target_panel`.
+`panel_path` is resolved relative to `panels/<name>/` and should point to a YAML with `source_panel` and `target_panel`.
+
+Panel-generation recipes live in `configs/panels/<dataset>/<name>.yaml`.
 
 Split recipes live in `configs/splits/<dataset>.yaml`. They are applied on the tile-level
 table created by joining `items/all.json` with `02_processed/<name>/metadata.parquet` on `sample_id`.

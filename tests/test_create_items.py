@@ -46,7 +46,7 @@ def test_create_items_writes_dataset_scoped_output(monkeypatch: pytest.MonkeyPat
 
     items_path = data_dir / '03_output' / 'hest1k' / 'items' / 'all.json'
     assert items_path.exists()
-    assert (data_dir / '03_output' / 'hest1k' / 'panels' / 'default.yaml').exists()
+    assert not (data_dir / '03_output' / 'hest1k' / 'panels').exists()
 
     items = json.loads(items_path.read_text())
     assert items == [

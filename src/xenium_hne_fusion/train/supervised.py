@@ -69,7 +69,7 @@ def validate_task_config(cfg: Config) -> None:
 
     if cfg.task.target == "cell_types":
         assert cfg.head.output_dim is not None, "cfg.head.output_dim"
-        assert cfg.lit.target_key != "target", "cfg.lit.target_key"
+        assert cfg.lit.target_key == "target", "cfg.lit.target_key"
         return
 
     raise ValueError(f"Unknown task target: {cfg.task.target}")

@@ -4,12 +4,14 @@ import pytest
 
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.utils import resolve_training_paths
+from xenium_hne_fusion.utils.getters import get_panels_dir
 
 
 def test_resolve_training_paths_defaults_to_dataset_output_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     data_dir = tmp_path / 'data'
     metadata_path = tmp_path / 'metadata.parquet'
     monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
     cfg = Config()
     cfg.data.name = 'hest1k'
@@ -29,6 +31,7 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
 ):
     data_dir = tmp_path / 'data'
     monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
     cfg = Config()
     cfg.data.name = 'beat'
@@ -41,7 +44,7 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
 
     assert cfg.data.items_path == output_dir / 'items/train.json'
     assert cfg.data.metadata_path == output_dir / 'metadata/tiles.parquet'
-    assert cfg.data.panel_path == output_dir / 'panels/default.yaml'
+    assert cfg.data.panel_path == get_panels_dir('beat') / 'default.yaml'
     assert cfg.data.cache_dir == output_dir / 'cache/run-a'
 
 
