@@ -13,7 +13,6 @@ from tqdm import tqdm
 from xenium_hne_fusion.utils.getters import load_pipeline_config
 
 DEFAULT_ITEMS_NAME = 'all'
-DEFAULT_PANEL_NAME = 'default'
 
 
 def _tile_item(tile_dir: Path, sample_id: str, tile_id: int) -> dict | None:
@@ -79,16 +78,7 @@ def main(dataset: str, config_path: Path | None = None, overwrite: bool = False)
 
 def _ensure_output_scaffold(output_dir: Path) -> None:
     items_dir = output_dir / 'items'
-    panels_dir = output_dir / 'panels'
     items_dir.mkdir(parents=True, exist_ok=True)
-    panels_dir.mkdir(parents=True, exist_ok=True)
-
-    default_panel_path = panels_dir / f'{DEFAULT_PANEL_NAME}.yaml'
-    if not default_panel_path.exists():
-        default_panel_path.write_text(
-            'source_panel: []\n'
-            'target_panel: []\n'
-        )
 
 
 if __name__ == '__main__':

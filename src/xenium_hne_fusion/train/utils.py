@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from xenium_hne_fusion.train.config import Config
-from xenium_hne_fusion.utils.getters import get_managed_paths
+from xenium_hne_fusion.utils.getters import get_managed_paths, get_panels_dir
 
 
 def set_fast_dev_run_settings(cfg: Config) -> Config:
@@ -22,7 +22,7 @@ def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
     assert name is not None, 'cfg.data.name must be set'
 
     output_dir = get_managed_paths(name).output_dir
-    panels_dir = output_dir / 'panels'
+    panels_dir = get_panels_dir(name)
     cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir, default=output_dir / 'items' / 'all.json')
     cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir)
     cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=panels_dir)

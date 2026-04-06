@@ -9,6 +9,16 @@ import yaml
 from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
 
 
+def get_repo_root() -> Path:
+    env_root = os.environ.get('XHF_REPO_ROOT')
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+
+    root = Path(__file__).resolve().parents[3]
+    assert (root / 'pyproject.toml').exists(), f'Could not resolve repo root from {__file__}'
+    return root
+
+
 @dataclass
 class FilterConfig:
     organ: str | list[str] | None = None
@@ -105,6 +115,10 @@ def get_managed_paths(name: str) -> ManagedPaths:
         processed_dir=data_dir / '02_processed' / name,
         output_dir=data_dir / '03_output' / name,
     )
+
+
+def get_panels_dir(name: str) -> Path:
+    return get_repo_root() / 'panels' / name
 
 
 def load_pipeline_config(dataset: str, config_path: Path | None = None) -> PipelineConfig:

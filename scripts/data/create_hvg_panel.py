@@ -10,7 +10,7 @@ load_dotenv()
 
 from xenium_hne_fusion.hvg import create_hvg_panel, load_hvg_recipe
 from xenium_hne_fusion.metadata import get_default_split_path, load_split_config
-from xenium_hne_fusion.utils.getters import load_pipeline_config
+from xenium_hne_fusion.utils.getters import get_panels_dir, load_pipeline_config
 
 
 def main(
@@ -20,14 +20,14 @@ def main(
     overwrite: bool = False,
 ) -> None:
     cfg = load_pipeline_config(dataset, config_path)
-    recipe_path = recipe_path or (Path('configs/panel_recipes') / dataset / 'default.yaml')
+    recipe_path = recipe_path or (Path('configs/panels') / dataset / 'default.yaml')
     recipe = load_hvg_recipe(recipe_path)
     split_cfg = load_split_config(Path('configs/splits') / f'{dataset}.yaml')
 
     items_path = cfg.output_dir / 'items' / f'{recipe.items_name}.json'
     split_dir = cfg.output_dir / 'splits' / recipe.split_name
     split_metadata_path = get_default_split_path(split_dir, split_cfg)
-    output_path = cfg.output_dir / 'panels' / f'{recipe.panel_name}.yaml'
+    output_path = get_panels_dir(cfg.name) / f'{recipe.panel_name}.yaml'
 
     if output_path.exists() and not overwrite:
         logger.info(f'HVG panel already exists: {output_path}')

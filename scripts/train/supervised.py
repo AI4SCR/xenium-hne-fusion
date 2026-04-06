@@ -11,7 +11,7 @@ assert load_dotenv(override=True)
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
 # fast_dev_run = debug = True
-# cfg = Config.from_yaml(Path("configs/train/gene_prediction/fusion-early.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/hest1k/expression.yaml"))
 # train(cfg, debug=debug)
 
 

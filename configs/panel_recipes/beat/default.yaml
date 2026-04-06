@@ -1,5 +1,0 @@
-panel_name: hvg-default
-items_name: default
-split_name: default
-n_top_genes: 128
-flavor: seurat_v3

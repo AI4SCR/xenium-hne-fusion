@@ -92,7 +92,7 @@ BEAT_RAW_DIR=
 ```
 
 Dataset-invariant settings (dataset `name`, tile size, sample filter) live in `configs/data/<dataset>.yaml`.
-Model architecture and training hyperparams live in `configs/train/<variant>.yaml`.
+Model architecture and training hyperparams live in `configs/train/<dataset>/<task>.yaml`.
 Never hardcode paths in versioned YAMLs.
 
 Managed paths are always derived as:
@@ -120,10 +120,10 @@ Dataset outputs reserve:
 
 ```bash
 DATA_DIR/03_output/<name>/items/all.json
-DATA_DIR/03_output/<name>/panels/default.yaml
+panels/<name>/default.yaml
 ```
 
-The `items/` folder is for multiple item-set variants. The `panels/` folder stores YAML files with
+The `items/` folder is for multiple item-set variants. The root-level `panels/` folder stores YAML files with
 `source_panel` and `target_panel` keys.
 
 Download-time structured sample artifacts also include:
@@ -137,8 +137,8 @@ Use the streamed transcript overlay path in `tiling.py`; never load the full raw
 just to render `transcripts.png`.
 
 Training configs use `data.name` to bind to a dataset output root. Relative
-`items_path`, `metadata_path`, `panel_path`, and `cache_dir` resolve under `DATA_DIR/03_output/<name>/`.
-`panel_path` is resolved under `DATA_DIR/03_output/<name>/panels/` and points to a YAML with `source_panel` and `target_panel`.
+`items_path`, `metadata_path`, and `cache_dir` resolve under `DATA_DIR/03_output/<name>/`.
+`panel_path` is resolved under `panels/<name>/` and points to a YAML with `source_panel` and `target_panel`.
 
 ## Code philosophy
 
