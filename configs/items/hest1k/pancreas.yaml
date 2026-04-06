@@ -1,6 +1,7 @@
-name: default
-organs: null
-num_transcripts: 5000
+name: pancreas
+organs:
+  - Pancreas
+num_transcripts: 100
 num_unique_transcripts: null
 num_cells: null
 num_unique_cells: null

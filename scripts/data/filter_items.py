@@ -56,6 +56,12 @@ def main(
     )
 
     items_df = load_items_dataframe(items_path)
+
+    if filter_cfg.organs is not None:
+        meta = pd.read_parquet(cfg.processed_dir / 'metadata.parquet')
+        allowed_samples = set(meta.loc[meta.organ.isin(filter_cfg.organs), 'sample_id'])
+        items_df = items_df[items_df['sample_id'].isin(allowed_samples)]
+
     stats = pd.read_parquet(stats_path)
 
     mask = _apply_filter(stats, filter_cfg)

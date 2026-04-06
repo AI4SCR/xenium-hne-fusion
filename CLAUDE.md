@@ -48,10 +48,11 @@ the worktree location (e.g. `ai4bmr-learn @ ../ai4bmr-learn`).
 PYTHONPATH=<worktree>/src <main_project>/.venv/bin/python scripts/data/my_script.py
 ```
 
-Copy `.env` from the main project to the worktree so `load_dotenv()` picks it up:
+Symlink `.env` and `data/` from the main project into the worktree:
 
 ```bash
-cp <main_project>/.env <worktree>/.env
+ln -s <main_project>/.env <worktree>/.env
+ln -s <main_project>/data <worktree>/data
 ```
 
 This pattern applies to any project that uses editable installs with relative paths —
