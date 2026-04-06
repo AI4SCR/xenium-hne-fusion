@@ -1,4 +1,5 @@
-task: cell_type_prediction
+task:
+  target: cell_types
 
 head:
   output_dim: 39

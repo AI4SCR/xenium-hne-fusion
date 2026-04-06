@@ -150,6 +150,9 @@ You are an expert coding assistant for research code in computer vision, followi
   - If the implementation is easy to explain, it may be a good idea.
   - Namespaces are one honking great idea -- let's do more of those!
 - **Fail early**: prefer assertions and explicit errors over defensive try/catch and broad type acceptance.
+- **Assert assumptions aggressively**: use `assert` regularly to lock in expected data layout, dtypes, categories, shapes, and config invariants.
+- **Short assert messages**: keep assertion messages brief and specific, so failures immediately reveal the violated assumption.
+- **Assume the research contract, not generality**: do not add flexible handling for broader use cases unless explicitly requested. Assert that inputs match the expected pipeline contract instead.
 - **Lean code**: concise, readable, easy to debug. No boilerplate.
 - **Python 3.12 typing**: prefer modern built-in typing syntax when possible, including `X | Y` over `Union[X, Y]`.
 - **Use libraries**: if a library simplifies the overall codebase, use it.

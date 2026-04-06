@@ -8,7 +8,8 @@ from xenium_hne_fusion.train.supervised import infer_head_input_dim, resolve_num
 
 
 def make_gene_prediction_cfg() -> Config:
-    cfg = Config(task='gene_prediction')
+    cfg = Config()
+    cfg.task.target = 'expression'
     cfg.lit.target_key = 'target'
     cfg.data.source_panel = ['A', 'B']
     cfg.data.target_panel = ['C', 'D', 'E']
@@ -16,7 +17,8 @@ def make_gene_prediction_cfg() -> Config:
 
 
 def make_cell_type_cfg() -> Config:
-    cfg = Config(task='cell_type_prediction')
+    cfg = Config()
+    cfg.task.target = 'cell_types'
     cfg.head.output_dim = 39
     cfg.lit.target_key = 'metadata.cell_type_target'
     return cfg

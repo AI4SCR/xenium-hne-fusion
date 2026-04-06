@@ -18,7 +18,7 @@ def test_resolve_training_paths_defaults_to_dataset_output_root(monkeypatch: pyt
     cfg, output_dir = resolve_training_paths(cfg)
 
     assert output_dir == (data_dir / '03_output' / 'hest1k').resolve()
-    assert cfg.data.items_path == output_dir / 'items' / 'default.json'
+    assert cfg.data.items_path == output_dir / 'items' / 'all.json'
     assert cfg.data.cache_dir == output_dir / 'cache'
     assert cfg.data.metadata_path == metadata_path
 
@@ -62,7 +62,7 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
 
     for path in Path('configs/train').rglob('*.yaml'):
         cfg = Config.from_yaml(path)
-        assert cfg.task is not None
+        assert cfg.task.target is not None
         assert cfg.data.name is not None
         assert isinstance(cfg.data.metadata_path, Path)
         assert isinstance(cfg.data.panel_path, Path)

@@ -1,4 +1,5 @@
-task: gene_prediction
+task:
+  target: expression
 
 head:
   num_hidden_layers: 0

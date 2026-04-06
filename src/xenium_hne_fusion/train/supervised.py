@@ -27,7 +27,7 @@ from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.lit import RegressionLit
 from xenium_hne_fusion.train.utils import resolve_training_paths, set_fast_dev_run_settings
 
-TaskName = Literal["gene_prediction", "cell_type_prediction"]
+TaskTarget = Literal["expression", "cell_types"]
 
 mp.set_sharing_strategy("file_system")
 L.seed_everything(0)
@@ -56,28 +56,28 @@ def resolve_num_source_genes(cfg: Config) -> int | None:
 
 
 def validate_task_config(cfg: Config) -> None:
-    assert cfg.task is not None, "cfg.task must be set"
+    assert cfg.task.target is not None, "cfg.task.target"
     assert cfg.lit.target_key is not None, "cfg.lit.target_key must be set explicitly"
 
-    if cfg.task == "gene_prediction":
-        assert cfg.head.output_dim is None, "cfg.head.output_dim must not be set for task='gene_prediction'"
-        assert cfg.lit.target_key == "target", "cfg.lit.target_key must be 'target' for task='gene_prediction'"
-        assert cfg.data.target_panel is not None, "cfg.data.target_panel must be set for task='gene_prediction'"
+    if cfg.task.target == "expression":
+        assert cfg.head.output_dim is None, "cfg.head.output_dim"
+        assert cfg.lit.target_key == "target", "cfg.lit.target_key"
+        assert cfg.data.target_panel is not None, "cfg.data.target_panel"
         if cfg.data.source_panel is not None:
             assert set(cfg.data.source_panel).isdisjoint(set(cfg.data.target_panel))
         return
 
-    if cfg.task == "cell_type_prediction":
-        assert cfg.head.output_dim is not None, "cfg.head.output_dim must be set for task='cell_type_prediction'"
-        assert cfg.lit.target_key != "target", "cfg.lit.target_key must not be 'target' for task='cell_type_prediction'"
+    if cfg.task.target == "cell_types":
+        assert cfg.head.output_dim is not None, "cfg.head.output_dim"
+        assert cfg.lit.target_key != "target", "cfg.lit.target_key"
         return
 
-    raise ValueError(f"Unknown task: {cfg.task}")
+    raise ValueError(f"Unknown task target: {cfg.task.target}")
 
 
 def resolve_num_outputs(cfg: Config) -> int:
     validate_task_config(cfg)
-    if cfg.task == "gene_prediction":
+    if cfg.task.target == "expression":
         assert cfg.data.target_panel is not None
         return len(cfg.data.target_panel)
     assert cfg.head.output_dim is not None
@@ -112,7 +112,9 @@ def train(cfg: Config, debug: bool | None = None):
 
     num_source_genes = resolve_num_source_genes(cfg)
     num_outputs = resolve_num_outputs(cfg)
-    logger.info(f"Training task={cfg.task} with num_outputs={num_outputs} and num_source_genes={num_source_genes}")
+    logger.info(
+        f"Training task.target={cfg.task.target} with num_outputs={num_outputs} and num_source_genes={num_source_genes}"
+    )
 
     morph_encoder_name = cfg.backbone.morph_encoder_name
     morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
@@ -199,10 +201,11 @@ def train(cfg: Config, debug: bool | None = None):
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
     dataset_kws = dict(
+        target=cfg.task.target,
         items_path=cfg.data.items_path,
         metadata_path=cfg.data.metadata_path,
-        panel=cfg.data.source_panel,
-        target_panel=cfg.data.target_panel if cfg.task == "gene_prediction" else None,
+        source_panel=cfg.data.source_panel,
+        target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=morph_encoder is not None,
         include_expr=expr_encoder is not None,
         image_transform=image_transform,
@@ -230,7 +233,7 @@ def train(cfg: Config, debug: bool | None = None):
         save_dir=logs_dir,
         **asdict(cfg.wandb),
         config={
-            "task": cfg.task,
+            "task": cfg.task.target,
             "global_batch_size": global_batch_size,
             "num_outputs": num_outputs,
             "num_source_genes": num_source_genes,
