@@ -74,8 +74,7 @@ data/
     ├── items/
     │   └── all.json                     # full item set (all complete tiles)
     ├── splits/
-    │   ├── <split_name>.parquet         # canonical tile-level metadata for training
-    │   └── <split_name>/                # full split set saved via ai4bmr_learn.save_splits
+    │   └── <split_name>/                # split parquet collection saved via ai4bmr_learn.save_splits
     ├── cache/
     ├── logs/
     └── checkpoints/
@@ -194,9 +193,9 @@ The split parquet is tile-level. Its index is item `id`, and each tile row keeps
 - copied sample-level metadata columns
 - the generated `split` column used by `TileDataset`
 
-`create_splits.py` uses `ai4bmr_learn.data.splits.save_splits`, keeps the full saved fold set under
-`03_output/<name>/splits/<split_name>/`, and copies the canonical `outer=0-inner=0` split to
-`03_output/<name>/splits/<split_name>.parquet` for direct training use.
+`create_splits.py` uses `ai4bmr_learn.data.splits.save_splits` and keeps the saved fold set under
+`03_output/<name>/splits/<split_name>/`. Training configs and HVG recipes should point to a concrete
+parquet inside that folder, such as `default/outer=0-inner=0-seed=0.parquet`.
 
 ## Configuration
 
@@ -231,15 +230,23 @@ relative paths resolve under `DATA_DIR/03_output/<name>/` except for panel artif
 ```yaml
 data:
   name: hest1k
-  metadata_path: splits/default.parquet  # tile-level split metadata
-  panel_path: default.yaml          # resolves to panels/hest1k/default.yaml
+  metadata_path: default/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-default-default-outer=0-inner=0-seed=0.yaml
   cache_dir: cache/cell-types       # resolves to DATA_DIR/03_output/hest1k/cache/cell-types
 ```
 
-`metadata_path` should point to the canonical parquet at `03_output/<name>/splits/<split_name>.parquet`.
+`metadata_path` may be absolute. If relative, it is resolved under `03_output/<name>/splits/`.
 `panel_path` is resolved relative to `panels/<name>/` and should point to a YAML with `source_panel` and `target_panel`.
 
-Panel-generation recipes live in `configs/panels/<dataset>/<name>.yaml`.
+`items/all.json` is the unfiltered base item set created by `create_items.py`. Additional item sets such as
+`default`, `breast`, `lung`, or `pancreas` are produced separately from `configs/items/<dataset>/`.
+
+Panel-generation recipes live in `configs/panels/<dataset>/<name>.yaml`. They keep `panel_name`
+explicit and record the source split parquet via `split_path`, relative to
+`DATA_DIR/03_output/<dataset>/splits/`. By convention, the recipe filename matches `panel_name`.
+
+Only BEAT has a predetermined `panels/beat/default.yaml`. HEST1K panel files are expected to use
+explicit computed names such as `hvg-default-default-outer=0-inner=0-seed=0.yaml`.
 
 Split recipes live in `configs/splits/<dataset>.yaml`. They are applied on the tile-level
 table created by joining `items/all.json` with `02_processed/<name>/metadata.parquet` on `sample_id`.

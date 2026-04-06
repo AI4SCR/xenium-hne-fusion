@@ -23,8 +23,8 @@ data:
   name: beat
   batch_size: 256
   expr_pool: token
-  metadata_path: splits/default/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-default.yaml
+  metadata_path: default/outer=0-inner=0-seed=0.parquet
+  panel_path: default.yaml
 
 lit:
   target_key: target

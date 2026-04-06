@@ -22,9 +22,10 @@ def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
     assert name is not None, 'cfg.data.name must be set'
 
     output_dir = get_managed_paths(name).output_dir
+    splits_dir = output_dir / 'splits'
     panels_dir = get_panels_dir(name)
     cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir, default=output_dir / 'items' / 'all.json')
-    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir)
+    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=splits_dir)
     cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=panels_dir)
     cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir, default=output_dir / 'cache')
 

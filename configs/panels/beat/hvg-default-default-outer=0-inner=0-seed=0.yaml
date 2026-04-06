@@ -1,0 +1,5 @@
+panel_name: hvg-default-default-outer=0-inner=0-seed=0
+items_name: default
+split_path: default/outer=0-inner=0-seed=0.parquet
+n_top_genes: 128
+flavor: seurat_v3

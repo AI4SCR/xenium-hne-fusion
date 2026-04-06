@@ -1,6 +1,6 @@
 name: default
 organs: null
-num_transcripts: 5000
+num_transcripts: 200
 num_unique_transcripts: null
 num_cells: null
 num_unique_cells: null
