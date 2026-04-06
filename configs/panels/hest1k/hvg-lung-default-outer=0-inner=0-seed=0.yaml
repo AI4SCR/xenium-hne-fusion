@@ -1,5 +1,0 @@
-panel_name: hvg-lung-default-outer=0-inner=0-seed=0
-items_name: lung
-split_path: lung/outer=0-inner=0-seed=0.parquet
-n_top_genes: 128
-flavor: seurat_v3

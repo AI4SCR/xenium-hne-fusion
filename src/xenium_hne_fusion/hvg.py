@@ -17,7 +17,7 @@ class HvgRecipe:
     panel_name: str
     n_top_genes: int
     items_name: str = 'default'
-    split_path: Path = Path('default/outer=0-inner=0-seed=0.parquet')
+    split_path: Path = Path('default/outer=0-seed=0.parquet')
     flavor: str = 'seurat_v3'
 
 
@@ -27,7 +27,7 @@ def load_hvg_recipe(path: Path) -> HvgRecipe:
         panel_name=data['panel_name'],
         n_top_genes=data['n_top_genes'],
         items_name=data.get('items_name', 'default'),
-        split_path=Path(data.get('split_path', 'default/outer=0-inner=0-seed=0.parquet')),
+        split_path=Path(data.get('split_path', 'default/outer=0-seed=0.parquet')),
         flavor=data.get('flavor', 'seurat_v3'),
     )
 

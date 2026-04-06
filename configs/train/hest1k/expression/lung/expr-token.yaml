@@ -22,8 +22,8 @@ data:
   batch_size: 256
   expr_pool: token
   items_path: items/lung.json
-  metadata_path: lung/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-lung-default-outer=0-inner=0-seed=0.yaml
+  metadata_path: lung/outer=0-seed=0.parquet
+  panel_path: hvg-lung-default-outer=0-seed=0.yaml
 
 lit:
   target_key: target

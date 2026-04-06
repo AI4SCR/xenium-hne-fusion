@@ -36,14 +36,14 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
     cfg = Config()
     cfg.data.name = 'beat'
     cfg.data.items_path = Path('items/train.json')
-    cfg.data.metadata_path = Path('default/outer=0-inner=0-seed=0.parquet')
+    cfg.data.metadata_path = Path('default/outer=0-seed=0.parquet')
     cfg.data.panel_path = Path('default.yaml')
     cfg.data.cache_dir = Path('cache/run-a')
 
     cfg, output_dir = resolve_training_paths(cfg)
 
     assert cfg.data.items_path == output_dir / 'items/train.json'
-    assert cfg.data.metadata_path == output_dir / 'splits' / 'default/outer=0-inner=0-seed=0.parquet'
+    assert cfg.data.metadata_path == output_dir / 'splits' / 'default/outer=0-seed=0.parquet'
     assert cfg.data.panel_path == get_panels_dir('beat') / 'default.yaml'
     assert cfg.data.cache_dir == output_dir / 'cache/run-a'
 
@@ -107,7 +107,7 @@ def test_train_configs_use_expected_panel_defaults():
 
     for path in hest1k_paths:
         cfg = Config.from_yaml(path)
-        assert cfg.data.panel_path == Path('hvg-default-default-outer=0-inner=0-seed=0.yaml')
+        assert cfg.data.panel_path == Path('hvg-default-default-outer=0-seed=0.yaml')
 
 
 def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
@@ -120,6 +120,6 @@ def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
         for path in paths:
             cfg = Config.from_yaml(path)
             assert cfg.data.items_path == Path(f'items/{organ}.json')
-            assert cfg.data.metadata_path == Path(f'{organ}/outer=0-inner=0-seed=0.parquet')
-            assert cfg.data.panel_path == Path(f'hvg-{organ}-default-outer=0-inner=0-seed=0.yaml')
+            assert cfg.data.metadata_path == Path(f'{organ}/outer=0-seed=0.parquet')
+            assert cfg.data.panel_path == Path(f'hvg-{organ}-default-outer=0-seed=0.yaml')
             assert cfg.wandb.tags == [organ]

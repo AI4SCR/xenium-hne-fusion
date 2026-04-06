@@ -20,7 +20,7 @@ def main(
 ) -> None:
     cfg = load_pipeline_config(dataset, config_path)
     recipe_path = recipe_path or (
-        get_repo_root() / 'configs' / 'panels' / dataset / 'hvg-default-default-outer=0-inner=0-seed=0.yaml'
+        get_repo_root() / 'configs' / 'panels' / dataset / 'hvg-default-default-outer=0-seed=0.yaml'
     )
     recipe = load_hvg_recipe(recipe_path)
 

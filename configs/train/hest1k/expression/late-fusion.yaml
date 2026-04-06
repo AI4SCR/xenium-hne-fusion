@@ -24,8 +24,8 @@ data:
   name: hest1k
   batch_size: 256
   expr_pool: tile
-  metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-default-default-outer=0-inner=0-seed=0.yaml
+  metadata_path: default/outer=0-seed=0.parquet
+  panel_path: hvg-default-default-outer=0-seed=0.yaml
 
 lit:
   target_key: target

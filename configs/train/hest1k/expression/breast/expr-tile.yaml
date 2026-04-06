@@ -22,8 +22,8 @@ data:
   batch_size: 256
   expr_pool: tile
   items_path: items/breast.json
-  metadata_path: breast/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-breast-default-outer=0-inner=0-seed=0.yaml
+  metadata_path: breast/outer=0-seed=0.parquet
+  panel_path: hvg-breast-default-outer=0-seed=0.yaml
 
 lit:
   target_key: target

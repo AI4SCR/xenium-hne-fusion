@@ -123,7 +123,7 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     split_config_path.write_text(
         'split_name: default\n'
         'test_size: 0.2\n'
-        'val_size: 0.2\n'
+        'val_size: null\n'
         'stratify: false\n'
         'group_column_name: sample_id\n'
         'random_state: 0\n'
@@ -158,7 +158,7 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     split_dir = output_dir / 'splits' / 'default'
     assert split_dir.exists()
 
-    split_metadata = pd.read_parquet(split_dir / 'outer=0-inner=0-seed=0.parquet')
+    split_metadata = pd.read_parquet(split_dir / 'outer=0-seed=0.parquet')
     assert set(split_metadata.index) == {item['id'] for item in items}
     assert {'sample_id', 'tile_id', 'tile_dir', 'patient', 'cohort', 'split'} <= set(split_metadata.columns)
 
@@ -193,7 +193,7 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
     split_config_path.write_text(
         'split_name: lung\n'
         'test_size: 0.2\n'
-        'val_size: 0.1\n'
+        'val_size: null\n'
         'stratify: false\n'
         'group_column_name: null\n'
         'random_state: 0\n'
@@ -231,7 +231,7 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
         overwrite=True,
     )
 
-    split_path = output_dir / 'splits' / 'lung' / 'outer=0-inner=0-seed=0.parquet'
+    split_path = output_dir / 'splits' / 'lung' / 'outer=0-seed=0.parquet'
     assert split_path.exists()
 
     split_metadata = pd.read_parquet(split_path)

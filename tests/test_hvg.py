@@ -134,7 +134,7 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     output_dir = data_dir / '03_output' / 'hest1k'
     tile_dir = data_dir / '02_processed' / 'hest1k' / 'TENX95' / '256_256' / '0'
     config_path = tmp_path / 'hest1k.yaml'
-    recipe_path = tmp_path / 'configs' / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-inner=0-seed=0.yaml'
+    recipe_path = tmp_path / 'configs' / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-seed=0.yaml'
 
     tile_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
@@ -148,12 +148,12 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     pd.DataFrame(
         {'split': ['fit']},
         index=pd.Index(['TENX95_0'], name='id'),
-    ).to_parquet(output_dir / 'splits' / 'default' / 'outer=0-inner=0-seed=0.parquet')
+    ).to_parquet(output_dir / 'splits' / 'default' / 'outer=0-seed=0.parquet')
 
     recipe_path.write_text(
-        'panel_name: hvg-default-default-outer=0-inner=0-seed=0\n'
+        'panel_name: hvg-default-default-outer=0-seed=0\n'
         'items_name: default\n'
-        'split_path: default/outer=0-inner=0-seed=0.parquet\n'
+        'split_path: default/outer=0-seed=0.parquet\n'
         'n_top_genes: 1\n'
         'flavor: seurat_v3\n'
     )
@@ -177,7 +177,7 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     module = _load_script('scripts/data/create_hvg_panel.py', 'create_hvg_panel_script')
     module.main('hest1k', config_path=config_path, overwrite=True)
 
-    panel_path = tmp_path / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-inner=0-seed=0.yaml'
+    panel_path = tmp_path / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-seed=0.yaml'
     assert panel_path.exists()
     panel = __import__('yaml').safe_load(panel_path.read_text())
     assert panel['source_panel'] == ['A']
