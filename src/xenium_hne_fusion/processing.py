@@ -1,5 +1,6 @@
 
 import gc
+import tempfile
 from pathlib import Path
 
 import geopandas as gpd
@@ -116,8 +117,13 @@ def set_feature_universe(feature_names: pd.Series, feature_universe: list[str]) 
     return pd.Series(categorical, index=feature_names.index, name=feature_names.name)
 
 
-def tile_transcripts(tiles, transcripts_path: Path, save_dir: Path, predicate: str = "within") -> None:
-    # NOTE: this will only create parquet files for tiles that have transcripts!
+def _load_partitioned_points(points_dir: Path) -> gpd.GeoDataFrame:
+    df = pd.read_parquet(points_dir)
+    return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
+
+
+def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir: Path, predicate: str = "within") -> None:
+    """Write tile-local transcript subsets to <tile_dir>/transcripts.parquet."""
 
     transcripts = pq.ParquetFile(transcripts_path)
 
@@ -125,64 +131,56 @@ def tile_transcripts(tiles, transcripts_path: Path, save_dir: Path, predicate: s
         f"Tiling transcripts (num_tiles={len(tiles)}, num_transcripts={transcripts.metadata.num_rows})..."
     )
 
-    chunk_size = 1_000_000
-    num_chunks = transcripts.metadata.num_rows // chunk_size + 1
-    for j, batch in enumerate(
-        transcripts.iter_batches(
-            batch_size=chunk_size,
-            columns=["transcript_id", "cell_id", "feature_name", "geometry"],
-        ),
-        start=1,
-    ):
-        logger.info(f"Processing chunk {j}/{num_chunks}")
-        chunk = gpd.GeoDataFrame.from_arrow(batch)
-        chunk = filter_transcripts(chunk)
+    with tempfile.TemporaryDirectory(prefix="xhf-transcripts-") as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        chunk_size = 1_000_000
+        num_chunks = transcripts.metadata.num_rows // chunk_size + 1
+        for j, batch in enumerate(
+            transcripts.iter_batches(
+                batch_size=chunk_size,
+                columns=["transcript_id", "cell_id", "feature_name", "geometry"],
+            ),
+            start=1,
+        ):
+            logger.info(f"Processing chunk {j}/{num_chunks}")
+            chunk = gpd.GeoDataFrame.from_arrow(batch)
+            chunk = filter_transcripts(chunk)
 
-        # NOTE: alternative predicates: 'intersects'.
-        joined = gpd.sjoin(chunk, tiles, how="inner", predicate=predicate)
-        joined = joined.drop(columns=["index_right"]).to_arrow()
+            joined = gpd.sjoin(chunk, tiles, how="inner", predicate=predicate)
+            joined = joined.drop(columns=["index_right"]).to_arrow()
 
-        ds.write_dataset(
-            data=joined,
-            base_dir=str(save_dir),
-            format="parquet",
-            basename_template=f"part-{{i}}-chunk={j}.parquet",
-            partitioning=["tile_id"],
-            partitioning_flavor="hive",
-            existing_data_behavior="overwrite_or_ignore",
-        )
+            ds.write_dataset(
+                data=joined,
+                base_dir=str(tmpdir_path),
+                format="parquet",
+                basename_template=f"part-{{i}}-chunk={j}.parquet",
+                partitioning=["tile_id"],
+                partitioning_flavor="hive",
+                existing_data_behavior="overwrite_or_ignore",
+            )
 
-        del chunk, joined
-        gc.collect()
+            del chunk, joined
+            gc.collect()
+
+        for tile_id in tiles["tile_id"].tolist():
+            partition_dir = tmpdir_path / f"tile_id={tile_id}"
+            if not partition_dir.exists():
+                continue
+
+            tile_dir = output_dir / str(tile_id)
+            tile_dir.mkdir(parents=True, exist_ok=True)
+            pts = _load_partitioned_points(partition_dir)
+            pts = pts.drop(columns=["tile_id"], errors="ignore")
+            pts.to_parquet(tile_dir / "transcripts.parquet")
+
+        logger.info("Transcript tiling done")
 
 
-def get_tiled_transcripts(tile_id: int, transcripts_dir: Path) -> gpd.GeoDataFrame | None:
-    """
-    Load transcripts for a single tile from the hive-partitioned dataset.
-
-    Returns None if the tile has no transcripts.
-    Reconstructs geometry from WKB so the result is a proper GeoDataFrame.
-    """
-    tile_dir = transcripts_dir / f"tile_id={tile_id}"
-    if not tile_dir.exists():
+def load_tile_points(tile_path: Path) -> gpd.GeoDataFrame | None:
+    if not tile_path.exists():
         return None
 
-    df = pd.read_parquet(tile_dir)
-    return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
-
-
-def get_tiled_cells(tile_id: int, cells_dir: Path) -> gpd.GeoDataFrame | None:
-    """Load cells for a single tile from the hive-partitioned dataset.
-
-    Returns None if the tile has no cells.
-    Reconstructs geometry from WKB so the result is a proper GeoDataFrame.
-    """
-    tile_dir = cells_dir / f"tile_id={tile_id}"
-    if not tile_dir.exists():
-        return None
-
-    df = pd.read_parquet(tile_dir)
-    return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
+    return gpd.read_parquet(tile_path)
 
 
 def make_token_tiles(img_size: int, kernel_size: int) -> gpd.GeoDataFrame:
@@ -199,7 +197,6 @@ def make_token_tiles(img_size: int, kernel_size: int) -> gpd.GeoDataFrame:
 
 def process_tiles(
     tiles: gpd.GeoDataFrame,
-    transcripts_dir: Path,
     output_dir: Path,
     raw_transcripts_path: Path,
     img_size: int = 256,
@@ -222,12 +219,12 @@ def process_tiles(
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        pts = get_tiled_transcripts(tile_id, transcripts_dir)
+        pts = load_tile_points(tile_dir / "transcripts.parquet")
         if pts is None:
-            continue  # no transcripts in this tile
+            continue
 
         pts = transform_points(pts, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
-        pts = pts.drop(columns="index_right", errors="ignore")
+        pts = pts.drop(columns=["tile_id", "index_right"], errors="ignore")
         pts["feature_name"] = set_feature_universe(pts["feature_name"], feature_universe)
         pts.to_parquet(tile_dir / "transcripts.parquet")
 
@@ -248,72 +245,63 @@ def process_tiles(
         viz = draw_tiles(viz, token_tiles, thickness=1, alpha=0.7)
         imsave(tile_dir / "transcripts.png", viz)
 
-        viz = visualize_points(pts, image=img.copy(), radius=1, color_by_label=True, include_labels=top_feats, legend=True)
+        viz = visualize_points(
+            pts,
+            image=img.copy(),
+            radius=1,
+            color_by_label=True,
+            include_labels=top_feats,
+            legend=True,
+        )
         viz = draw_tiles(viz, token_tiles, thickness=1, alpha=0.7)
         imsave(tile_dir / "transcripts_top5_feats.png", viz)
 
     logger.info("Tile processing done")
 
 
-def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, save_dir: Path, predicate: str = "within") -> None:
-    """Spatially join cells with tiles and write a hive-partitioned dataset by tile_id.
-
-    Mirrors tile_transcripts() but for cell centroids. No chunking needed (cell counts << transcripts).
-    """
+def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, output_dir: Path, predicate: str = "within") -> None:
+    """Write tile-local cell subsets to <tile_dir>/cells.parquet."""
     cells = gpd.read_parquet(cells_path)
     logger.info(f"Tiling cells (num_tiles={len(tiles)}, num_cells={len(cells)})...")
     joined = gpd.sjoin(cells, tiles, how="inner", predicate=predicate)
-    joined = joined.drop(columns=["index_right"]).to_arrow()
-    ds.write_dataset(
-        data=joined,
-        base_dir=str(save_dir),
-        format="parquet",
-        partitioning=["tile_id"],
-        partitioning_flavor="hive",
-        existing_data_behavior="overwrite_or_ignore",
-    )
+    joined = joined.drop(columns=["index_right"])
+
+    for tile_id, tile_cells in joined.groupby("tile_id", observed=True):
+        tile_dir = output_dir / str(tile_id)
+        tile_dir.mkdir(parents=True, exist_ok=True)
+        tile_cells = tile_cells.drop(columns=["tile_id"], errors="ignore")
+        tile_cells.to_parquet(tile_dir / "cells.parquet")
 
 
-def process_cell_types(
+def process_cells(
     tiles: gpd.GeoDataFrame,
-    cells_dir: Path,
     output_dir: Path,
-    cell_type_universe: list[str],
-    cell_type_col: str = "Level3_grouped",
     img_size: int = 256,
-    kernel_size: int = 16,
 ) -> None:
-    """Compute per-tile cell type token counts and save as cell_types-kernel_size={k}.parquet.
+    """Transform tile-local cell subsets and render cells.png overlays."""
+    from skimage.io import imsave
 
-    Mirrors process_tiles() but aggregates cell type labels instead of gene expression.
-    Output shape: (n_tokens × len(cell_type_universe)).
-    """
-    token_tiles = make_token_tiles(img_size, kernel_size)
-    logger.info(f"Processing cell types for {len(tiles)} tiles (img_size={img_size}, kernel_size={kernel_size})")
+    from ai4bmr_learn.plotting.xenium import visualize_points
+
+    logger.info(f"Processing cells for {len(tiles)} tiles (img_size={img_size})")
 
     for _, tile in tiles.iterrows():
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        cells = get_tiled_cells(tile_id, cells_dir)
+        cells = load_tile_points(tile_dir / "cells.parquet")
         if cells is None:
             continue
 
         cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
-        cells = cells.drop(columns="index_right", errors="ignore")
-        cells[cell_type_col] = pd.Categorical(cells[cell_type_col], categories=cell_type_universe)
+        cells = cells.drop(columns=["tile_id", "index_right"], errors="ignore")
+        cells.to_parquet(tile_dir / "cells.parquet")
 
-        expr = compute_expr_tokens(
-            cells,
-            tiles=token_tiles,
-            feature_universe=cell_type_universe,
-            group_by=cell_type_col,
-            id_col="original_cell_id",
-        )
-        expr.columns = expr.columns.astype(str)
-        expr.to_parquet(tile_dir / f"cell_types-kernel_size={kernel_size}.parquet")
+        img = torch.load(tile_dir / "tile.pt").permute(1, 2, 0).numpy()
+        viz = visualize_points(cells, image=img.copy(), radius=1)
+        imsave(tile_dir / "cells.png", viz)
 
-    logger.info("Cell type processing done")
+    logger.info("Cell processing done")
 
 
 def transform_points(

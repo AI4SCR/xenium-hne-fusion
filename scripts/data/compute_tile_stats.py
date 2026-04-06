@@ -1,4 +1,4 @@
-"""Compute per-tile statistics from transcripts.parquet and cells hive dataset.
+"""Compute per-tile statistics from tile-local transcripts.parquet and cells.parquet.
 
 Output:
   DATA_DIR/03_output/<name>/statistics/<items_name>.parquet
@@ -23,21 +23,17 @@ STAT_COLS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_uniq
 
 def _compute_item_stats(item: dict, cell_type_col: str) -> dict:
     tile_dir = Path(item['tile_dir'])
-    tile_id = item['tile_id']
-
     transcripts = pd.read_parquet(tile_dir / 'transcripts.parquet', columns=['feature_name'])
     num_transcripts = len(transcripts)
     num_unique_transcripts = transcripts['feature_name'].nunique()
 
     num_cells = float('nan')
     num_unique_cells = float('nan')
-    cells_partition = tile_dir.parent / 'cells' / f'tile_id={tile_id}'
-    if cells_partition.exists():
-        parts = list(cells_partition.glob('*.parquet'))
-        if parts:
-            cells = pd.concat([pd.read_parquet(p, columns=[cell_type_col]) for p in parts], ignore_index=True)
-            num_cells = len(cells)
-            num_unique_cells = cells[cell_type_col].nunique()
+    cells_path = tile_dir / 'cells.parquet'
+    if cells_path.exists():
+        cells = pd.read_parquet(cells_path, columns=[cell_type_col])
+        num_cells = len(cells)
+        num_unique_cells = cells[cell_type_col].nunique()
 
     return {
         'id': item['id'],
