@@ -67,6 +67,25 @@ class FusionModel(nn.Module):
             freeze_expr_encoder: bool = False,
             learnable_gate: bool = False
     ):
+        """
+        Unified backbone for morphology-only, expression-only, and fusion models.
+
+        Route semantics are inferred from the input batch:
+        - `fusion`: both `morph_key` and `expr_key` are present
+        - `morph_only`: only `morph_key` is present
+        - `expr_only`: only `expr_key` is present
+
+        Configuration semantics are independent from route inference:
+        - `fusion_strategy is None` means the model is configured as genuinely unimodal,
+          so exactly one encoder must be provided.
+        - `fusion_strategy is not None` means the model is configured for fusion,
+          so both encoders must be provided.
+
+        `allow_unimodal_routes` only matters in the second case. It allows a
+        fusion-configured model to accept batches that contain only one modality
+        at runtime. It does not block intentionally unimodal models configured
+        with `fusion_strategy=None`.
+        """
 
         _validate_config(morph_encoder, expr_encoder, fusion_strategy, fusion_stage, global_pool, morph_token_pool, expr_token_pool)
 
