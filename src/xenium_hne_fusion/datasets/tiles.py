@@ -10,43 +10,53 @@ from ai4bmr_learn.datasets.items import Items
 
 class TileDataset(Items):
     """
-    Per-tile H&E image + expression token dataset.
+    Per-tile H&E image + tile-local target dataset.
 
     Each item must have a 'tile_dir' key pointing to a directory containing:
-        tile.pt                          # uint8 CHW tensor
-        expr-kernel_size={k}.parquet     # (n_tokens × n_genes) DataFrame
+        tile.pt                     # uint8 CHW tensor
+        expr-kernel_size=16.parquet # (n_tokens x n_genes) DataFrame
+        cells.parquet               # optional per-cell table for cell type targets
 
     Args:
-        kernel_size: sub-tile size used when computing expression tokens.
-        panel: gene subset to select from expr columns (all if None).
+        target: prediction target, either tile-level expression or cell type counts.
+        source_panel: expression genes to load into expr_tokens.
+        target_panel: expression genes to aggregate into the target when target='expression'.
         include_image: load tile.pt.
-        include_expr: load expr parquet.
+        include_expr: load expr-kernel_size=16.parquet.
+        target_transform: applied to the target tensor.
         image_transform: applied to uint8 CHW tensor.
         expr_transform: applied to float expr tensor after optional pooling.
         expr_pool: 'token' keeps (n_tokens, n_genes); 'tile' avg-pools to (n_genes,).
+        cell_type_col: categorical cell type column to count when target='cell_types'.
     """
 
     def __init__(self, *,
-                 kernel_size: int = 16,
-                 panel: list[str] | None = None,
+                 target: Literal['cell_types', 'expression'],
+                 source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
                  include_image: bool = True,
                  include_expr: bool = True,
+                 target_transform: Callable | None = None,
                  image_transform: Callable | None = None,
                  expr_transform: Callable | None = None,
                  expr_pool: Literal['token', 'tile'] = 'token',
-                 cell_types_kernel_size: int | None = None,
+                 cell_type_col: str = 'Level3_grouped',
                  **kwargs):
+
         super().__init__(**kwargs)
-        self.kernel_size = kernel_size
-        self.panel = panel
+
+        self.target = target
+        self.source_panel = source_panel
         self.target_panel = target_panel
         self.include_image = include_image
         self.include_expr = include_expr
+        self.target_transform = target_transform
         self.image_transform = image_transform
         self.expr_transform = expr_transform
         self.expr_pool = expr_pool
-        self.cell_types_kernel_size = cell_types_kernel_size
+        self.cell_type_col = cell_type_col
+
+        assert target == 'expression' and target_panel is not None or target == 'cell_types', "target_panel must be specified when target is 'expression'"
 
     def __getitem__(self, idx) -> dict:
         item = deepcopy(self.items[idx])
@@ -56,30 +66,38 @@ class TileDataset(Items):
         if self.cache_dir is not None and self.has_cache(iid=iid):
             item = torch.load(self.get_cache_path(iid), weights_only=False)
         else:
-            modalities = {}
 
+            if self.include_expr or self.target == 'expression':
+                expr = pd.read_parquet(tile_dir / f'expr-kernel_size=16.parquet')
+
+            # construct target
+            if self.target == 'expression':
+                target = expr[self.target_panel].sum()
+            elif self.target == 'cell_types':
+                cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
+                assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
+                target = cell_types[self.cell_type_col].value_counts().sort_index()
+            else:
+                raise ValueError(f"Unsupported target: {self.target}")
+
+            target = torch.tensor(target.values, dtype=torch.float32)
+            item['target'] = target
+
+            modalities = {}
             if self.include_image:
                 modalities['image'] = torch.load(tile_dir / 'tile.pt', weights_only=True)
 
-            if self.include_expr or self.target_panel is not None:
-                expr_raw = pd.read_parquet(tile_dir / f'expr-kernel_size={self.kernel_size}.parquet')
-
             if self.include_expr:
-                expr = expr_raw[self.panel] if self.panel is not None else expr_raw
-                expr_t = torch.tensor(expr.values, dtype=torch.float32)
+                source = expr[self.source_panel]
+                source = torch.tensor(source.values, dtype=torch.float32)
                 if self.expr_pool == 'tile':
-                    expr_t = expr_t.mean(dim=0)
-                modalities['expr_tokens'] = expr_t
-
-            if self.target_panel is not None:
-                target_t = torch.tensor(expr_raw[self.target_panel].values, dtype=torch.float32)
-                item['target'] = target_t.mean(dim=0)  # avg-pool to (n_target_genes,)
-
-            if self.cell_types_kernel_size is not None:
-                ct = pd.read_parquet(tile_dir / f'cell_types-kernel_size={self.cell_types_kernel_size}.parquet')
-                item['target'] = torch.tensor(ct.values, dtype=torch.float32).mean(dim=0)
+                    source = source.mean(dim=0)
+                modalities['expr_tokens'] = source
 
             item['modalities'] = modalities
+
+        if self.target_transform is not None:
+            item['target'] = self.target_transform(item['target'])
 
         if self.image_transform is not None and 'image' in item.get('modalities', {}):
             item['modalities']['image'] = self.image_transform(item['modalities']['image'])
@@ -88,10 +106,7 @@ class TileDataset(Items):
             item['modalities']['expr_tokens'] = self.expr_transform(item['modalities']['expr_tokens'])
 
         if self.metadata is not None:
-            import numpy as np
-            item['metadata'] = {
-                k: v.item() if isinstance(v, np.generic) else v
-                for k, v in self.metadata.loc[iid].items()
-            }
+            metadata_dict = self.metadata.loc[iid].to_dict()
+            item['metadata'] = metadata_dict
 
         return item

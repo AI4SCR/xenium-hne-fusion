@@ -5,6 +5,11 @@ from typing import Any, Literal
 
 
 @dataclass
+class TaskConfig:
+    target: Literal['expression', 'cell_types'] | None = None
+
+
+@dataclass
 class HeadConfig:
     output_dim: int | None = None
     hidden_dim: int = 32
@@ -83,7 +88,7 @@ class WandbConfig:
 
 @dataclass
 class Config:
-    task: Literal['gene_prediction', 'cell_type_prediction'] | None = None
+    task: TaskConfig = field(default_factory=TaskConfig)
     debug: bool = False
     head: HeadConfig = field(default_factory=HeadConfig)
     backbone: BackboneConfig = field(default_factory=BackboneConfig)
