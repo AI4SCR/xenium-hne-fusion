@@ -75,8 +75,8 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
     monkeypatch.setattr(
         module,
         'process_tiles',
-        lambda tiles, transcripts_dir, output_dir, raw_transcripts_path, img_size=256, kernel_size=16: calls.append(
-            ('process_tiles', len(tiles), transcripts_dir, output_dir, raw_transcripts_path, img_size, kernel_size)
+        lambda tiles, output_dir, raw_transcripts_path, img_size=256, kernel_size=16: calls.append(
+            ('process_tiles', len(tiles), output_dir, raw_transcripts_path, img_size, kernel_size)
         ),
     )
 
@@ -96,6 +96,6 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
             0.2125,
         ),
         ('extract_tiles', sample_dir / 'wsi.tiff', 1, processed_dir, 0.5, 0.2125),
-        ('tile_transcripts', 1, sample_dir / 'transcripts.parquet', processed_dir / 'transcripts', 'within'),
-        ('process_tiles', 1, processed_dir / 'transcripts', processed_dir, sample_dir / 'transcripts.parquet', 256, 16),
+        ('tile_transcripts', 1, sample_dir / 'transcripts.parquet', processed_dir, 'within'),
+        ('process_tiles', 1, processed_dir, sample_dir / 'transcripts.parquet', 256, 16),
     ]

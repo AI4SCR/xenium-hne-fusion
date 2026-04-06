@@ -12,7 +12,7 @@ load_dotenv()
 
 from xenium_hne_fusion.download import get_hest_sample_mpp
 from xenium_hne_fusion.metadata import get_structured_metadata_path
-from xenium_hne_fusion.processing import extract_tiles, process_tiles, tile_transcripts
+from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import load_pipeline_config, resolve_samples
 
@@ -35,6 +35,7 @@ def main(
         structured_dir = cfg.structured_dir / sample_id
         wsi_path = structured_dir / "wsi.tiff"
         transcripts_path = structured_dir / "transcripts.parquet"
+        cells_path = structured_dir / "cells.parquet"
         tissues_path = structured_dir / "tissues.parquet"
         tiles_path = structured_dir / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
         processed_dir = cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
@@ -56,15 +57,17 @@ def main(
         )
         tiles = gpd.read_parquet(tiles_path)
         extract_tiles(wsi_path, tiles, processed_dir, cfg.tile_mpp, native_mpp=slide_mpp)
-        tile_transcripts(tiles, transcripts_path, processed_dir / "transcripts", predicate)
+        tile_transcripts(tiles, transcripts_path, processed_dir, predicate)
         process_tiles(
             tiles,
-            processed_dir / "transcripts",
             processed_dir,
             transcripts_path,
             img_size=cfg.tile_px,
             kernel_size=kernel_size,
         )
+        if cells_path.exists():
+            tile_cells(tiles, cells_path, processed_dir, predicate)
+            process_cells(tiles, processed_dir, img_size=cfg.tile_px)
 
 
 if __name__ == "__main__":

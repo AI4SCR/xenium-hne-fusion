@@ -6,7 +6,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from shapely.geometry import Point
+import torch
+from shapely.geometry import Point, box
 
 from xenium_hne_fusion.processing import (
     compute_expr_tokens,
@@ -14,7 +15,11 @@ from xenium_hne_fusion.processing import (
     extract_tiles,
     infer_feature_universe,
     make_token_tiles,
+    process_cells,
+    process_tiles,
     set_feature_universe,
+    tile_cells,
+    tile_transcripts,
 )
 
 
@@ -147,3 +152,101 @@ def test_extract_tiles_uses_native_mpp_override(monkeypatch: pytest.MonkeyPatch,
 
     tensor = __import__('torch').load(output_dir / '0' / 'tile.pt', weights_only=True)
     assert tuple(tensor.shape) == (3, 50, 50)
+
+
+def test_tile_subsets_are_written_directly_into_tile_dirs(tmp_path: Path):
+    tiles = gpd.GeoDataFrame(
+        [
+            {'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100},
+            {'tile_id': 1, 'x_px': 100, 'y_px': 0, 'width_px': 100, 'height_px': 100},
+        ],
+        geometry=[box(0, 0, 100, 100), box(100, 0, 200, 100)],
+    )
+    transcripts = gpd.GeoDataFrame(
+        {
+            'transcript_id': [1, 2],
+            'cell_id': [10, 11],
+            'feature_name': ['A', 'B'],
+        },
+        geometry=[Point(10, 10), Point(150, 20)],
+    )
+    cells = gpd.GeoDataFrame(
+        {
+            'original_cell_id': [100, 101],
+            'Level3_grouped': ['tumor', 'stroma'],
+        },
+        geometry=[Point(20, 20), Point(120, 30)],
+    )
+
+    transcripts_path = tmp_path / 'transcripts.parquet'
+    cells_path = tmp_path / 'cells.parquet'
+    transcripts.to_parquet(transcripts_path)
+    cells.to_parquet(cells_path)
+
+    output_dir = tmp_path / 'processed'
+    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_cells(tiles, cells_path, output_dir)
+
+    assert not (output_dir / 'transcripts').exists()
+    assert not (output_dir / 'cells').exists()
+    assert (output_dir / '0' / 'transcripts.parquet').exists()
+    assert (output_dir / '1' / 'transcripts.parquet').exists()
+    assert (output_dir / '0' / 'cells.parquet').exists()
+    assert (output_dir / '1' / 'cells.parquet').exists()
+
+    stored_tx = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
+    stored_cells = gpd.read_parquet(output_dir / '0' / 'cells.parquet')
+    assert 'tile_id' not in stored_tx.columns
+    assert 'tile_id' not in stored_cells.columns
+
+
+def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: Path):
+    tiles = gpd.GeoDataFrame(
+        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
+        geometry=[box(0, 0, 100, 100)],
+    )
+    transcripts = gpd.GeoDataFrame(
+        {
+            'transcript_id': [1, 2],
+            'cell_id': [10, 11],
+            'feature_name': ['A', 'B'],
+        },
+        geometry=[Point(10, 10), Point(60, 20)],
+    )
+    cells = gpd.GeoDataFrame(
+        {
+            'original_cell_id': [100, 101],
+            'Level3_grouped': ['tumor', 'stroma'],
+        },
+        geometry=[Point(15, 15), Point(75, 35)],
+    )
+
+    transcripts_path = tmp_path / 'transcripts.parquet'
+    cells_path = tmp_path / 'cells.parquet'
+    transcripts.to_parquet(transcripts_path)
+    cells.to_parquet(cells_path)
+
+    output_dir = tmp_path / 'processed'
+    tile_dir = output_dir / '0'
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(torch.zeros((3, 100, 100), dtype=torch.uint8), tile_dir / 'tile.pt')
+
+    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_cells(tiles, cells_path, output_dir)
+    process_tiles(tiles, output_dir, transcripts_path, img_size=100, kernel_size=50)
+    process_cells(tiles, output_dir, img_size=100)
+
+    assert (tile_dir / 'transcripts.parquet').exists()
+    assert (tile_dir / 'expr-kernel_size=50.parquet').exists()
+    assert (tile_dir / 'tile.png').exists()
+    assert (tile_dir / 'transcripts.png').exists()
+    assert (tile_dir / 'transcripts_top5_feats.png').exists()
+    assert (tile_dir / 'cells.parquet').exists()
+    assert (tile_dir / 'cells.png').exists()
+
+    stored_tx = gpd.read_parquet(tile_dir / 'transcripts.parquet')
+    stored_cells = gpd.read_parquet(tile_dir / 'cells.parquet')
+    assert stored_tx.geometry.x.between(0, 100).all()
+    assert stored_tx.geometry.y.between(0, 100).all()
+    assert stored_cells.geometry.x.between(0, 100).all()
+    assert stored_cells.geometry.y.between(0, 100).all()
