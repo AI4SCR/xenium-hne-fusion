@@ -252,7 +252,7 @@ def train(cfg: Config, debug: bool | None = None):
         ModelCheckpoint(monitor=None, save_last="link"),
         LearningRateMonitor(logging_interval="epoch"),
         EarlyStopping(monitor=monitor, mode=mode, patience=10),
-        TestCache(exclude_keys=["modalities.image", "loss", "z"]),
+        TestCache(exclude_keys=["modalities", "loss", "z"]),
     ]
 
     trainer = L.Trainer(

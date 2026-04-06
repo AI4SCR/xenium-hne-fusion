@@ -1,0 +1,39 @@
+task:
+  target: expression
+
+head:
+  num_hidden_layers: 0
+
+backbone:
+  morph_encoder_name: null
+  morph_encoder_kws: null
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: null
+  fusion_stage: null
+  use_proj: false
+  global_pool: avg
+
+data:
+  name: beat
+  batch_size: 256
+  expr_pool: token
+  metadata_path: default/outer=0-inner=0-seed=0.parquet
+  panel_path: default.yaml
+
+lit:
+  target_key: target
+  lr_head: 1.0e-4
+  lr_backbone: 1.0e-5
+
+wandb:
+  project: debug
+
+trainer:
+  max_time: 00:01:45:00
+  max_epochs: 35
+  accumulate_grad_batches: 2
+  gradient_clip_val: 1.0

@@ -11,7 +11,11 @@ assert load_dotenv(override=True)
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
 # fast_dev_run = debug = True
-# cfg = Config.from_yaml(Path("configs/train/hest1k/expression.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/beat/expression/early-fusion.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/beat/expression/late-fusion.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/beat/expression/vision.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-token.yaml"))
+# cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-tile.yaml"))
 # train(cfg, debug=debug)
 
 
