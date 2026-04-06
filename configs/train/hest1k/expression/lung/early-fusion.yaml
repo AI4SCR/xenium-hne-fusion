@@ -1,14 +1,13 @@
 task:
-  target: cell_types
+  target: expression
 
 head:
-  output_dim: 39
   num_hidden_layers: 0
 
 backbone:
   morph_encoder_name: vit_small_patch16_224
   morph_encoder_kws:
-    img_size: 512
+    img_size: 256
   expr_encoder_name: mlp
   expr_encoder_kws:
     output_dim: 32
@@ -20,11 +19,12 @@ backbone:
   global_pool: token
 
 data:
-  name: beat
+  name: hest1k
   batch_size: 256
   expr_pool: token
-  metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: default.yaml
+  items_path: items/lung.json
+  metadata_path: lung/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-lung-default-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target
@@ -34,6 +34,7 @@ lit:
 wandb:
   project: debug
   name: early-fusion
+  tags: [lung]
 
 trainer:
   max_time: 00:01:45:00

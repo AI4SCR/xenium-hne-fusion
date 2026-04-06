@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from xenium_hne_fusion.metadata import load_split_config
+
 from xenium_hne_fusion.metadata import link_structured_metadata
 
 
@@ -162,3 +164,76 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
 
     for _, group in split_metadata.groupby('sample_id'):
         assert group['split'].nunique() == 1
+
+
+def test_beat_default_split_groups_by_sample_id():
+    cfg = load_split_config(Path('configs/splits/beat.yaml'))
+    assert cfg.group_column_name == 'sample_id'
+
+
+def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    output_dir = data_dir / '03_output' / 'hest1k'
+    processed_dir = data_dir / '02_processed' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+    split_config_path = tmp_path / 'lung.yaml'
+
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  sample_ids: null\n'
+    )
+    split_config_path.write_text(
+        'split_name: lung\n'
+        'test_size: 0.2\n'
+        'val_size: 0.1\n'
+        'stratify: false\n'
+        'group_column_name: null\n'
+        'random_state: 0\n'
+    )
+
+    sample_rows = []
+    items = []
+    for sample_idx in range(2):
+        sample_id = f'S{sample_idx}'
+        sample_rows.append({'sample_id': sample_id, 'organ': 'Lung'})
+        for tile_id in range(20):
+            items.append(
+                {
+                    'id': f'{sample_id}_{tile_id}',
+                    'sample_id': sample_id,
+                    'tile_id': tile_id,
+                    'tile_dir': f'/tmp/{sample_id}/{tile_id}',
+                }
+            )
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'items').mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(sample_rows).to_parquet(processed_dir / 'metadata.parquet', index=False)
+    (output_dir / 'items' / 'lung.json').write_text(json.dumps(items))
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_splits.py', 'create_splits_lung_script')
+    module.main(
+        'hest1k',
+        config_path=config_path,
+        split_config_path=split_config_path,
+        items_path=output_dir / 'items' / 'lung.json',
+        overwrite=True,
+    )
+
+    split_path = output_dir / 'splits' / 'lung' / 'outer=0-inner=0-seed=0.parquet'
+    assert split_path.exists()
+
+    split_metadata = pd.read_parquet(split_path)
+    assert set(split_metadata['sample_id']) == {'S0', 'S1'}
+    assert split_metadata.groupby('sample_id')['split'].nunique().max() > 1

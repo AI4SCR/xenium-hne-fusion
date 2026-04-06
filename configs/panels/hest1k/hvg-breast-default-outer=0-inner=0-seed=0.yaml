@@ -1,0 +1,5 @@
+panel_name: hvg-breast-default-outer=0-inner=0-seed=0
+items_name: breast
+split_path: breast/outer=0-inner=0-seed=0.parquet
+n_top_genes: 128
+flavor: seurat_v3

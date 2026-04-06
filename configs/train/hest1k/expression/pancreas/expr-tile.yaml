@@ -15,14 +15,15 @@ backbone:
   fusion_strategy: null
   fusion_stage: null
   use_proj: false
-  global_pool: avg
+  global_pool: null
 
 data:
-  name: beat
+  name: hest1k
   batch_size: 256
-  expr_pool: token
-  metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: default.yaml
+  expr_pool: tile
+  items_path: items/pancreas.json
+  metadata_path: pancreas/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-pancreas-default-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target
@@ -31,7 +32,8 @@ lit:
 
 wandb:
   project: debug
-  name: expr-token
+  name: expr-tile
+  tags: [pancreas]
 
 trainer:
   max_time: 00:01:45:00

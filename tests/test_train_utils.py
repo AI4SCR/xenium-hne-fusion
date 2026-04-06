@@ -96,8 +96,30 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
 
 
 def test_train_configs_use_expected_panel_defaults():
-    beat_cfg = Config.from_yaml(Path('configs/train/beat/expression.yaml'))
-    hest1k_cfg = Config.from_yaml(Path('configs/train/hest1k/expression.yaml'))
+    beat_paths = sorted(Path('configs/train/beat/expression').glob('*.yaml'))
+    hest1k_paths = sorted(Path('configs/train/hest1k/expression').glob('*.yaml'))
 
-    assert beat_cfg.data.panel_path == Path('default.yaml')
-    assert hest1k_cfg.data.panel_path == Path('hvg-default-default-outer=0-inner=0-seed=0.yaml')
+    assert [path.name for path in hest1k_paths] == [path.name for path in beat_paths]
+
+    for path in beat_paths:
+        cfg = Config.from_yaml(path)
+        assert cfg.data.panel_path == Path('default.yaml')
+
+    for path in hest1k_paths:
+        cfg = Config.from_yaml(path)
+        assert cfg.data.panel_path == Path('hvg-default-default-outer=0-inner=0-seed=0.yaml')
+
+
+def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
+    base_variants = sorted(path.name for path in Path('configs/train/hest1k/expression').glob('*.yaml'))
+
+    for organ in ['breast', 'lung', 'pancreas']:
+        paths = sorted(Path('configs/train/hest1k/expression', organ).glob('*.yaml'))
+        assert [path.name for path in paths] == base_variants
+
+        for path in paths:
+            cfg = Config.from_yaml(path)
+            assert cfg.data.items_path == Path(f'items/{organ}.json')
+            assert cfg.data.metadata_path == Path(f'{organ}/outer=0-inner=0-seed=0.parquet')
+            assert cfg.data.panel_path == Path(f'hvg-{organ}-default-outer=0-inner=0-seed=0.yaml')
+            assert cfg.wandb.tags == [organ]

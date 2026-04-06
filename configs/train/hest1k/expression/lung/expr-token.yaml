@@ -5,25 +5,25 @@ head:
   num_hidden_layers: 0
 
 backbone:
-  morph_encoder_name: vit_small_patch16_224
-  morph_encoder_kws:
-    img_size: 256
+  morph_encoder_name: null
+  morph_encoder_kws: null
   expr_encoder_name: mlp
   expr_encoder_kws:
     output_dim: 32
     num_hidden_layers: 1
     dropout: 0.1
-  fusion_strategy: add
-  fusion_stage: early
-  use_proj: true
-  global_pool: token
+  fusion_strategy: null
+  fusion_stage: null
+  use_proj: false
+  global_pool: avg
 
 data:
   name: hest1k
   batch_size: 256
   expr_pool: token
-  metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-default-default-outer=0-inner=0-seed=0.yaml
+  items_path: items/lung.json
+  metadata_path: lung/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-lung-default-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target
@@ -32,6 +32,8 @@ lit:
 
 wandb:
   project: debug
+  name: expr-token
+  tags: [lung]
 
 trainer:
   max_time: 00:01:45:00

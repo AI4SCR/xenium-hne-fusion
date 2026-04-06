@@ -7,25 +7,23 @@ head:
 backbone:
   morph_encoder_name: vit_small_patch16_224
   morph_encoder_kws:
-    img_size: 512
-  expr_encoder_name: mlp
-  expr_encoder_kws:
-    output_dim: 32
-    num_hidden_layers: 1
-    dropout: 0.1
-  fusion_strategy: add
-  fusion_stage: late
-  use_proj: true
+    img_size: 256
+  expr_encoder_name: null
+  expr_encoder_kws: null
+  fusion_strategy: null
+  fusion_stage: null
+  use_proj: false
   expr_token_pool: null
-  morph_token_pool: token
-  global_pool: null
+  morph_token_pool: null
+  global_pool: token
 
 data:
-  name: beat
+  name: hest1k
   batch_size: 256
   expr_pool: tile
-  metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: default.yaml
+  items_path: items/breast.json
+  metadata_path: breast/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-breast-default-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target
@@ -34,7 +32,8 @@ lit:
 
 wandb:
   project: debug
-  name: late-fusion
+  name: vision
+  tags: [breast]
 
 trainer:
   max_time: 00:01:45:00

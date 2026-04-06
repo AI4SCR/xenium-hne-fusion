@@ -32,6 +32,7 @@ lit:
 
 wandb:
   project: debug
+  name: early-fusion
 
 trainer:
   max_time: 00:01:45:00

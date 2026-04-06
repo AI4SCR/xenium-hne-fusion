@@ -171,3 +171,70 @@ def test_tile_dataset_loads_matching_metadata_for_selected_split(tmp_path: Path)
         "patient": "P1",
         "score": 1.5,
     }
+
+
+def test_tile_dataset_ignores_token_index_expr_column(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(torch.arange(12, dtype=torch.uint8).reshape(3, 2, 2), tile_dir / "tile.pt")
+    pd.DataFrame(
+        {
+            "token_index": [0, 1, 2],
+            "A": [1, 0, 2],
+            "B": [0, 1, 3],
+            "C": [4, 5, 6],
+        }
+    ).to_parquet(tile_dir / "expr-kernel_size=16.parquet", index=False)
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target="expression",
+        source_panel=["A", "B"],
+        target_panel=["C"],
+        include_image=False,
+        include_expr=True,
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert item["target"].tolist() == [15.0]
+    assert item["modalities"]["expr_tokens"].tolist() == [[1.0, 0.0], [0.0, 1.0], [2.0, 3.0]]
+
+
+def test_tile_dataset_raises_clear_error_for_missing_target_genes(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(torch.zeros((3, 2, 2), dtype=torch.uint8), tile_dir / "tile.pt")
+    pd.DataFrame(
+        {
+            "A": [1, 0, 2],
+            "B": [0, 1, 3],
+        }
+    ).to_parquet(tile_dir / "expr-kernel_size=16.parquet", index=False)
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target="expression",
+        source_panel=["A"],
+        target_panel=["C"],
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    with pytest.raises(AssertionError, match="missing target genes"):
+        ds[0]

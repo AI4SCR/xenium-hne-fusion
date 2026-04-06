@@ -69,9 +69,14 @@ class TileDataset(Items):
 
             if self.include_expr or self.target == 'expression':
                 expr = pd.read_parquet(tile_dir / f'expr-kernel_size=16.parquet')
+                if 'token_index' in expr.columns:
+                    expr = expr.drop(columns=['token_index'])
 
             # construct target
             if self.target == 'expression':
+                assert self.target_panel is not None
+                missing = sorted(set(self.target_panel) - set(expr.columns))
+                assert not missing, f'missing target genes: {missing[:8]}'
                 target = expr[self.target_panel].sum()
             elif self.target == 'cell_types':
                 cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
@@ -88,6 +93,9 @@ class TileDataset(Items):
                 modalities['image'] = torch.load(tile_dir / 'tile.pt', weights_only=True)
 
             if self.include_expr:
+                assert self.source_panel is not None, 'source_panel must be specified when include_expr=True'
+                missing = sorted(set(self.source_panel) - set(expr.columns))
+                assert not missing, f'missing source genes: {missing[:8]}'
                 source = expr[self.source_panel]
                 source = torch.tensor(source.values, dtype=torch.float32)
                 if self.expr_pool == 'tile':
