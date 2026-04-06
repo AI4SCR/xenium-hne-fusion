@@ -122,6 +122,13 @@ def _load_partitioned_points(points_dir: Path) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df.geometry))
 
 
+def _load_transcript_batch(batch) -> gpd.GeoDataFrame:
+    chunk = batch.to_pandas()
+    assert {"he_x", "he_y"} <= set(chunk.columns), f"Missing he_x/he_y: {chunk.columns.tolist()}"
+    chunk["geometry"] = gpd.points_from_xy(chunk["he_x"], chunk["he_y"])
+    return gpd.GeoDataFrame(chunk, geometry="geometry")
+
+
 def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir: Path, predicate: str = "within") -> None:
     """Write tile-local transcript subsets to <tile_dir>/transcripts.parquet."""
 
@@ -138,12 +145,12 @@ def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir
         for j, batch in enumerate(
             transcripts.iter_batches(
                 batch_size=chunk_size,
-                columns=["transcript_id", "cell_id", "feature_name", "geometry"],
+                columns=["transcript_id", "cell_id", "feature_name", "he_x", "he_y"],
             ),
             start=1,
         ):
             logger.info(f"Processing chunk {j}/{num_chunks}")
-            chunk = gpd.GeoDataFrame.from_arrow(batch)
+            chunk = _load_transcript_batch(batch)
             chunk = filter_transcripts(chunk)
 
             joined = gpd.sjoin(chunk, tiles, how="inner", predicate=predicate)

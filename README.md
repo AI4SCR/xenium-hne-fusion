@@ -160,6 +160,11 @@ Output: GeoDataFrame parquet with `tile_id`, `geometry`, `x_px`, `y_px`, `width_
 
 Extract tile images, tile-level transcript subsets, and patch-token expression tables.
 
+HEST transcript coordinates are taken only from `he_x` and `he_y`. Some HEST samples
+such as `NCBI784` omit raw `geometry`, while samples that do store `geometry` match
+`he_x` and `he_y` exactly, so the pipeline rebuilds transcript points from H&E coords
+for a single consistent contract.
+
 ```bash
 uv run scripts/data/process.py \
     --wsi_path data/01_structured/hest1k/TENX95/wsi.tiff \
@@ -259,17 +264,26 @@ uv add <pkg>            # add runtime dependency
 uv add --dev <pkg>      # add dev dependency
 ```
 
-## Kaiko Ray Smoke Test
+## Kaiko Ray Submission
 
-For a minimal Kaiko cluster submission smoke test, keep the submission tooling out of the
-project environment and create a dedicated local env instead.
+Submitting to the Kaiko Ray cluster uses two separate environments:
+
+- a local submission env, `.venv-kray`, which only needs `kray` and related CLI tooling
+- a remote job env, generated from `ray/runtime_envs/runtime_env_template.yml` and `ray/runtime_envs/conda.yml`
+
+`ray/submit.sh` is the entrypoint. It reads `.env.kaiko`, renders
+`ray/runtime_envs/runtime_env.yml`, uploads the repo as the Ray working directory, and submits
+the command through `kray job submit`.
+
+### 1 — Create the local submission env
 
 Prerequisites:
 
 - Kaiko VPN must be enabled during install and job submission.
-- The packages come from Kaiko's Nexus Python index.
+- `envsubst` must be on `PATH` because `ray/submit.sh` uses it to render the runtime env YAML.
+- The Kaiko submission packages come from Kaiko's Nexus Python index.
 
-Create the submission env:
+Create the dedicated submitter env:
 
 ```bash
 uv venv .venv-kray
@@ -279,59 +293,97 @@ uv pip install --python .venv-kray/bin/python \
   kaiko-ray-plugins kaiko-kray
 ```
 
-Then submit a minimal job:
+If `envsubst` is missing on macOS, install `gettext` and expose it on `PATH` before submitting.
+
+### 2 — Verify the repo-side modules used by Ray
+
+The remote runtime uploads local source trees through `py_modules` instead of relying on editable
+installs. `ray/submit.sh` expects these paths:
 
 ```bash
-bash ray/submit.sh
-bash ray/submit.sh pwd
-bash ray/submit.sh "ls -la"
-```
-
-The minimal smoke-test command being submitted is:
-
-```bash
-kray job submit --address https://chuv.nebul.prd.kaiko.ai -- bash -c "<command>"
-```
-
-For cluster submission, `ray/submit.sh` reads `.env.kaiko` and renders the runtime env.
-
-## Kaiko Ray Runtime Environment
-
-For actual `xenium-hne-fusion` jobs on the Kaiko Ray cluster, mirror the FMX setup with:
-
-- `--working-dir` set to the repo root
-- a generated Ray runtime env YAML
-- a minimal conda env with Python 3.12 and `pip`
-- a checked-in `requirements.txt` snapshot exported from `uv.lock`
-- `py_modules` entries for local source packages that are not available from an index
-
-`ai4bmr-learn` is handled like FMX handles local libraries: it is uploaded through `py_modules`
-from a `KAIKO_OTHER_MODULES_PATH` folder instead of being installed from a local editable path.
-
-This repo uses a local mirror of that layout:
-
-```bash
+src/xenium_hne_fusion
 ray/other_modules/ai4bmr-learn -> ../../../ai4bmr-learn
 ```
 
-The helper uses the repo-local path:
+If the `ai4bmr-learn` symlink is missing, recreate it from the repo root:
 
 ```bash
-KAIKO_OTHER_MODULES_PATH=ray/other_modules
+ln -s ../../../ai4bmr-learn ray/other_modules/ai4bmr-learn
 ```
 
-Cluster-side environment variables come from `.env.kaiko`, notably:
+Do not edit `ray/runtime_envs/runtime_env.yml` by hand. It is generated from the template on each
+submission.
+
+### 3 — Create `.env.kaiko`
+
+Cluster-side paths, tokens, and cache locations live in `.env.kaiko`. `ray/submit.sh` exports this
+file and injects its values into the Ray runtime env.
+
+Start with something like:
 
 ```bash
 DATA_DIR=/raid/ray/shared/fmx/data/processed-v0
 HEST1K_RAW_DIR=/raid/ray/shared/data/public/bronze/hest
 BEAT_RAW_DIR=/raid/ray/shared/data/private
-HF_TOKEN=...
+
+HF_TOKEN=hf_...
 WANDB_API_KEY=...
+WANDB_BASE_URL=https://api.wandb.ai
+
+HF_HOME=/raid/ray/shared/cache/huggingface
+HF_HUB_CACHE=/raid/ray/shared/cache/huggingface/hub
+TORCH_HOME=/raid/ray/shared/cache/torch
+DATASETS_CACHE=/raid/ray/shared/cache/datasets
+CACHE_DIR_HELICAL=/raid/ray/shared/cache/helical
 ```
 
-Once those are set, submit a job with the prepared runtime env:
+`WANDB_API_KEY` is required by the submission wrapper. The dataset and cache paths above are the
+ones typically needed by real data-processing and training jobs.
+
+### 4 — Smoke test the submission path
+
+First activate the local submitter env:
 
 ```bash
-bash ray/submit.sh pwd
+source .venv-kray/bin/activate
 ```
+
+Then run a few small jobs in order:
+
+```bash
+bash ray/submit.sh
+bash ray/scripts/disk_space.sh
+bash ray/submit.sh "bash ray/scripts/test_env.sh"
+```
+
+These check, respectively:
+
+- the basic `pwd` submission path
+- filesystem visibility inside the cluster job
+- that `xenium_hne_fusion`, `ai4bmr_learn`, `torch`, and `lightning` import correctly in the remote env
+
+### 5 — Submit repo scripts
+
+The general pattern is:
+
+```bash
+bash ray/submit.sh "python <repo-script> <args>"
+```
+
+Examples:
+
+```bash
+bash ray/submit.sh "python scripts/data/process_metadata.py --dataset hest1k"
+bash ray/submit.sh "python scripts/train/supervised.py --cfg configs/train/hest1k/expression/early-fusion.yaml"
+```
+
+For the end-to-end HEST1K pipeline there is also a small wrapper that forwards its arguments to
+`scripts/data/run_hest1k.py` before submitting:
+
+```bash
+bash ray/scripts/run_hest1k.sh --sample_id TENX95
+bash ray/scripts/run_hest1k.sh --organ breast
+```
+
+When adding a new cluster job, prefer testing the command locally with `uv run ...` first, then
+submit the same Python invocation through `bash ray/submit.sh "python ..."`.
