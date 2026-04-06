@@ -9,6 +9,7 @@ from loguru import logger
 load_dotenv()
 
 from xenium_hne_fusion.hvg import create_hvg_panel, load_hvg_recipe
+from xenium_hne_fusion.metadata import get_default_split_path, load_split_config
 from xenium_hne_fusion.utils.getters import load_pipeline_config
 
 
@@ -21,9 +22,11 @@ def main(
     cfg = load_pipeline_config(dataset, config_path)
     recipe_path = recipe_path or (Path('configs/panel_recipes') / dataset / 'default.yaml')
     recipe = load_hvg_recipe(recipe_path)
+    split_cfg = load_split_config(Path('configs/splits') / f'{dataset}.yaml')
 
     items_path = cfg.output_dir / 'items' / f'{recipe.items_name}.json'
-    split_metadata_path = cfg.output_dir / 'splits' / f'{recipe.split_name}.parquet'
+    split_dir = cfg.output_dir / 'splits' / recipe.split_name
+    split_metadata_path = get_default_split_path(split_dir, split_cfg)
     output_path = cfg.output_dir / 'panels' / f'{recipe.panel_name}.yaml'
 
     if output_path.exists() and not overwrite:

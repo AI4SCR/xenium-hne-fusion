@@ -1,4 +1,4 @@
-"""Generate tile-level split metadata by joining items with sample metadata."""
+"""Generate tile-level split metadata collection by joining items with sample metadata."""
 
 from pathlib import Path
 
@@ -30,14 +30,14 @@ def main(
 
     items_path = items_path or (cfg.output_dir / 'items' / 'all.json')
     metadata_path = metadata_path or (cfg.processed_dir / 'metadata.parquet')
-    output_path = cfg.output_dir / 'splits' / f'{split_cfg.split_name}.parquet'
+    split_dir = cfg.output_dir / 'splits' / split_cfg.split_name
 
-    if output_path.exists() and not overwrite:
-        logger.info(f'Split metadata already exists: {output_path}')
+    if split_dir.exists() and not overwrite:
+        logger.info(f'Split metadata already exists: {split_dir}')
         return
 
     joined = join_items_with_metadata(items_path, metadata_path)
-    save_split_metadata(joined, output_path, split_cfg, overwrite=overwrite)
+    save_split_metadata(joined, split_dir, split_cfg, overwrite=overwrite)
 
 
 if __name__ == '__main__':

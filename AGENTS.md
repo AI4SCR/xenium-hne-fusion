@@ -77,14 +77,11 @@ Metadata is split across two levels:
 ```bash
 DATA_DIR/01_structured/<name>/metadata.{csv,parquet}   # raw metadata symlink
 DATA_DIR/02_processed/<name>/metadata.parquet          # cleaned sample-level metadata
-DATA_DIR/03_output/<name>/splits/<split_name>.parquet  # canonical tile-level metadata + split labels
 DATA_DIR/03_output/<name>/splits/<split_name>/         # full split set from save_splits
 ```
 
 The split parquet is built by joining `items/all.json` with sample-level metadata on `sample_id`,
 replicating sample annotations onto each tile row, then applying `save_splits(...)`.
-The canonical tile-level split parquet is the metadata file consumed by `TileDataset`.
-
 Dataset outputs reserve:
 
 ```bash

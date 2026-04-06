@@ -17,13 +17,28 @@ from xenium_hne_fusion.download import (
 from xenium_hne_fusion.utils.getters import load_pipeline_config, resolve_samples
 
 
+def get_hest_metadata_path(raw_dir: Path) -> Path:
+    metadata_path = raw_dir / 'HEST_v1_3_0.csv'
+    if metadata_path.exists():
+        return metadata_path
+    return download_hest_metadata(raw_dir)
+
+
+def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
+    wsi_files = list((raw_dir / 'wsis').glob(f'{sample_id}*'))
+    tx_files = list((raw_dir / 'transcripts').glob(f'{sample_id}*'))
+    if len(wsi_files) == 1 and len(tx_files) == 1:
+        return
+    download_sample(sample_id, raw_dir)
+
+
 def main(dataset: str, config_path: Path | None = None) -> None:
     cfg = load_pipeline_config(dataset, config_path)
-    metadata_csv = download_hest_metadata(cfg.raw_dir)
+    metadata_csv = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_csv, cfg.structured_dir)
     samples = resolve_samples(cfg, metadata_csv)
     for sample_id in samples:
-        download_sample(sample_id, cfg.raw_dir)
+        ensure_hest_sample_downloaded(sample_id, cfg.raw_dir)
         validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_csv)
         create_structured_symlinks(sample_id, cfg.raw_dir, cfg.structured_dir)
 

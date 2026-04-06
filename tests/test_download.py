@@ -237,3 +237,62 @@ def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.Monke
         ('validate_hest_sample_mpp', 'NCBI783', raw_dir.resolve(), metadata_path),
         ('create_structured_symlinks', 'NCBI783', raw_dir.resolve(), structured_dir.resolve()),
     ]
+
+
+def test_structure_hest1k_reuses_existing_raw_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  sample_ids:\n'
+        '    - NCBI783\n'
+    )
+
+    (raw_dir / 'wsis').mkdir(parents=True, exist_ok=True)
+    (raw_dir / 'transcripts').mkdir(parents=True, exist_ok=True)
+    metadata_path = raw_dir / 'HEST_v1_3_0.csv'
+    metadata_path.write_text('id\nNCBI783\n')
+    (raw_dir / 'wsis' / 'NCBI783.tif').write_text('wsi')
+    (raw_dir / 'transcripts' / 'NCBI783_transcripts.parquet').write_text('tx')
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/structure_hest1k.py', 'structure_hest1k_reuse_script')
+
+    calls = []
+
+    def fail_download_hest_metadata(raw_dir_arg: Path) -> Path:
+        raise AssertionError(f'download_hest_metadata should not be called for {raw_dir_arg}')
+
+    def fake_create_structured_metadata_symlink(metadata_path_arg: Path, structured_dir_arg: Path) -> None:
+        calls.append(('create_structured_metadata_symlink', metadata_path_arg, structured_dir_arg))
+
+    def fail_download_sample(sample_id: str, raw_dir_arg: Path) -> Path:
+        raise AssertionError(f'download_sample should not be called for {sample_id} in {raw_dir_arg}')
+
+    def fake_validate_hest_sample_mpp(sample_id: str, raw_dir_arg: Path, metadata_path_arg: Path) -> None:
+        calls.append(('validate_hest_sample_mpp', sample_id, raw_dir_arg, metadata_path_arg))
+
+    def fake_create_structured_symlinks(sample_id: str, raw_dir_arg: Path, structured_dir_arg: Path) -> None:
+        calls.append(('create_structured_symlinks', sample_id, raw_dir_arg, structured_dir_arg))
+
+    monkeypatch.setattr(module, 'download_hest_metadata', fail_download_hest_metadata)
+    monkeypatch.setattr(module, 'create_structured_metadata_symlink', fake_create_structured_metadata_symlink)
+    monkeypatch.setattr(module, 'download_sample', fail_download_sample)
+    monkeypatch.setattr(module, 'validate_hest_sample_mpp', fake_validate_hest_sample_mpp)
+    monkeypatch.setattr(module, 'create_structured_symlinks', fake_create_structured_symlinks)
+
+    module.main('hest1k', config_path=config_path)
+
+    structured_dir = data_dir / '01_structured' / 'hest1k'
+    assert calls == [
+        ('create_structured_metadata_symlink', metadata_path, structured_dir.resolve()),
+        ('validate_hest_sample_mpp', 'NCBI783', raw_dir.resolve(), metadata_path),
+        ('create_structured_symlinks', 'NCBI783', raw_dir.resolve(), structured_dir.resolve()),
+    ]

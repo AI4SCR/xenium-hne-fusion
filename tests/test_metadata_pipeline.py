@@ -60,6 +60,45 @@ def test_process_metadata_writes_cleaned_sample_metadata(monkeypatch: pytest.Mon
     assert 'id' not in metadata.columns
 
 
+def test_process_metadata_writes_beat_metadata_to_processed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'beat'
+    structured_dir = data_dir / '01_structured' / 'beat'
+    config_path = tmp_path / 'beat.yaml'
+    raw_metadata_path = raw_dir / 'metadata.parquet'
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {'sample_id': 'S1', 'patient': 'P1'},
+            {'sample_id': 'S2', 'patient': 'P2'},
+        ]
+    ).set_index('sample_id').to_parquet(raw_metadata_path)
+    link_structured_metadata(raw_metadata_path, structured_dir)
+
+    config_path.write_text(
+        'name: beat\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  sample_ids:\n'
+        '    - S2\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('BEAT_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/process_metadata.py', 'process_metadata_beat_script')
+    module.main('beat', config_path=config_path)
+
+    output_path = data_dir / '02_processed' / 'beat' / 'metadata.parquet'
+    assert output_path.exists()
+
+    metadata = pd.read_parquet(output_path)
+    assert metadata['sample_id'].tolist() == ['S2']
+
+
 def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -114,12 +153,10 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     module = _load_script('scripts/data/create_splits.py', 'create_splits_script')
     module.main('hest1k', config_path=config_path, split_config_path=split_config_path, overwrite=True)
 
-    split_path = output_dir / 'splits' / 'default.parquet'
     split_dir = output_dir / 'splits' / 'default'
-    assert split_path.exists()
     assert split_dir.exists()
 
-    split_metadata = pd.read_parquet(split_path)
+    split_metadata = pd.read_parquet(split_dir / 'outer=0-inner=0-seed=0.parquet')
     assert set(split_metadata.index) == {item['id'] for item in items}
     assert {'sample_id', 'tile_id', 'tile_dir', 'patient', 'cohort', 'split'} <= set(split_metadata.columns)
 

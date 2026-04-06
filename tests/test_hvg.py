@@ -138,16 +138,16 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     tile_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
-    (output_dir / 'splits').mkdir(parents=True, exist_ok=True)
+    (output_dir / 'splits' / 'default').mkdir(parents=True, exist_ok=True)
 
     _write_transcripts_parquet(tile_dir, ['A', 'B'], ['A', 'B', 'B', 'B'])
-    (output_dir / 'items' / 'all.json').write_text(
-        json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
-    )
+    items = json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
+    (output_dir / 'items' / 'all.json').write_text(items)
+    (output_dir / 'items' / 'default.json').write_text(items)
     pd.DataFrame(
         {'split': ['fit']},
         index=pd.Index(['TENX95_0'], name='id'),
-    ).to_parquet(output_dir / 'splits' / 'default.parquet')
+    ).to_parquet(output_dir / 'splits' / 'default' / 'outer=0-inner=0-seed=0.parquet')
 
     recipe_path.write_text(
         'panel_name: hvg-default\n'
