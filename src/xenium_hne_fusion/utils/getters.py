@@ -51,6 +51,7 @@ class PipelineConfig:
 @dataclass
 class ItemsFilterConfig:
     name: str
+    organs: list[str] | None = None
     num_transcripts: int | None = None
     num_unique_transcripts: int | None = None
     num_cells: int | None = None
@@ -61,6 +62,7 @@ def load_items_filter_config(path: Path) -> ItemsFilterConfig:
     data = yaml.safe_load(path.read_text())
     return ItemsFilterConfig(
         name=data['name'],
+        organs=data.get('organs'),
         num_transcripts=data.get('num_transcripts'),
         num_unique_transcripts=data.get('num_unique_transcripts'),
         num_cells=data.get('num_cells'),
