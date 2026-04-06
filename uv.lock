@@ -4038,12 +4038,16 @@ dependencies = [
     { name = "lazyslide" },
     { name = "lightning" },
     { name = "loguru" },
+    { name = "matplotlib" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "scanpy" },
+    { name = "scikit-image" },
     { name = "scikit-misc" },
+    { name = "scipy" },
+    { name = "spatialdata" },
     { name = "tiffslide" },
     { name = "timm" },
     { name = "torch" },
@@ -4051,6 +4055,7 @@ dependencies = [
     { name = "torchvision" },
     { name = "transformers" },
     { name = "wandb" },
+    { name = "wsidata" },
 ]
 
 [package.dev-dependencies]
@@ -4069,12 +4074,16 @@ requires-dist = [
     { name = "lazyslide", specifier = ">=0.10.0" },
     { name = "lightning" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "matplotlib" },
     { name = "pandas" },
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scanpy" },
+    { name = "scikit-image" },
     { name = "scikit-misc" },
+    { name = "scipy" },
+    { name = "spatialdata" },
     { name = "tiffslide", specifier = ">=3.0.0" },
     { name = "timm" },
     { name = "torch", specifier = ">=2.11.0" },
@@ -4082,6 +4091,7 @@ requires-dist = [
     { name = "torchvision" },
     { name = "transformers", specifier = ">=4.47" },
     { name = "wandb" },
+    { name = "wsidata" },
 ]
 
 [package.metadata.requires-dev]

@@ -258,3 +258,80 @@ uv run pytest           # run tests
 uv add <pkg>            # add runtime dependency
 uv add --dev <pkg>      # add dev dependency
 ```
+
+## Kaiko Ray Smoke Test
+
+For a minimal Kaiko cluster submission smoke test, keep the submission tooling out of the
+project environment and create a dedicated local env instead.
+
+Prerequisites:
+
+- Kaiko VPN must be enabled during install and job submission.
+- The packages come from Kaiko's Nexus Python index.
+
+Create the submission env:
+
+```bash
+uv venv .venv-kray
+source .venv-kray/bin/activate
+uv pip install --python .venv-kray/bin/python \
+  --extra-index-url https://nexus.infra.prd.kaiko.ai/repository/python-all/simple \
+  kaiko-ray-plugins kaiko-kray
+```
+
+Then submit a minimal job:
+
+```bash
+bash ray/submit.sh
+bash ray/submit.sh pwd
+bash ray/submit.sh "ls -la"
+```
+
+The minimal smoke-test command being submitted is:
+
+```bash
+kray job submit --address https://chuv.nebul.prd.kaiko.ai -- bash -c "<command>"
+```
+
+For cluster submission, `ray/submit.sh` reads `.env.kaiko` and renders the runtime env.
+
+## Kaiko Ray Runtime Environment
+
+For actual `xenium-hne-fusion` jobs on the Kaiko Ray cluster, mirror the FMX setup with:
+
+- `--working-dir` set to the repo root
+- a generated Ray runtime env YAML
+- a minimal conda env with Python 3.12 and `pip`
+- a checked-in `requirements.txt` snapshot exported from `uv.lock`
+- `py_modules` entries for local source packages that are not available from an index
+
+`ai4bmr-learn` is handled like FMX handles local libraries: it is uploaded through `py_modules`
+from a `KAIKO_OTHER_MODULES_PATH` folder instead of being installed from a local editable path.
+
+This repo uses a local mirror of that layout:
+
+```bash
+ray/other_modules/ai4bmr-learn -> ../../../ai4bmr-learn
+```
+
+The helper uses the repo-local path:
+
+```bash
+KAIKO_OTHER_MODULES_PATH=ray/other_modules
+```
+
+Cluster-side environment variables come from `.env.kaiko`, notably:
+
+```bash
+DATA_DIR=/raid/ray/shared/fmx/data/processed-v0
+HEST1K_RAW_DIR=/raid/ray/shared/data/public/bronze/hest
+BEAT_RAW_DIR=/raid/ray/shared/data/private
+HF_TOKEN=...
+WANDB_API_KEY=...
+```
+
+Once those are set, submit a job with the prepared runtime env:
+
+```bash
+bash ray/submit.sh pwd
+```

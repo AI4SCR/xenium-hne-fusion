@@ -1,0 +1,40 @@
+name: xenium-hne-fusion-ray
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - pip
+  - pip:
+      - wandb
+      - anndata
+      - colorcet
+      - glom
+      - numpy
+      - pandas
+      - geopandas
+      - huggingface-hub
+      - jsonargparse
+      - lazyslide
+      - lightning
+      - loguru
+      - matplotlib
+      - opencv-python
+      - openslide-bin
+      - openslide-python
+      - pillow
+      - pyarrow
+      - python-dotenv
+      - pyyaml
+      - scanpy
+      - scikit-image
+      - scikit-learn
+      - scikit-misc
+      - scipy
+      - spatialdata
+      - tiffslide
+      - torch
+      - torchinfo
+      - tqdm
+      - wsidata
+      - zarr

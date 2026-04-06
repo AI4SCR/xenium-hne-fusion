@@ -1,0 +1,37 @@
+env_vars:
+  DATA_DIR: ${DATA_DIR}
+  HEST1K_RAW_DIR: ${HEST1K_RAW_DIR}
+  BEAT_RAW_DIR: ${BEAT_RAW_DIR}
+  HF_TOKEN: ${HF_TOKEN}
+  HF_HOME: ${HF_HOME}
+  HF_HUB_CACHE: ${HF_HUB_CACHE}
+  TORCH_HOME: ${TORCH_HOME}
+  DATASETS_CACHE: ${DATASETS_CACHE}
+  CACHE_DIR_HELICAL: ${CACHE_DIR_HELICAL}
+  WANDB_BASE_URL: ${WANDB_BASE_URL}
+  WANDB_API_KEY: ${WANDB_API_KEY}
+
+excludes:
+  - .venv/
+  - .venv-kray/
+  - .git/
+  - .idea/
+  - __pycache__/
+  - '*.ipynb'
+  - '*.parquet'
+  - '*.pt'
+  - '*.png'
+  - '*.jpg'
+  - '*.tif'
+  - '*.tiff'
+  - '*.log'
+  - '*.safetensors'
+
+conda: ray/runtime_envs/conda.yml
+
+py_modules:
+  - ${KAIKO_XENIUM_MODULE_PATH}
+  - ${KAIKO_AI4BMR_MODULE_PATH}
+
+config:
+  setup_timeout_seconds: 1800

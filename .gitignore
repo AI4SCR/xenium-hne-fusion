@@ -94,7 +94,9 @@ cover/
 
 # Virtual environments
 .env
+.env.kaiko
 .venv
+.venv-kray/
 env/
 venv/
 ENV/
@@ -144,3 +146,11 @@ checkpoints/
 
 # Claude
 .claude/
+.codex/
+
+# Codex
+.codex_skill_tmp/
+
+# Kaiko
+kaiko-ca-bundle.pem
+ray/runtime_envs/runtime_env.yml
