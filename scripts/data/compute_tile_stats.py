@@ -2,7 +2,7 @@
 
 Output:
   DATA_DIR/03_output/<name>/statistics/<items_name>.parquet
-  figures/<name>/tile_stats_<items_name>/*.png
+  figures/<name>/tile_stats/<items_name>/*.png
 """
 
 from pathlib import Path
@@ -52,6 +52,51 @@ def _format_axis_ticks(ax, axis: str = 'x') -> None:
         the_axis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v / 1000:.0f}k'))
 
 
+def _resolve_items_path(cfg, items_path: Path | None) -> tuple[Path, str]:
+    if items_path is None:
+        items_path = cfg.paths.output_dir / 'items' / 'all.json'
+    else:
+        items_path = Path(items_path)
+
+    assert items_path.suffix == '.json', f'Expected a .json items file, got: {items_path}'
+    return items_path, items_path.stem
+
+
+def _plot_transcript_scatter(stats: pd.DataFrame, output_dir: Path, *, log_axes: bool) -> None:
+    scatter = stats[['num_transcripts', 'num_unique_transcripts']].dropna()
+    if log_axes:
+        scatter = scatter[(scatter['num_transcripts'] > 0) & (scatter['num_unique_transcripts'] > 0)]
+
+    if scatter.empty:
+        logger.info(f'Skipping transcript scatter plot with log_axes={log_axes}: no valid rows')
+        return
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.scatter(
+        scatter['num_transcripts'],
+        scatter['num_unique_transcripts'],
+        s=8,
+        alpha=0.5,
+        linewidths=0,
+    )
+    ax.set_xlabel('num_transcripts')
+    ax.set_ylabel('num_unique_transcripts')
+    ax.set_title('num_transcripts vs num_unique_transcripts')
+
+    suffix = 'log' if log_axes else 'linear'
+    if log_axes:
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+
+    _format_axis_ticks(ax, 'x')
+    _format_axis_ticks(ax, 'y')
+    fig.tight_layout()
+    output_path = output_dir / f'num_transcripts_vs_num_unique_transcripts_{suffix}.png'
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    logger.info(f'Saved diagnostic plot → {output_path}')
+
+
 def plot_tile_stats(stats: pd.DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     cols = [c for c in STAT_COLS if c in stats.columns and stats[c].notna().any()]
@@ -87,23 +132,27 @@ def plot_tile_stats(stats: pd.DataFrame, output_dir: Path) -> None:
         plt.close(fig)
         logger.info(f'Saved diagnostic plot → {output_dir / col}.png')
 
+    _plot_transcript_scatter(stats, output_dir, log_axes=False)
+    _plot_transcript_scatter(stats, output_dir, log_axes=True)
+
 
 def main(
     dataset: str,
-    items_name: str = 'all',
+    items_path: Path | None = None,
     cell_type_col: str = 'Level3_grouped',
     config_path: Path | None = None,
     overwrite: bool = False,
 ) -> None:
     load_dotenv()
     cfg = load_pipeline_config(dataset, config_path)
-    stats_path = cfg.paths.output_dir / 'statistics' / f'{items_name}.parquet'
+    items_path, resolved_items_name = _resolve_items_path(cfg, items_path)
+    stats_path = cfg.paths.output_dir / 'statistics' / f'{resolved_items_name}.parquet'
 
     if stats_path.exists() and not overwrite:
         logger.info(f'Statistics already exist: {stats_path}')
         return
 
-    items_path = cfg.paths.output_dir / 'items' / f'{items_name}.json'
+    assert items_path.exists(), f'Items not found: {items_path}'
     items_df = load_items_dataframe(items_path)
     items = items_df.to_dict('records')
     logger.info(f'Computing stats for {len(items)} tiles from {items_path}')
@@ -115,7 +164,7 @@ def main(
     stats.to_parquet(stats_path)
     logger.info(f'Saved statistics → {stats_path}')
 
-    figures_dir = Path('figures') / cfg.processing.name / 'tile_stats' / items_name
+    figures_dir = Path('figures') / cfg.processing.name / 'tile_stats' / resolved_items_name
     plot_tile_stats(stats, figures_dir)
 
 

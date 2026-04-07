@@ -192,7 +192,7 @@ This creates:
 Then join items with sample-level metadata and cache tile-level splits:
 
 ```bash
-uv run scripts/data/create_splits.py --dataset hest1k
+uv run scripts/data/create_splits.py --config configs/data/local/hest1k.yaml
 ```
 
 The split parquet is tile-level. Its index is item `id`, and each tile row keeps:
@@ -204,22 +204,24 @@ The split parquet is tile-level. Its index is item `id`, and each tile row keeps
 `03_output/<name>/splits/<split_name>/`. Training configs and HVG recipes should point to a concrete
 parquet inside that folder, such as `default/outer=0-inner=0-seed=0.parquet`.
 
-For HEST1K organ-specific datasets, `create_splits.py` does not infer the matching item set on its own.
-You must pass both the organ item filter and the organ split recipe explicitly:
+For HEST1K organ-specific datasets, use the same processing config and override the nested
+`items.*` and `split.*` fields on the CLI:
 
 ```bash
 uv run scripts/data/filter_items.py \
-  --dataset hest1k \
-  --items_config_path configs/items/hest1k/breast.yaml
+  --config configs/data/local/hest1k.yaml \
+  --items.name breast \
+  --items.filter.organs '[Breast]'
 
 uv run scripts/data/create_splits.py \
-  --dataset hest1k \
-  --split_config_path configs/splits/hest1k/breast.yaml \
-  --items_path data/03_output/hest1k/items/breast.json
+  --config configs/data/local/hest1k.yaml \
+  --items.name breast \
+  --items.filter.organs '[Breast]' \
+  --split.split_name breast
 ```
 
-Repeat the same pattern for `lung` and `pancreas` with the corresponding files under
-`configs/items/hest1k/` and `configs/splits/hest1k/`.
+Repeat the same pattern for `lung` and `pancreas` by changing `items.name`,
+`items.filter.organs`, and `split.split_name`.
 
 ### 7 — HVG panels
 
@@ -364,13 +366,13 @@ This single command:
 Then create the organ-specific item sets, split collections, and HVG panels:
 
 ```bash
-uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/breast.yaml
-uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/lung.yaml
-uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/pancreas.yaml
+uv run scripts/data/filter_items.py --config configs/data/remote/hest1k.yaml --items.name breast --items.filter.organs '[Breast]'
+uv run scripts/data/filter_items.py --config configs/data/remote/hest1k.yaml --items.name lung --items.filter.organs '[Lung]'
+uv run scripts/data/filter_items.py --config configs/data/remote/hest1k.yaml --items.name pancreas --items.filter.organs '[Pancreas]'
 
-uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/breast.yaml --items_path data/03_output/hest1k/items/breast.json
-uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/lung.yaml --items_path data/03_output/hest1k/items/lung.json
-uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/pancreas.yaml --items_path data/03_output/hest1k/items/pancreas.json
+uv run scripts/data/create_splits.py --config configs/data/remote/hest1k.yaml --items.name breast --items.filter.organs '[Breast]' --split.split_name breast
+uv run scripts/data/create_splits.py --config configs/data/remote/hest1k.yaml --items.name lung --items.filter.organs '[Lung]' --split.split_name lung
+uv run scripts/data/create_splits.py --config configs/data/remote/hest1k.yaml --items.name pancreas --items.filter.organs '[Pancreas]' --split.split_name pancreas
 
 uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-default-default-outer=0-seed=0.yaml
 uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-breast-default-outer=0-seed=0.yaml
