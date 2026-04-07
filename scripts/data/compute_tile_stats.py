@@ -16,32 +16,7 @@ from loguru import logger
 from tqdm import tqdm
 
 from xenium_hne_fusion.metadata import load_items_dataframe
-from xenium_hne_fusion.utils.getters import load_pipeline_config
-
-STAT_COLS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
-
-
-def _compute_item_stats(item: dict, cell_type_col: str) -> dict:
-    tile_dir = Path(item['tile_dir'])
-    transcripts = pd.read_parquet(tile_dir / 'transcripts.parquet', columns=['feature_name'])
-    num_transcripts = len(transcripts)
-    num_unique_transcripts = transcripts['feature_name'].nunique()
-
-    num_cells = float('nan')
-    num_unique_cells = float('nan')
-    cells_path = tile_dir / 'cells.parquet'
-    if cells_path.exists():
-        cells = pd.read_parquet(cells_path, columns=[cell_type_col])
-        num_cells = len(cells)
-        num_unique_cells = cells[cell_type_col].nunique()
-
-    return {
-        'id': item['id'],
-        'num_transcripts': num_transcripts,
-        'num_unique_transcripts': num_unique_transcripts,
-        'num_cells': num_cells,
-        'num_unique_cells': num_unique_cells,
-    }
+from xenium_hne_fusion.utils.getters import STAT_COLS, compute_item_stats, load_pipeline_config
 
 
 def _format_axis_ticks(ax, axis: str = 'x') -> None:
@@ -157,7 +132,7 @@ def main(
     items = items_df.to_dict('records')
     logger.info(f'Computing stats for {len(items)} tiles from {items_path}')
 
-    rows = [_compute_item_stats(item, cell_type_col) for item in tqdm(items, desc='Tiles')]
+    rows = [compute_item_stats(item, cell_type_col) for item in tqdm(items, desc='Tiles')]
     stats = pd.DataFrame(rows).set_index('id')
 
     stats_path.parent.mkdir(parents=True, exist_ok=True)

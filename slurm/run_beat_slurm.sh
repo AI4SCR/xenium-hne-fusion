@@ -66,7 +66,7 @@ SAMPLE_IDS=()
 while IFS= read -r sample_id; do
     SAMPLE_IDS+=("${sample_id}")
 done < <(
-    find "${BEAT_RAW_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+    find "${BEAT_RAW_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
 )
 
 [[ ${#SAMPLE_IDS[@]} -gt 0 ]] || {

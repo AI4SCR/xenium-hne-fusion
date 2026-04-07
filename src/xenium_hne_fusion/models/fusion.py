@@ -5,15 +5,6 @@ from loguru import logger
 from ai4bmr_learn.utils.pooling import pool
 from typing import Literal
 
-# NOTE
-# The forward_pass of this implementation is limited to `timm` vision encoders
-# check the sections with `TODO: LIMITATIONS`, these are the sections that need to be generalized
-
-def _freeze_module(module: nn.Module):
-    """Freeze the parameters of a module."""
-    for param in module.parameters():
-        param.requires_grad = False
-
 
 def _validate_config(morph_encoder, expr_encoder, fusion_strategy, fusion_stage, global_pool, morph_token_pool, expr_token_pool):
     assert morph_encoder is not None or expr_encoder is not None, (
@@ -99,7 +90,7 @@ class FusionModel(nn.Module):
         self.allow_unimodal_routes = allow_unimodal_routes
 
         self.fusion_strategy = fusion_strategy
-        self.fusion_stage =fusion_stage
+        self.fusion_stage = fusion_stage
 
         if fusion_strategy is None:
             assert (self.expr_encoder is None) != (self.morph_encoder is None), (
@@ -133,10 +124,10 @@ class FusionModel(nn.Module):
                 assert use_modality_embed is False and expr_encoder_dim == morph_encoder_dim, f'Modality embedding requires same embedding dimension. Use `use_proj=True`.'
 
         if freeze_morph_encoder and self.morph_encoder is not None:
-            _freeze_module(self.morph_encoder)
+            self.morph_encoder.requires_grad_(False)
 
         if freeze_expr_encoder and self.expr_encoder is not None:
-            _freeze_module(self.expr_encoder)
+            self.expr_encoder.requires_grad_(False)
 
         self.global_pool = global_pool
         self.expr_token_pool = expr_token_pool

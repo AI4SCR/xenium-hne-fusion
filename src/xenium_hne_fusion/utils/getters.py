@@ -236,6 +236,109 @@ def _require_env_path(var: str) -> Path:
     return Path(_require_env(var)).expanduser().resolve()
 
 
+DEFAULT_CELL_TYPE_COL = 'Level3_grouped'
+DEFAULT_SOURCE_ITEMS_NAME = 'all'
+STAT_COLS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
+
+
+def structured_done_path(cfg: 'PipelineConfig', sample_id: str) -> Path:
+    return cfg.paths.structured_dir / sample_id / '.structured.done'
+
+
+def processed_done_path(cfg: 'PipelineConfig', sample_id: str) -> Path:
+    tiles = cfg.processing.tiles
+    return cfg.paths.processed_dir / sample_id / f'{tiles.tile_px}_{tiles.stride_px}' / '.processed.done'
+
+
+def processed_sample_dir(cfg: 'PipelineConfig', sample_id: str) -> Path:
+    tiles = cfg.processing.tiles
+    return cfg.paths.processed_dir / sample_id / f'{tiles.tile_px}_{tiles.stride_px}'
+
+
+def is_sample_structured(cfg: 'PipelineConfig', sample_id: str) -> bool:
+    return structured_done_path(cfg, sample_id).exists()
+
+
+def is_sample_processed(cfg: 'PipelineConfig', sample_id: str) -> bool:
+    return processed_done_path(cfg, sample_id).exists()
+
+
+def mark_sample_structured(cfg: 'PipelineConfig', sample_id: str) -> None:
+    path = structured_done_path(cfg, sample_id)
+    assert path.parent.exists(), f'Structured sample dir missing: {path.parent}'
+    path.write_text(f'sample_id={sample_id}\nstage=structured\n')
+
+
+def mark_sample_processed(cfg: 'PipelineConfig', sample_id: str) -> None:
+    path = processed_done_path(cfg, sample_id)
+    assert path.parent.exists(), f'Processed sample dir missing: {path.parent}'
+    path.write_text(f'sample_id={sample_id}\nstage=processed\n')
+
+
+def clear_sample_markers(cfg: 'PipelineConfig', sample_id: str) -> None:
+    structured_done_path(cfg, sample_id).unlink(missing_ok=True)
+    processed_done_path(cfg, sample_id).unlink(missing_ok=True)
+
+
+def tile_item(tile_dir: Path, sample_id: str, tile_id: int, kernel_size: int = 16) -> dict | None:
+    if not (tile_dir / 'tile.pt').exists():
+        return None
+    if not (tile_dir / f'expr-kernel_size={kernel_size}.parquet').exists():
+        return None
+    if not (tile_dir / 'transcripts.parquet').exists():
+        return None
+    return {
+        'id': f'{sample_id}_{tile_id}',
+        'sample_id': sample_id,
+        'tile_id': tile_id,
+        'tile_dir': str(tile_dir),
+    }
+
+
+def iter_tile_dirs(sample_dir: Path) -> list[Path]:
+    direct_tile_dirs = [p for p in sample_dir.iterdir() if p.is_dir() and p.name.isdigit()]
+    if direct_tile_dirs:
+        return sorted(direct_tile_dirs, key=lambda p: int(p.name))
+    config_dirs = [p for p in sample_dir.iterdir() if p.is_dir()]
+    assert len(config_dirs) == 1, f'Expected exactly one tile-config dir in {sample_dir}, found {config_dirs}'
+    tile_root = config_dirs[0]
+    return sorted(
+        [p for p in tile_root.iterdir() if p.is_dir() and p.name.isdigit()],
+        key=lambda p: int(p.name),
+    )
+
+
+def compute_item_stats(item: dict, cell_type_col: str) -> dict:
+    tile_dir = Path(item['tile_dir'])
+    transcripts = pd.read_parquet(tile_dir / 'transcripts.parquet', columns=['feature_name'])
+
+    num_cells = float('nan')
+    num_unique_cells = float('nan')
+    cells_path = tile_dir / 'cells.parquet'
+    if cells_path.exists():
+        cells = pd.read_parquet(cells_path, columns=[cell_type_col])
+        num_cells = len(cells)
+        num_unique_cells = cells[cell_type_col].nunique()
+
+    return {
+        'id': item['id'],
+        'num_transcripts': len(transcripts),
+        'num_unique_transcripts': transcripts['feature_name'].nunique(),
+        'num_cells': num_cells,
+        'num_unique_cells': num_unique_cells,
+    }
+
+
+def apply_filter(stats: pd.DataFrame, cfg: 'ItemsFilterConfig') -> pd.Series:
+    mask = pd.Series(True, index=stats.index)
+    for field in STAT_COLS:
+        threshold = getattr(cfg, field)
+        if threshold is None:
+            continue
+        mask &= stats[field].isna() | (stats[field] >= threshold)
+    return mask
+
+
 def resolve_samples(cfg: ProcessingConfig | PipelineConfig, metadata_path: Path) -> list[str]:
     filter_cfg = cfg.processing.filter if isinstance(cfg, PipelineConfig) else cfg.filter
 

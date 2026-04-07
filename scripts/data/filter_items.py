@@ -14,21 +14,7 @@ from loguru import logger
 
 from xenium_hne_fusion.metadata import load_items_dataframe
 from xenium_hne_fusion.processing_cli import parse_processing_args
-from xenium_hne_fusion.utils.getters import ItemsFilterConfig, build_pipeline_config, load_pipeline_config
-
-_FILTER_FIELDS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
-
-
-def _apply_filter(stats: pd.DataFrame, cfg: ItemsFilterConfig) -> pd.Series:
-    mask = pd.Series(True, index=stats.index)
-    for field in _FILTER_FIELDS:
-        threshold = getattr(cfg, field)
-        if threshold is None:
-            continue
-        col = stats[field]
-        # NaN values (e.g. missing cells data) pass the filter
-        mask &= col.isna() | (col >= threshold)
-    return mask
+from xenium_hne_fusion.utils.getters import ItemsFilterConfig, apply_filter, build_pipeline_config, load_pipeline_config
 
 
 def main(
@@ -71,7 +57,7 @@ def main(
 
     stats = pd.read_parquet(stats_path)
 
-    mask = _apply_filter(stats, filter_cfg)
+    mask = apply_filter(stats, filter_cfg)
     kept_ids = set(stats.index[mask])
     filtered = items_df[items_df['id'].isin(kept_ids)]
 
