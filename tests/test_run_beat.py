@@ -334,7 +334,7 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path, source_items_name, overwrite: calls.append(("filtered",)),
+        lambda cfg, source_items_name="all", overwrite=False: calls.append(("filtered",)),
     )
 
     with pytest.raises(RuntimeError, match=r"Failed samples: \['S1'\]"):

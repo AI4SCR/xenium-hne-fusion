@@ -20,6 +20,7 @@ backbone:
 
 data:
   name: hest1k
+  num_workers: 10
   batch_size: 256
   expr_pool: token
   items_path: lung.json

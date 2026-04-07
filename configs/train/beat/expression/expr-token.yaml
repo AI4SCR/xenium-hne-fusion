@@ -19,6 +19,7 @@ backbone:
 
 data:
   name: beat
+  num_workers: 10
   batch_size: 256
   expr_pool: token
   items_path: all.json

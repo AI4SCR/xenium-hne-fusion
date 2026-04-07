@@ -1,7 +1,8 @@
 name: breast
-organs:
-  - Breast
-num_transcripts: 100
-num_unique_transcripts: null
-num_cells: null
-num_unique_cells: null
+filter:
+  organs:
+    - Breast
+  num_transcripts: 100
+  num_unique_transcripts: null
+  num_cells: null
+  num_unique_cells: null

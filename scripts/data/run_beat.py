@@ -10,7 +10,6 @@ from typing import Literal
 import geopandas as gpd
 import pandas as pd
 from dotenv import load_dotenv
-from jsonargparse import ArgumentParser
 from loguru import logger
 from tqdm import tqdm
 
@@ -30,6 +29,7 @@ from xenium_hne_fusion.metadata import (
     process_dataset_metadata,
     save_split_metadata,
 )
+from xenium_hne_fusion.processing_cli import parse_processing_args
 from xenium_hne_fusion.processing import (
     extract_tiles,
     process_cells,
@@ -334,35 +334,6 @@ def load_ray_module():
     return importlib.import_module("ray")
 
 
-def _build_parser() -> ArgumentParser:
-    parser = ArgumentParser()
-    parser.add_argument("--config", action="config", required=True, help="Path to a YAML config file.")
-    parser.add_argument("--name", type=str, required=True)
-    parser.add_class_arguments(TilesConfig, nested_key="tiles")
-    parser.add_class_arguments(FilterConfig, nested_key="filter")
-    parser.add_class_arguments(ItemsConfig, nested_key="items")
-    parser.add_class_arguments(SplitConfig, nested_key="split")
-    parser.add_argument("--overwrite", type=bool, default=False)
-    parser.add_argument("--executor", type=Literal["serial", "ray"], default="serial")
-    return parser
-
-
-def _namespace_to_processing_config(ns) -> ProcessingConfig:
-    data = ns.as_dict()
-    items_filter = data["items"]["filter"]
-    split = data["split"]
-    return ProcessingConfig(
-        name=data["name"],
-        tiles=TilesConfig(**data["tiles"]),
-        filter=FilterConfig(**data["filter"]),
-        items=ItemsConfig(
-            name=data["items"]["name"],
-            filter=ItemsThresholdConfig(**items_filter),
-        ),
-        split=SplitConfig(**split),
-    )
-
-
 def _run(
     processing_cfg: ProcessingConfig,
     overwrite: bool,
@@ -583,10 +554,9 @@ def main(
 
 
 def cli(argv: list[str] | None = None) -> None:
-    parser = _build_parser()
-    ns = parser.parse_args(argv)
-    processing_cfg = _namespace_to_processing_config(ns)
-    _run(processing_cfg, overwrite=ns.overwrite, executor=ns.executor)
+    processing_cfg, overwrite, executor = parse_processing_args(argv)
+    assert executor is not None
+    _run(processing_cfg, overwrite=overwrite, executor=executor)
 
 
 if __name__ == "__main__":

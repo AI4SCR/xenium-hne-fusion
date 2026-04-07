@@ -3,29 +3,28 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
 from loguru import logger
 
 load_dotenv()
 
 from xenium_hne_fusion.metadata import (
     join_items_with_metadata,
-    load_split_config,
     save_split_metadata,
 )
-from xenium_hne_fusion.utils.getters import load_pipeline_config
+from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.utils.getters import build_pipeline_config, infer_dataset, load_pipeline_config
 
 
 def main(
     dataset: str,
     config_path: Path | None = None,
-    split_config_path: Path | None = None,
     items_path: Path | None = None,
     metadata_path: Path | None = None,
     overwrite: bool = False,
+    processing_cfg=None,
 ) -> None:
-    cfg = load_pipeline_config(dataset, config_path)
-    split_cfg = cfg.processing.split if split_config_path is None else load_split_config(split_config_path)
+    cfg = load_pipeline_config(dataset, config_path) if processing_cfg is None else build_pipeline_config(processing_cfg)
+    split_cfg = cfg.processing.split
 
     items_path = items_path or (cfg.paths.output_dir / 'items' / 'all.json')
     metadata_path = metadata_path or (cfg.paths.processed_dir / 'metadata.parquet')
@@ -40,4 +39,11 @@ def main(
 
 
 if __name__ == '__main__':
-    auto_cli(main)
+    import sys
+
+    processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    main(
+        dataset=infer_dataset(processing_cfg.name),
+        overwrite=overwrite_arg,
+        processing_cfg=processing_cfg,
+    )

@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
 from loguru import logger
 
 from xenium_hne_fusion.metadata import load_items_dataframe
-from xenium_hne_fusion.utils.getters import ItemsFilterConfig, load_items_filter_config, load_pipeline_config
+from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.utils.getters import ItemsFilterConfig, build_pipeline_config, load_pipeline_config
 
 _FILTER_FIELDS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
 
@@ -33,14 +33,21 @@ def _apply_filter(stats: pd.DataFrame, cfg: ItemsFilterConfig) -> pd.Series:
 
 def main(
     dataset: str,
-    items_config_path: Path,
     source_items_name: str = 'all',
     config_path: Path | None = None,
     overwrite: bool = False,
+    processing_cfg=None,
 ) -> None:
     load_dotenv()
-    cfg = load_pipeline_config(dataset, config_path)
-    filter_cfg = load_items_filter_config(items_config_path)
+    cfg = load_pipeline_config(dataset, config_path) if processing_cfg is None else build_pipeline_config(processing_cfg)
+    filter_cfg = ItemsFilterConfig(
+        name=cfg.processing.items.name,
+        organs=cfg.processing.items.filter.organs,
+        num_transcripts=cfg.processing.items.filter.num_transcripts,
+        num_unique_transcripts=cfg.processing.items.filter.num_unique_transcripts,
+        num_cells=cfg.processing.items.filter.num_cells,
+        num_unique_cells=cfg.processing.items.filter.num_unique_cells,
+    )
 
     output_path = cfg.paths.output_dir / 'items' / f'{filter_cfg.name}.json'
     if output_path.exists() and not overwrite:
@@ -80,4 +87,13 @@ def main(
 
 
 if __name__ == '__main__':
-    auto_cli(main)
+    import sys
+
+    processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    main(
+        dataset=processing_cfg.name.split('-', 1)[0],
+        source_items_name='all',
+        config_path=None,
+        overwrite=overwrite_arg,
+        processing_cfg=processing_cfg,
+    )

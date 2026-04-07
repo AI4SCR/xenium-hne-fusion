@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from xenium_hne_fusion.utils.getters import load_processing_config
+
 
 def _load_filter_items_module():
     path = Path('scripts/data/filter_items.py').resolve()
@@ -32,7 +34,8 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     items_config_path = tmp_path / 'beat-items.yaml'
     items_config_path.write_text(
         'name: default\n'
-        'num_transcripts: 200\n'
+        'filter:\n'
+        '  num_transcripts: 200\n'
     )
 
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
@@ -60,11 +63,14 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv('BEAT_RAW_DIR', str(raw_dir))
 
     module = _load_filter_items_module()
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.items.name = 'default'
+    processing_cfg.items.filter.num_transcripts = 200
     module.main(
         'beat',
-        items_config_path=items_config_path,
-        config_path=config_path,
+        config_path=None,
         overwrite=True,
+        processing_cfg=processing_cfg,
     )
 
     filtered = json.loads((output_dir / 'items' / 'default.json').read_text())
@@ -120,11 +126,15 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_filter_items_module()
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.items.name = 'lung'
+    processing_cfg.items.filter.organs = ['Lung']
+    processing_cfg.items.filter.num_transcripts = 100
     module.main(
         'hest1k',
-        items_config_path=Path('configs/items/hest1k/lung.yaml'),
-        config_path=config_path,
+        config_path=None,
         overwrite=True,
+        processing_cfg=processing_cfg,
     )
 
     filtered = json.loads((output_dir / 'items' / 'lung.json').read_text())

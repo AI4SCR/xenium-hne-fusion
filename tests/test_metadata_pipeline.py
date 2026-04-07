@@ -109,7 +109,6 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     output_dir = data_dir / '03_output' / 'hest1k'
     processed_dir = data_dir / '02_processed' / 'hest1k'
     config_path = tmp_path / 'hest1k.yaml'
-    split_config_path = tmp_path / 'split.yaml'
 
     config_path.write_text(
         'name: hest1k\n'
@@ -119,15 +118,6 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
         'filter:\n'
         '  sample_ids: null\n'
     )
-    split_config_path.write_text(
-        'split_name: default\n'
-        'test_size: 0.2\n'
-        'val_size: null\n'
-        'stratify: false\n'
-        'group_column_name: sample_id\n'
-        'random_state: 0\n'
-    )
-
     sample_rows = []
     items = []
     for sample_idx in range(9):
@@ -152,7 +142,14 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_splits.py', 'create_splits_script')
-    module.main('hest1k', config_path=config_path, split_config_path=split_config_path, overwrite=True)
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.split.split_name = 'default'
+    processing_cfg.split.test_size = 0.2
+    processing_cfg.split.val_size = None
+    processing_cfg.split.stratify = False
+    processing_cfg.split.group_column_name = 'sample_id'
+    processing_cfg.split.random_state = 0
+    module.main('hest1k', config_path=None, overwrite=True, processing_cfg=processing_cfg)
 
     split_dir = output_dir / 'splits' / 'default'
     assert split_dir.exists()
@@ -179,7 +176,6 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
     output_dir = data_dir / '03_output' / 'hest1k'
     processed_dir = data_dir / '02_processed' / 'hest1k'
     config_path = tmp_path / 'hest1k.yaml'
-    split_config_path = tmp_path / 'lung.yaml'
 
     config_path.write_text(
         'name: hest1k\n'
@@ -189,15 +185,6 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
         'filter:\n'
         '  sample_ids: null\n'
     )
-    split_config_path.write_text(
-        'split_name: lung\n'
-        'test_size: 0.2\n'
-        'val_size: null\n'
-        'stratify: false\n'
-        'group_column_name: null\n'
-        'random_state: 0\n'
-    )
-
     sample_rows = []
     items = []
     for sample_idx in range(2):
@@ -222,12 +209,19 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_splits.py', 'create_splits_lung_script')
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.split.split_name = 'lung'
+    processing_cfg.split.test_size = 0.2
+    processing_cfg.split.val_size = None
+    processing_cfg.split.stratify = False
+    processing_cfg.split.group_column_name = None
+    processing_cfg.split.random_state = 0
     module.main(
         'hest1k',
-        config_path=config_path,
-        split_config_path=split_config_path,
+        config_path=None,
         items_path=output_dir / 'items' / 'lung.json',
         overwrite=True,
+        processing_cfg=processing_cfg,
     )
 
     split_path = output_dir / 'splits' / 'lung' / 'outer=0-seed=0.parquet'

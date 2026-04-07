@@ -13,24 +13,33 @@ MODEL_EMBEDDING_DIMS = {
     'conch_v1.5_trunk': 1024,
 }
 
-_log1p = lambda x: torch.log1p(x)
-_arcsinh= lambda x: torch.arcsinh(x)
+
+def log1p_transform(x: torch.Tensor) -> torch.Tensor:
+    return torch.log1p(x)
+
+
+def expm1_transform(x: torch.Tensor) -> torch.Tensor:
+    return torch.expm1(x).int()
+
+
+def is_half(value: float) -> bool:
+    return value == 0.5
+
 
 def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | None = None, output_dim: int | None = None, source_panel: list[str] | None = None, **kws):
     match expr_encoder_name:
         case "mlp":
             expr_encoder_dim = output_dim
             expr_encoder = Head(input_dim=input_dim, output_dim=output_dim, **kws)
-            expr_transform = _log1p
+            expr_transform = log1p_transform
         case "geneformer":
             from xenium_hne_fusion.models.geneformer import Geneformer
-            transform = lambda x: torch.expm1(x).int()
-            expr_encoder = Geneformer(gene_names=source_panel, transform=transform, **kws)
-            expr_transform = _log1p
+            expr_encoder = Geneformer(gene_names=source_panel, transform=expm1_transform, **kws)
+            expr_transform = log1p_transform
             expr_encoder_dim = expr_encoder.embed_dim
         case None:
             expr_encoder = None
-            expr_transform = _log1p
+            expr_transform = log1p_transform
             expr_encoder_dim = None
         case _:
             raise ValueError(f"Unknown expr_encoder_name: {expr_encoder_name}")
@@ -51,8 +60,8 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 
         transform = get_timm_transform(morph_encoder)
         normalize = get_normalize_from_transform(transform)
 
-        assert all(map(lambda x: x == 0.5, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
-        assert all(map(lambda x: x == 0.5, normalize.std)), f"Expected std 0.5, got {normalize.std}"
+        assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
+        assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
 
         # No spatial resize — tiles are assumed to be img_size × img_size already.
         image_transform = v2.Compose(

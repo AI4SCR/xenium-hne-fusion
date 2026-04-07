@@ -204,6 +204,36 @@ The split parquet is tile-level. Its index is item `id`, and each tile row keeps
 `03_output/<name>/splits/<split_name>/`. Training configs and HVG recipes should point to a concrete
 parquet inside that folder, such as `default/outer=0-inner=0-seed=0.parquet`.
 
+For HEST1K organ-specific datasets, `create_splits.py` does not infer the matching item set on its own.
+You must pass both the organ item filter and the organ split recipe explicitly:
+
+```bash
+uv run scripts/data/filter_items.py \
+  --dataset hest1k \
+  --items_config_path configs/items/hest1k/breast.yaml
+
+uv run scripts/data/create_splits.py \
+  --dataset hest1k \
+  --split_config_path configs/splits/hest1k/breast.yaml \
+  --items_path data/03_output/hest1k/items/breast.json
+```
+
+Repeat the same pattern for `lung` and `pancreas` with the corresponding files under
+`configs/items/hest1k/` and `configs/splits/hest1k/`.
+
+### 7 — HVG panels
+
+HEST1K expression training configs expect organ-specific HVG panel YAMLs under `panels/hest1k/`.
+Generate them from the saved split parquet and matching item set:
+
+```bash
+uv run scripts/data/create_hvg_panel.py \
+  --dataset hest1k \
+  --recipe_path configs/panels/hest1k/hvg-breast-default-outer=0-seed=0.yaml
+```
+
+Use the parallel recipe files for `lung`, `pancreas`, or the full default dataset.
+
 ## Configuration
 
 Sample filtering and dataset naming are controlled by a YAML config:
@@ -307,6 +337,60 @@ Notes:
   logic as `run_hest1k.py`.
 - Each submitted job runs the serial entrypoint for exactly one sample, e.g.
   `uv run scripts/data/run_hest1k.py ... --filter.sample_ids '[TENX95]'`.
+
+## Full Remote Reproduction
+
+To rebuild the full dataset on a remote machine, use the dataset-level runners first, then create the
+organ-specific HEST1K derivatives in a second pass.
+
+### HEST1K
+
+Run the full default HEST1K build:
+
+```bash
+uv run scripts/data/run_hest1k.py --config configs/data/remote/hest1k.yaml
+```
+
+This single command:
+- downloads or reuses raw HEST assets
+- structures sample-level inputs under `01_structured/hest1k/`
+- writes cleaned sample metadata to `02_processed/hest1k/metadata.parquet`
+- processes every eligible sample into `02_processed/hest1k/<sample_id>/...`
+- writes `03_output/hest1k/items/all.json`
+- writes `03_output/hest1k/statistics/all.parquet`
+- writes the filtered default item set `03_output/hest1k/items/default.json`
+- writes the default split collection under `03_output/hest1k/splits/default/`
+
+Then create the organ-specific item sets, split collections, and HVG panels:
+
+```bash
+uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/breast.yaml
+uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/lung.yaml
+uv run scripts/data/filter_items.py --dataset hest1k --items_config_path configs/items/hest1k/pancreas.yaml
+
+uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/breast.yaml --items_path data/03_output/hest1k/items/breast.json
+uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/lung.yaml --items_path data/03_output/hest1k/items/lung.json
+uv run scripts/data/create_splits.py --dataset hest1k --split_config_path configs/splits/hest1k/pancreas.yaml --items_path data/03_output/hest1k/items/pancreas.json
+
+uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-default-default-outer=0-seed=0.yaml
+uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-breast-default-outer=0-seed=0.yaml
+uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-lung-default-outer=0-seed=0.yaml
+uv run scripts/data/create_hvg_panel.py --dataset hest1k --recipe_path configs/panels/hest1k/hvg-pancreas-default-outer=0-seed=0.yaml
+```
+
+After that, the HEST1K training configs under `configs/train/hest1k/expression/*/` should resolve.
+
+### BEAT
+
+Run the full BEAT build:
+
+```bash
+uv run scripts/data/run_beat.py --config configs/data/remote/beat.yaml
+```
+
+This already produces the default processed metadata, `items/all.json`, `items/default.json`,
+`statistics/all.parquet`, and `splits/default/`. BEAT ships with `panels/beat/default.yaml`, so no
+extra organ-specific item or split generation step is needed.
 
 ## Training
 
