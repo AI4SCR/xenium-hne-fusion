@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
-from ai4bmr_learn.data.splits import save_splits
+from ai4bmr_learn.data.splits import Split, save_splits
 from loguru import logger
 
 from xenium_hne_fusion.config import SplitConfig
@@ -156,6 +156,66 @@ def load_split_config(path: Path) -> SplitConfig:
         group_column_name=data.get('group_column_name'),
         random_state=data.get('random_state'),
     )
+
+
+def load_named_split_ids(split_root: Path) -> dict[str, list[str]]:
+    split_root = Path(split_root)
+    split_to_ids: dict[str, list[str]] = {}
+    for split in ['train', 'val', 'test']:
+        path = split_root / f'{split}.csv'
+        assert path.exists(), f'Missing split file: {path}'
+        frame = pd.read_csv(path)
+        assert 'id' in frame.columns, f"Expected 'id' column in {path}"
+        ids = frame['id'].tolist()
+        assert len(ids) == len(set(ids)), f'Duplicate sample ids in {path}'
+        split_to_ids[split] = ids
+
+    universe = set().union(*map(set, split_to_ids.values()))
+    assigned = sum(len(ids) for ids in split_to_ids.values())
+    assert assigned == len(universe), f'Overlap across split files in {split_root}'
+    return split_to_ids
+
+
+def save_named_split_metadata(
+    joined_metadata: pd.DataFrame,
+    split_dir: Path,
+    split_to_sample_ids: dict[str, list[str]],
+    overwrite: bool = False,
+) -> Path:
+    if split_dir.exists():
+        assert overwrite, f'Split directory already exists: {split_dir}'
+        shutil.rmtree(split_dir)
+
+    assert joined_metadata.index.is_unique, 'Tile-level metadata index must be unique'
+    joined_metadata = joined_metadata.copy()
+    sample_ids = joined_metadata['sample_id']
+
+    split_to_value = {
+        'train': Split.FIT.value,
+        'val': Split.VAL.value,
+        'test': Split.TEST.value,
+    }
+    assigned_splits = pd.Series(pd.NA, index=joined_metadata.index, dtype='object')
+
+    for source_split, target_split in split_to_value.items():
+        split_ids = split_to_sample_ids[source_split]
+        mask = sample_ids.isin(split_ids)
+        assigned_splits.loc[mask] = target_split
+
+    missing = joined_metadata.loc[assigned_splits.isna(), 'sample_id'].drop_duplicates().tolist()
+    assert not missing, f'Samples missing split assignment: {missing}'
+
+    dtype = pd.CategoricalDtype(
+        categories=[Split.FIT.value, Split.VAL.value, Split.TEST.value],
+        ordered=False,
+    )
+    joined_metadata[Split.COLUMN_NAME.value] = assigned_splits.astype(dtype)
+
+    split_dir.mkdir(parents=True, exist_ok=True)
+    output_path = split_dir / 'outer=0-inner=0-seed=0.parquet'
+    joined_metadata.to_parquet(output_path)
+    logger.info(f'Saved explicit split collection → {output_path}')
+    return split_dir
 
 
 def save_split_metadata(

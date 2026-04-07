@@ -36,6 +36,9 @@ figures/*
 *.sif
 *.tdb
 *.bpcells
+!splits/
+!splits/**
+!splits/**/*.csv
 
 # Compressed files
 *.zip
