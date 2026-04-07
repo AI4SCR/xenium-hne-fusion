@@ -24,6 +24,7 @@ dependencies:
       - openslide-python
       - pillow
       - pyarrow
+      - ray
       - python-dotenv
       - pyyaml
       - scanpy

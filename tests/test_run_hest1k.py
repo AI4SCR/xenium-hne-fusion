@@ -13,6 +13,70 @@ def _load_script(path: str, module_name: str):
     return module
 
 
+class _FakeFuture:
+    def __init__(self, fake_ray, fn, name: str, args: tuple[object, ...], sample_id: str):
+        self.fake_ray = fake_ray
+        self.fn = fn
+        self.name = name
+        self.args = args
+        self.sample_id = sample_id
+        self._resolved = False
+        self._result = None
+
+    def resolve(self):
+        if self._resolved:
+            return self._result
+
+        if self.name == "process_sample_remote" and isinstance(self.args[0], _FakeFuture):
+            self.args[0].resolve()
+
+        if self.name == "process_sample_remote" and self.sample_id in self.fake_ray.fail_samples:
+            raise RuntimeError(f"boom {self.sample_id}")
+
+        self._result = self.fn(*self.args)
+        self.fake_ray.calls.append(("resolve", self.name, self.sample_id))
+        self._resolved = True
+        return self._result
+
+
+class _FakeRemoteFunction:
+    def __init__(self, fake_ray, fn, name: str):
+        self.fake_ray = fake_ray
+        self.fn = fn
+        self.name = name
+
+    def remote(self, *args):
+        sample_id = args[1] if self.name == "structure_sample_remote" else args[2]
+        depends_on_future = self.name == "process_sample_remote" and isinstance(args[0], _FakeFuture)
+        self.fake_ray.calls.append(("submit", self.name, sample_id, depends_on_future))
+        return _FakeFuture(self.fake_ray, self.fn, self.name, args, sample_id)
+
+
+class _FakeRay:
+    def __init__(self, calls: list[tuple], fail_samples: set[str] | None = None):
+        self.calls = calls
+        self.fail_samples = fail_samples or set()
+        self.initialized = False
+
+    def is_initialized(self) -> bool:
+        self.calls.append(("ray.is_initialized",))
+        return self.initialized
+
+    def init(self) -> None:
+        self.calls.append(("ray.init",))
+        self.initialized = True
+
+    def remote(self, **_resources):
+        def decorator(fn):
+            return _FakeRemoteFunction(self, fn, fn.__name__)
+
+        return decorator
+
+    def get(self, future: _FakeFuture):
+        self.calls.append(("ray.get", future.name, future.sample_id))
+        return future.resolve()
+
+
 def test_run_hest1k_runs_full_pipeline_in_training_order(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -678,3 +742,260 @@ def test_run_hest1k_excludes_ineligible_samples_before_processing(
         ("process", "L1"),
         ("metadata", ["L1"]),
     ]
+
+
+def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "hest1k"
+    config_path = tmp_path / "hest1k.yaml"
+    items_config_dir = tmp_path / "configs" / "items" / "hest1k"
+    config_path.write_text(
+        "name: hest1k\n"
+        "tile_px: 256\n"
+        "stride_px: 256\n"
+        "tile_mpp: 0.5\n"
+    )
+    items_config_dir.mkdir(parents=True, exist_ok=True)
+    (items_config_dir / "default.yaml").write_text("name: default\norgans: null\nnum_transcripts: 100\n")
+
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("HEST1K_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_ray_script")
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    calls = []
+    fake_ray = _FakeRay(calls)
+
+    monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
+    monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: metadata_path)
+    monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
+    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["DONE", "L1", "P1"])
+    monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
+    monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
+    monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
+    monkeypatch.setattr(
+        module,
+        "validate_hest_sample_mpp",
+        lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)),
+    )
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (
+            (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append(("symlink", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_dataset_metadata",
+        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+    )
+    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
+    monkeypatch.setattr(
+        module,
+        "compute_all_tile_stats",
+        lambda cfg, cell_type_col, overwrite: calls.append(("stats", cell_type_col, overwrite)),
+    )
+    monkeypatch.setattr(
+        module,
+        "create_filtered_items",
+        lambda cfg, items_config_path, source_items_name, overwrite: (
+            calls.append(("filtered", items_config_path.name, source_items_name, overwrite)),
+            (cfg.output_dir / "items" / "default.json", 0),
+        )[1],
+    )
+
+    cfg = module.load_pipeline_config("hest1k", config_path)
+    (cfg.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
+    (cfg.processed_dir / "DONE" / "256_256").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "DONE")
+    module.mark_sample_processed(cfg, "DONE")
+    (cfg.structured_dir / "P1").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "P1")
+
+    module.main(
+        config_path=config_path,
+        items_config_dir=items_config_dir,
+        kernel_size=32,
+        predicate="intersects",
+        cell_type_col="ct",
+        overwrite=False,
+        executor="ray",
+    )
+
+    assert ("submit", "structure_sample_remote", "L1", False) in calls
+    assert ("submit", "process_sample_remote", "L1", True) in calls
+    assert ("submit", "process_sample_remote", "P1", False) in calls
+    assert ("ensure", "L1") in calls
+    assert ("validate", "L1") in calls
+    assert ("symlink", "L1") in calls
+    assert ("process", "L1", 32, "intersects", False) in calls
+    assert ("process", "P1", 32, "intersects", False) in calls
+    assert ("metadata", ["DONE", "L1", "P1"]) in calls
+    assert ("items", 32, False) in calls
+    assert ("stats", "ct", False) in calls
+    assert calls.index(("metadata", ["DONE", "L1", "P1"])) > calls.index(("resolve", "process_sample_remote", "L1"))
+    assert calls.index(("metadata", ["DONE", "L1", "P1"])) > calls.index(("resolve", "process_sample_remote", "P1"))
+
+
+def test_run_hest1k_ray_aborts_finalization_when_any_sample_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "hest1k"
+    config_path = tmp_path / "hest1k.yaml"
+    items_config_dir = tmp_path / "configs" / "items" / "hest1k"
+    config_path.write_text(
+        "name: hest1k\n"
+        "tile_px: 256\n"
+        "stride_px: 256\n"
+        "tile_mpp: 0.5\n"
+    )
+    items_config_dir.mkdir(parents=True, exist_ok=True)
+    (items_config_dir / "default.yaml").write_text("name: default\norgans: null\nnum_transcripts: 100\n")
+
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("HEST1K_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_ray_failure_script")
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    calls = []
+    fake_ray = _FakeRay(calls, fail_samples={"L1"})
+
+    monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
+    monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: metadata_path)
+    monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
+    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["L1", "P1"])
+    monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
+    monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
+    monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: None)
+    monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: None)
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True)
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_dataset_metadata",
+        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+    )
+    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items",)))
+    monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats",)))
+    monkeypatch.setattr(
+        module,
+        "create_filtered_items",
+        lambda cfg, items_config_path, source_items_name, overwrite: calls.append(("filtered",)),
+    )
+
+    with pytest.raises(RuntimeError, match=r"Failed samples: \['L1'\]"):
+        module.main(
+            config_path=config_path,
+            items_config_dir=items_config_dir,
+            overwrite=False,
+            executor="ray",
+        )
+
+    assert ("metadata", ["L1", "P1"]) not in calls
+    assert ("items",) not in calls
+    assert ("stats",) not in calls
+    assert ("filtered",) not in calls
+
+
+def test_run_hest1k_ray_skips_structuring_for_structured_resume_sample(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "hest1k"
+    config_path = tmp_path / "hest1k.yaml"
+    items_config_dir = tmp_path / "configs" / "items" / "hest1k"
+    config_path.write_text(
+        "name: hest1k\n"
+        "tile_px: 256\n"
+        "stride_px: 256\n"
+        "tile_mpp: 0.5\n"
+    )
+    items_config_dir.mkdir(parents=True, exist_ok=True)
+    (items_config_dir / "default.yaml").write_text("name: default\norgans: null\nnum_transcripts: 100\n")
+
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("HEST1K_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_ray_resume_script")
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    calls = []
+    fake_ray = _FakeRay(calls)
+
+    monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
+    monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: metadata_path)
+    monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
+    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["B1"])
+    monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
+    monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
+    monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
+    monkeypatch.setattr(
+        module,
+        "validate_hest_sample_mpp",
+        lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)),
+    )
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: calls.append(("symlink", sample_id)),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: None)
+    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: None)
+    monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: None)
+    monkeypatch.setattr(
+        module,
+        "create_filtered_items",
+        lambda cfg, items_config_path, source_items_name, overwrite: (cfg.output_dir / "items" / "default.json", 0),
+    )
+
+    cfg = module.load_pipeline_config("hest1k", config_path)
+    (cfg.structured_dir / "B1").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "B1")
+
+    module.main(
+        config_path=config_path,
+        items_config_dir=items_config_dir,
+        overwrite=False,
+        executor="ray",
+    )
+
+    assert ("submit", "structure_sample_remote", "B1", False) not in calls
+    assert ("submit", "process_sample_remote", "B1", False) in calls
+    assert ("ensure", "B1") not in calls
+    assert ("validate", "B1") not in calls
+    assert ("symlink", "B1") not in calls
+    assert ("process", "B1") in calls
+    assert module.is_sample_processed(cfg, "B1")

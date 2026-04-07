@@ -1,6 +1,6 @@
 split_name: default
-test_size: 0.2
-val_size: null
+test_size: 0.25
+val_size: 0.25
 stratify: false
 target_column_name: null
 encode_targets: false

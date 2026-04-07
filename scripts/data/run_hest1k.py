@@ -1,8 +1,10 @@
 """Run the end-to-end HEST1K human Xenium pipeline."""
 
+import importlib
 import json
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import geopandas as gpd
 import pandas as pd
@@ -75,6 +77,10 @@ def processed_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
     return cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}" / ".processed.done"
 
 
+def processed_sample_dir(cfg: PipelineConfig, sample_id: str) -> Path:
+    return cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+
+
 def is_sample_structured(cfg: PipelineConfig, sample_id: str) -> bool:
     return structured_done_path(cfg, sample_id).exists()
 
@@ -115,7 +121,7 @@ def process_sample(
     cells_path = structured_dir / "cells.parquet"
     tissues_path = structured_dir / "tissues.parquet"
     tiles_path = structured_dir / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
-    processed_dir = cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+    processed_dir = processed_sample_dir(cfg, sample_id)
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
 
     detect_tissues(wsi_path, tissues_path)
@@ -347,17 +353,15 @@ def select_items_config_paths(
     return selected
 
 
-def main(
-    dataset: str = "hest1k",
-    config_path: Path | None = None,
-    sample_id: str | None = None,
-    organ: str | list[str] | None = None,
-    items_config_dir: Path = DEFAULT_ITEMS_CONFIG_DIR,
-    kernel_size: int = 16,
-    predicate: str = "within",
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
-    overwrite: bool = False,
-) -> None:
+def load_ray_module():
+    return importlib.import_module("ray")
+
+
+def prepare_driver_context(
+    dataset: str,
+    config_path: Path | None,
+    sample_id: str | None,
+) -> tuple[PipelineConfig, Path, list[str]]:
     assert dataset == "hest1k", f"Expected dataset='hest1k', got {dataset!r}"
     cfg = load_pipeline_config(dataset, config_path)
     cfg.filter.sample_ids = None
@@ -370,38 +374,171 @@ def main(
     sample_ids = [sample_id] if sample_id is not None else resolve_samples(cfg, metadata_path)
     eligible_sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     logger.info(f"Running HEST1K pipeline for {len(eligible_sample_ids)} eligible human Xenium samples")
+    return cfg, metadata_path, eligible_sample_ids
+
+
+def maybe_reset_sample(cfg: PipelineConfig, sample_id: str, overwrite: bool) -> None:
+    if not overwrite:
+        return
+    clear_sample_markers(cfg, sample_id)
+    processed_dir = processed_sample_dir(cfg, sample_id)
+    if processed_dir.exists():
+        shutil.rmtree(processed_dir)
+
+
+def structure_sample(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> None:
+    ensure_hest_sample_downloaded(sample_id, cfg.raw_dir)
+    validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_path)
+    assert can_extract_sample_at_tile_mpp(cfg, sample_id, metadata_path), f"Ineligible sample: {sample_id}"
+    create_structured_symlinks(sample_id, cfg.raw_dir, cfg.structured_dir)
+    mark_sample_structured(cfg, sample_id)
+
+
+def process_sample_stage(
+    cfg: PipelineConfig,
+    sample_id: str,
+    metadata_path: Path,
+    kernel_size: int,
+    predicate: str,
+    overwrite: bool,
+) -> None:
+    process_sample(
+        cfg,
+        sample_id,
+        metadata_path,
+        kernel_size=kernel_size,
+        predicate=predicate,
+        overwrite=overwrite,
+    )
+    mark_sample_processed(cfg, sample_id)
+
+
+def run_sample_serial(
+    cfg: PipelineConfig,
+    sample_id: str,
+    metadata_path: Path,
+    kernel_size: int,
+    predicate: str,
+    overwrite: bool,
+) -> str:
+    maybe_reset_sample(cfg, sample_id, overwrite)
+
+    if not is_sample_structured(cfg, sample_id):
+        structure_sample(cfg, sample_id, metadata_path)
+
+    if is_sample_processed(cfg, sample_id):
+        logger.info(f"Skipping {sample_id}: already processed")
+        return sample_id
+
+    process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
+    return sample_id
+
+
+def build_remote_sample_functions(ray):
+    @ray.remote(num_cpus=1, num_gpus=0)
+    def structure_sample_remote(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> str:
+        structure_sample(cfg, sample_id, metadata_path)
+        return sample_id
+
+    @ray.remote(num_cpus=1, num_gpus=0)
+    def process_sample_remote(
+        ref: object,
+        cfg: PipelineConfig,
+        sample_id: str,
+        metadata_path: Path,
+        kernel_size: int,
+        predicate: str,
+        overwrite: bool,
+    ) -> str:
+        del ref
+        process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
+        return sample_id
+
+    return structure_sample_remote, process_sample_remote
+
+
+def wait_for_ray_samples(ray, futures: list[tuple[str, object]]) -> None:
+    failed_sample_ids = []
+    for sample_id, future in futures:
+        try:
+            ray.get(future)
+        except Exception as exc:
+            logger.error(f"{sample_id} failed: {exc}")
+            failed_sample_ids.append(sample_id)
+    if failed_sample_ids:
+        raise RuntimeError(f"Failed samples: {failed_sample_ids}")
+
+
+def run_samples_serial(
+    cfg: PipelineConfig,
+    sample_ids: list[str],
+    metadata_path: Path,
+    kernel_size: int,
+    predicate: str,
+    overwrite: bool,
+) -> list[str]:
+    retained_sample_ids = []
+    for current_sample_id in sample_ids:
+        retained_sample_ids.append(
+            run_sample_serial(cfg, current_sample_id, metadata_path, kernel_size, predicate, overwrite)
+        )
+    return retained_sample_ids
+
+
+def run_samples_ray(
+    cfg: PipelineConfig,
+    sample_ids: list[str],
+    metadata_path: Path,
+    kernel_size: int,
+    predicate: str,
+    overwrite: bool,
+) -> list[str]:
+    ray = load_ray_module()
+    if not ray.is_initialized():
+        ray.init()
+
+    structure_sample_remote, process_sample_remote = build_remote_sample_functions(ray)
 
     retained_sample_ids = []
-    for current_sample_id in eligible_sample_ids:
-        if overwrite:
-            clear_sample_markers(cfg, current_sample_id)
-            processed_dir = cfg.processed_dir / current_sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
-            if processed_dir.exists():
-                shutil.rmtree(processed_dir)
-
-        if not is_sample_structured(cfg, current_sample_id):
-            ensure_hest_sample_downloaded(current_sample_id, cfg.raw_dir)
-            validate_hest_sample_mpp(current_sample_id, cfg.raw_dir, metadata_path)
-            assert can_extract_sample_at_tile_mpp(cfg, current_sample_id, metadata_path), f"Ineligible sample: {current_sample_id}"
-            create_structured_symlinks(current_sample_id, cfg.raw_dir, cfg.structured_dir)
-            mark_sample_structured(cfg, current_sample_id)
+    futures = []
+    for current_sample_id in sample_ids:
+        maybe_reset_sample(cfg, current_sample_id, overwrite)
 
         if is_sample_processed(cfg, current_sample_id):
             logger.info(f"Skipping {current_sample_id}: already processed")
             retained_sample_ids.append(current_sample_id)
             continue
 
-        process_sample(
+        structure_ref = None
+        if not is_sample_structured(cfg, current_sample_id):
+            structure_ref = structure_sample_remote.remote(cfg, current_sample_id, metadata_path)
+
+        process_ref = process_sample_remote.remote(
+            structure_ref,
             cfg,
             current_sample_id,
             metadata_path,
-            kernel_size=kernel_size,
-            predicate=predicate,
-            overwrite=overwrite,
+            kernel_size,
+            predicate,
+            overwrite,
         )
-        mark_sample_processed(cfg, current_sample_id)
+        futures.append((current_sample_id, process_ref))
         retained_sample_ids.append(current_sample_id)
 
+    wait_for_ray_samples(ray, futures)
+    return retained_sample_ids
+
+
+def finalize_dataset(
+    cfg: PipelineConfig,
+    metadata_path: Path,
+    retained_sample_ids: list[str],
+    items_config_dir: Path,
+    organ: str | list[str] | None,
+    kernel_size: int,
+    cell_type_col: str,
+    overwrite: bool,
+) -> None:
     process_dataset_metadata(
         dataset="hest1k",
         metadata_path=metadata_path,
@@ -427,6 +564,51 @@ def main(
             filtered_items_path,
             overwrite=overwrite,
         )
+
+
+def main(
+    dataset: str = "hest1k",
+    config_path: Path | None = None,
+    sample_id: str | None = None,
+    organ: str | list[str] | None = None,
+    items_config_dir: Path = DEFAULT_ITEMS_CONFIG_DIR,
+    kernel_size: int = 16,
+    predicate: str = "within",
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+    overwrite: bool = False,
+    executor: Literal["serial", "ray"] = "serial",
+) -> None:
+    cfg, metadata_path, eligible_sample_ids = prepare_driver_context(dataset, config_path, sample_id)
+
+    if executor == "serial":
+        retained_sample_ids = run_samples_serial(
+            cfg,
+            eligible_sample_ids,
+            metadata_path,
+            kernel_size,
+            predicate,
+            overwrite,
+        )
+    else:
+        retained_sample_ids = run_samples_ray(
+            cfg,
+            eligible_sample_ids,
+            metadata_path,
+            kernel_size,
+            predicate,
+            overwrite,
+        )
+
+    finalize_dataset(
+        cfg,
+        metadata_path,
+        retained_sample_ids,
+        items_config_dir,
+        organ,
+        kernel_size,
+        cell_type_col,
+        overwrite,
+    )
 
 
 if __name__ == "__main__":
