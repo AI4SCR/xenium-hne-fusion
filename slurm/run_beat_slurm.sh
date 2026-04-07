@@ -2,14 +2,12 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CONFIG_PATH="${REPO_ROOT}/configs/data/remote/beat.yaml"
+CONFIG_PATH=""
 
 usage() {
     cat <<'EOF'
 Usage:
-  scripts/data/run_beat_slurm.sh [--config configs/data/remote/beat.yaml]
+  ./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
 EOF
 }
 
@@ -31,14 +29,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-cd "${REPO_ROOT}"
+[[ -n "${CONFIG_PATH}" ]] || {
+    echo "--config is required." >&2
+    usage >&2
+    exit 1
+}
 
 CONFIG_PATH="$(realpath "${CONFIG_PATH}")"
 
-if [[ -f "${REPO_ROOT}/.env" ]]; then
+if [[ -f ".env" ]]; then
     set -a
     # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.env"
+    source ".env"
     set +a
 fi
 

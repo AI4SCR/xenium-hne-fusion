@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOG_DIR="${HOME}/logs"
 
 usage() {
@@ -29,12 +27,10 @@ case "${ORGAN}" in
         ;;
 esac
 
-cd "${REPO_ROOT}"
-
-if [[ -f "${REPO_ROOT}/.env" ]]; then
+if [[ -f ".env" ]]; then
     set -a
     # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.env"
+    source ".env"
     set +a
 fi
 
