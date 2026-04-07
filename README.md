@@ -364,6 +364,15 @@ Ray submission helpers live under `ray/`. The main entrypoint is:
 bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
 ```
 
+Data preparation:
+
+```bash
+./ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml
+./ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k-256.yaml
+./ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml
+./ray/scripts/run_beat.sh --config configs/data/remote/beat-256.yaml
+```
+
 Useful helpers:
 
 ```bash

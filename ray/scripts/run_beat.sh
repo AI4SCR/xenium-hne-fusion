@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+#SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PY_SCRIPT="scripts/data/run_beat.py"
 
 [[ -f "${REPO_ROOT}/${PY_SCRIPT}" ]] || {

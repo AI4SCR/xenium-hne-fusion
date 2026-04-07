@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Run the end-to-end HEST1K human Xenium pipeline."""
 
 import json
