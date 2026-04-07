@@ -67,6 +67,39 @@ def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
     download_sample(sample_id, raw_dir)
 
 
+def structured_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
+    return cfg.structured_dir / sample_id / ".structured.done"
+
+
+def processed_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
+    return cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}" / ".processed.done"
+
+
+def is_sample_structured(cfg: PipelineConfig, sample_id: str) -> bool:
+    return structured_done_path(cfg, sample_id).exists()
+
+
+def is_sample_processed(cfg: PipelineConfig, sample_id: str) -> bool:
+    return processed_done_path(cfg, sample_id).exists()
+
+
+def mark_sample_structured(cfg: PipelineConfig, sample_id: str) -> None:
+    path = structured_done_path(cfg, sample_id)
+    assert path.parent.exists(), f"Structured sample dir missing: {path.parent}"
+    path.write_text(f"sample_id={sample_id}\nstage=structured\n")
+
+
+def mark_sample_processed(cfg: PipelineConfig, sample_id: str) -> None:
+    path = processed_done_path(cfg, sample_id)
+    assert path.parent.exists(), f"Processed sample dir missing: {path.parent}"
+    path.write_text(f"sample_id={sample_id}\nstage=processed\n")
+
+
+def clear_sample_markers(cfg: PipelineConfig, sample_id: str) -> None:
+    structured_done_path(cfg, sample_id).unlink(missing_ok=True)
+    processed_done_path(cfg, sample_id).unlink(missing_ok=True)
+
+
 def process_sample(
     cfg: PipelineConfig,
     sample_id: str,
@@ -84,9 +117,6 @@ def process_sample(
     tiles_path = structured_dir / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
     processed_dir = cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
-
-    if overwrite and processed_dir.exists():
-        shutil.rmtree(processed_dir)
 
     detect_tissues(wsi_path, tissues_path)
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,50 +160,6 @@ def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], 
         if can_extract_sample_at_tile_mpp(cfg, sample_id, metadata_path):
             eligible_sample_ids.append(sample_id)
     return eligible_sample_ids
-
-
-def is_hest_sample_processed(
-    cfg: PipelineConfig,
-    sample_id: str,
-    kernel_size: int,
-) -> bool:
-    tiles_path = cfg.structured_dir / sample_id / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
-    if not tiles_path.exists():
-        return False
-
-    try:
-        tiles = pd.read_parquet(tiles_path, columns=["tile_id"])
-    except Exception as exc:
-        logger.warning(f"Failed to read tiles parquet for {sample_id}: {exc}")
-        return False
-
-    assert "tile_id" in tiles.columns, f"tile_id missing from {tiles_path}"
-    expected_tile_ids = {str(int(tile_id)) for tile_id in tiles["tile_id"].tolist()}
-    if not expected_tile_ids:
-        logger.warning(f"Tiles parquet is empty for {sample_id}: {tiles_path}")
-        return False
-
-    processed_dir = cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
-    if not processed_dir.exists():
-        return False
-
-    observed_tile_ids = {path.name for path in processed_dir.iterdir() if path.is_dir()}
-    if observed_tile_ids != expected_tile_ids:
-        return False
-
-    required_filenames = {
-        "tile.pt",
-        "transcripts.parquet",
-        f"expr-kernel_size={kernel_size}.parquet",
-    }
-    for tile_id in expected_tile_ids:
-        tile_dir = processed_dir / tile_id
-        if not tile_dir.is_dir():
-            return False
-        if any(not (tile_dir / filename).exists() for filename in required_filenames):
-            return False
-
-    return True
 
 
 def _tile_item(tile_dir: Path, sample_id: str, tile_id: int, kernel_size: int) -> dict | None:
@@ -387,15 +373,24 @@ def main(
 
     retained_sample_ids = []
     for current_sample_id in eligible_sample_ids:
-        if not overwrite and is_hest_sample_processed(cfg, current_sample_id, kernel_size):
+        if overwrite:
+            clear_sample_markers(cfg, current_sample_id)
+            processed_dir = cfg.processed_dir / current_sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+            if processed_dir.exists():
+                shutil.rmtree(processed_dir)
+
+        if not is_sample_structured(cfg, current_sample_id):
+            ensure_hest_sample_downloaded(current_sample_id, cfg.raw_dir)
+            validate_hest_sample_mpp(current_sample_id, cfg.raw_dir, metadata_path)
+            assert can_extract_sample_at_tile_mpp(cfg, current_sample_id, metadata_path), f"Ineligible sample: {current_sample_id}"
+            create_structured_symlinks(current_sample_id, cfg.raw_dir, cfg.structured_dir)
+            mark_sample_structured(cfg, current_sample_id)
+
+        if is_sample_processed(cfg, current_sample_id):
             logger.info(f"Skipping {current_sample_id}: already processed")
             retained_sample_ids.append(current_sample_id)
             continue
 
-        ensure_hest_sample_downloaded(current_sample_id, cfg.raw_dir)
-        validate_hest_sample_mpp(current_sample_id, cfg.raw_dir, metadata_path)
-        assert can_extract_sample_at_tile_mpp(cfg, current_sample_id, metadata_path), f"Ineligible sample: {current_sample_id}"
-        create_structured_symlinks(current_sample_id, cfg.raw_dir, cfg.structured_dir)
         process_sample(
             cfg,
             current_sample_id,
@@ -404,6 +399,7 @@ def main(
             predicate=predicate,
             overwrite=overwrite,
         )
+        mark_sample_processed(cfg, current_sample_id)
         retained_sample_ids.append(current_sample_id)
 
     process_dataset_metadata(

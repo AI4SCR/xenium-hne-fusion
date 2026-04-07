@@ -1,7 +1,6 @@
 import importlib.util
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 
@@ -70,9 +69,11 @@ def test_run_hest1k_runs_full_pipeline_in_training_order(
         calls.append(("validate_hest_sample_mpp", sample_id, raw_dir_arg, metadata_path_arg))
 
     def fake_create_structured_symlinks(sample_id: str, raw_dir_arg: Path, structured_dir_arg: Path) -> None:
+        (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True)
         calls.append(("create_structured_symlinks", sample_id, raw_dir_arg, structured_dir_arg))
 
     def fake_process_sample(cfg, sample_id: str, metadata_path_arg: Path, kernel_size: int, predicate: str, overwrite: bool) -> None:
+        (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True)
         calls.append(("process_sample", sample_id, metadata_path_arg, kernel_size, predicate, overwrite))
 
     def fake_process_dataset_metadata(
@@ -191,8 +192,18 @@ def test_run_hest1k_skips_split_creation_for_empty_filtered_items(
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: None)
     monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: None)
-    monkeypatch.setattr(module, "create_structured_symlinks", lambda sample_id, raw_dir_arg, structured_dir_arg: None)
-    monkeypatch.setattr(module, "process_sample", lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: None)
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+        ).mkdir(parents=True, exist_ok=True),
+    )
     monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: None)
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: cfg.output_dir / "items" / "all.json")
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: cfg.output_dir / "statistics" / "all.parquet")
@@ -245,8 +256,18 @@ def test_run_hest1k_organ_flag_only_filters_final_items_and_splits(
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: None)
     monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: None)
-    monkeypatch.setattr(module, "create_structured_symlinks", lambda sample_id, raw_dir_arg, structured_dir_arg: None)
-    monkeypatch.setattr(module, "process_sample", lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: None)
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+        ).mkdir(parents=True, exist_ok=True),
+    )
     monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: None)
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: cfg.output_dir / "items" / "all.json")
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: cfg.output_dir / "statistics" / "all.parquet")
@@ -330,7 +351,7 @@ def test_filter_hest_samples_by_tile_mpp_raises_for_missing_metadata(
         module.filter_hest_samples_by_tile_mpp(cfg, ["A"], metadata_path)
 
 
-def test_is_hest_sample_processed_requires_exact_tile_match(
+def test_sample_done_markers_define_completion(
     tmp_path: Path,
 ):
     module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_processed_script")
@@ -346,27 +367,22 @@ def test_is_hest_sample_processed_requires_exact_tile_match(
         output_dir=tmp_path / "output",
     )
     sample_id = "TENX116"
-    tiles_path = cfg.structured_dir / sample_id / "tiles" / "256_256.parquet"
-    tiles_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"tile_id": [0, 1]}).to_parquet(tiles_path)
 
-    processed_dir = cfg.processed_dir / sample_id / "256_256"
-    for tile_id in ["0", "1"]:
-        tile_dir = processed_dir / tile_id
-        tile_dir.mkdir(parents=True, exist_ok=True)
-        (tile_dir / "tile.pt").write_text("")
-        (tile_dir / "transcripts.parquet").write_text("")
-        (tile_dir / "expr-kernel_size=16.parquet").write_text("")
+    assert not module.is_sample_structured(cfg, sample_id)
+    assert not module.is_sample_processed(cfg, sample_id)
 
-    assert module.is_hest_sample_processed(cfg, sample_id, kernel_size=16)
+    (cfg.structured_dir / sample_id).mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, sample_id)
+    assert module.is_sample_structured(cfg, sample_id)
+    assert not module.is_sample_processed(cfg, sample_id)
 
-    extra_tile_dir = processed_dir / "2"
-    extra_tile_dir.mkdir()
-    (extra_tile_dir / "tile.pt").write_text("")
-    (extra_tile_dir / "transcripts.parquet").write_text("")
-    (extra_tile_dir / "expr-kernel_size=16.parquet").write_text("")
+    (cfg.processed_dir / sample_id / "256_256").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_processed(cfg, sample_id)
+    assert module.is_sample_processed(cfg, sample_id)
 
-    assert not module.is_hest_sample_processed(cfg, sample_id, kernel_size=16)
+    module.clear_sample_markers(cfg, sample_id)
+    assert not module.is_sample_structured(cfg, sample_id)
+    assert not module.is_sample_processed(cfg, sample_id)
 
 
 def test_run_hest1k_skips_processing_for_completed_samples_and_keeps_metadata(
@@ -400,9 +416,22 @@ def test_run_hest1k_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
     monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)))
-    monkeypatch.setattr(module, "create_structured_symlinks", lambda sample_id, raw_dir_arg, structured_dir_arg: calls.append(("symlink", sample_id)))
-    monkeypatch.setattr(module, "process_sample", lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: calls.append(("process", sample_id)))
-    monkeypatch.setattr(module, "is_hest_sample_processed", lambda cfg, sample_id, kernel_size: sample_id == "B1")
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (
+            (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append(("symlink", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id)),
+        ),
+    )
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
@@ -411,6 +440,12 @@ def test_run_hest1k_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: cfg.output_dir / "items" / "all.json")
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: cfg.output_dir / "statistics" / "all.parquet")
     monkeypatch.setattr(module, "create_filtered_items", lambda cfg, items_config_path, source_items_name, overwrite: (cfg.output_dir / "items" / "default.json", 0))
+
+    cfg = module.load_pipeline_config("hest1k", config_path)
+    (cfg.structured_dir / "B1").mkdir(parents=True, exist_ok=True)
+    (cfg.processed_dir / "B1" / "256_256").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "B1")
+    module.mark_sample_processed(cfg, "B1")
 
     module.main(
         config_path=config_path,
@@ -425,6 +460,153 @@ def test_run_hest1k_skips_processing_for_completed_samples_and_keeps_metadata(
         ("process", "L1"),
         ("metadata", ["B1", "L1"]),
     ]
+
+
+def test_run_hest1k_skips_structuring_but_processes_when_only_structured_marker_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "hest1k"
+    config_path = tmp_path / "hest1k.yaml"
+    items_config_dir = tmp_path / "configs" / "items" / "hest1k"
+    config_path.write_text(
+        "name: hest1k\n"
+        "tile_px: 256\n"
+        "stride_px: 256\n"
+        "tile_mpp: 0.5\n"
+    )
+    items_config_dir.mkdir(parents=True, exist_ok=True)
+    (items_config_dir / "default.yaml").write_text("name: default\norgans: null\nnum_transcripts: 100\n")
+
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("HEST1K_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_partial_resume_script")
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    calls = []
+
+    monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: metadata_path)
+    monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
+    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["B1"])
+    monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
+    monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
+    monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
+    monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)))
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (
+            (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append(("symlink", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)))
+    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: cfg.output_dir / "items" / "all.json")
+    monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: cfg.output_dir / "statistics" / "all.parquet")
+    monkeypatch.setattr(module, "create_filtered_items", lambda cfg, items_config_path, source_items_name, overwrite: (cfg.output_dir / "items" / "default.json", 0))
+
+    cfg = module.load_pipeline_config("hest1k", config_path)
+    (cfg.structured_dir / "B1").mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "B1")
+
+    module.main(
+        config_path=config_path,
+        items_config_dir=items_config_dir,
+        overwrite=False,
+    )
+
+    assert calls == [
+        ("process", "B1"),
+        ("metadata", ["B1"]),
+    ]
+    assert module.is_sample_processed(cfg, "B1")
+
+
+def test_run_hest1k_overwrite_reprocesses_and_recreates_markers(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "hest1k"
+    config_path = tmp_path / "hest1k.yaml"
+    items_config_dir = tmp_path / "configs" / "items" / "hest1k"
+    config_path.write_text(
+        "name: hest1k\n"
+        "tile_px: 256\n"
+        "stride_px: 256\n"
+        "tile_mpp: 0.5\n"
+    )
+    items_config_dir.mkdir(parents=True, exist_ok=True)
+    (items_config_dir / "default.yaml").write_text("name: default\norgans: null\nnum_transcripts: 100\n")
+
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("HEST1K_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_hest1k.py", "run_hest1k_overwrite_script")
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    calls = []
+
+    monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: metadata_path)
+    monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
+    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["B1"])
+    monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
+    monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
+    monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
+    monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)))
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (
+            (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append(("symlink", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id, overwrite)),
+        ),
+    )
+    monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)))
+    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: cfg.output_dir / "items" / "all.json")
+    monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: cfg.output_dir / "statistics" / "all.parquet")
+    monkeypatch.setattr(module, "create_filtered_items", lambda cfg, items_config_path, source_items_name, overwrite: (cfg.output_dir / "items" / "default.json", 0))
+
+    cfg = module.load_pipeline_config("hest1k", config_path)
+    (cfg.structured_dir / "B1").mkdir(parents=True, exist_ok=True)
+    processed_dir = cfg.processed_dir / "B1" / "256_256"
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    module.mark_sample_structured(cfg, "B1")
+    module.mark_sample_processed(cfg, "B1")
+    (processed_dir / "stale.txt").write_text("stale")
+
+    module.main(
+        config_path=config_path,
+        items_config_dir=items_config_dir,
+        overwrite=True,
+    )
+
+    assert calls == [
+        ("ensure", "B1"),
+        ("validate", "B1"),
+        ("symlink", "B1"),
+        ("process", "B1", True),
+        ("metadata", ["B1"]),
+    ]
+    assert module.is_sample_structured(cfg, "B1")
+    assert module.is_sample_processed(cfg, "B1")
+    assert not (processed_dir / "stale.txt").exists()
 
 
 def test_run_hest1k_excludes_ineligible_samples_before_processing(
@@ -458,9 +640,22 @@ def test_run_hest1k_excludes_ineligible_samples_before_processing(
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))
     monkeypatch.setattr(module, "validate_hest_sample_mpp", lambda sample_id, raw_dir_arg, metadata_path_arg: calls.append(("validate", sample_id)))
-    monkeypatch.setattr(module, "create_structured_symlinks", lambda sample_id, raw_dir_arg, structured_dir_arg: calls.append(("symlink", sample_id)))
-    monkeypatch.setattr(module, "process_sample", lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: calls.append(("process", sample_id)))
-    monkeypatch.setattr(module, "is_hest_sample_processed", lambda cfg, sample_id, kernel_size: False)
+    monkeypatch.setattr(
+        module,
+        "create_structured_symlinks",
+        lambda sample_id, raw_dir_arg, structured_dir_arg: (
+            (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append(("symlink", sample_id)),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_sample",
+        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+            (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
+            calls.append(("process", sample_id)),
+        ),
+    )
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
