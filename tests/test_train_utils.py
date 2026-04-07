@@ -7,25 +7,7 @@ from xenium_hne_fusion.train.utils import resolve_training_paths
 from xenium_hne_fusion.utils.getters import get_panels_dir
 
 
-def test_resolve_training_paths_defaults_to_dataset_output_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    data_dir = tmp_path / 'data'
-    metadata_path = tmp_path / 'metadata.parquet'
-    monkeypatch.setenv('DATA_DIR', str(data_dir))
-    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
-
-    cfg = Config()
-    cfg.data.name = 'hest1k'
-    cfg.data.metadata_path = metadata_path
-
-    cfg, output_dir = resolve_training_paths(cfg)
-
-    assert output_dir == (data_dir / '03_output' / 'hest1k').resolve()
-    assert cfg.data.items_path == output_dir / 'items' / 'all.json'
-    assert cfg.data.cache_dir == output_dir / 'cache'
-    assert cfg.data.metadata_path == metadata_path
-
-
-def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_root(
+def test_resolve_training_paths_requires_explicit_training_data_references(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
@@ -34,11 +16,45 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
     monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
     cfg = Config()
+    cfg.data.name = 'hest1k'
+
+    with pytest.raises(AssertionError, match='cfg.data.items_path'):
+        resolve_training_paths(cfg)
+
+
+def test_resolve_training_paths_still_defaults_cache_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    metadata_path = tmp_path / 'metadata.parquet'
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+
+    cfg = Config()
+    cfg.data.name = 'hest1k'
+    cfg.data.items_path = Path('all.json')
+    cfg.data.metadata_path = metadata_path
+    cfg.data.panel_path = Path('hvg-default-default-outer=0-seed=0.yaml')
+
+    cfg, output_dir = resolve_training_paths(cfg)
+
+    assert output_dir == (data_dir / '03_output' / 'hest1k').resolve()
+    assert cfg.data.items_path == output_dir / 'items/all.json'
+    assert cfg.data.cache_dir == output_dir / 'cache'
+    assert cfg.data.metadata_path == metadata_path
+    assert cfg.data.panel_path == output_dir / 'panels/hvg-default-default-outer=0-seed=0.yaml'
+
+
+def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / 'data'
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+
+    cfg = Config()
     cfg.data.name = 'beat'
-    cfg.data.items_path = Path('items/train.json')
+    cfg.data.items_path = Path('train.json')
     cfg.data.metadata_path = Path('default/outer=0-seed=0.parquet')
     cfg.data.panel_path = Path('default.yaml')
-    cfg.data.cache_dir = Path('cache/run-a')
+    cfg.data.cache_dir = Path('run-a')
 
     cfg, output_dir = resolve_training_paths(cfg)
 
@@ -48,22 +64,30 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
     assert cfg.data.cache_dir == output_dir / 'cache/run-a'
 
 
-def test_resolve_training_paths_keeps_absolute_metadata_path(
+def test_resolve_training_paths_keeps_absolute_paths(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ):
     data_dir = tmp_path / 'data'
     metadata_path = tmp_path / 'custom' / 'split.parquet'
+    items_path = tmp_path / 'custom' / 'items.json'
+    panel_path = tmp_path / 'custom' / 'panel.yaml'
+    cache_dir = tmp_path / 'custom' / 'cache'
     monkeypatch.setenv('DATA_DIR', str(data_dir))
-    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
     cfg = Config()
     cfg.data.name = 'beat'
     cfg.data.metadata_path = metadata_path
+    cfg.data.items_path = items_path
+    cfg.data.panel_path = panel_path
+    cfg.data.cache_dir = cache_dir
 
     cfg, _ = resolve_training_paths(cfg)
 
+    assert cfg.data.items_path == items_path
     assert cfg.data.metadata_path == metadata_path
+    assert cfg.data.panel_path == panel_path
+    assert cfg.data.cache_dir == cache_dir
 
 
 def test_resolve_training_paths_requires_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -85,6 +109,7 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
         cfg = Config.from_yaml(path)
         assert cfg.task.target is not None
         assert cfg.data.name is not None
+        assert isinstance(cfg.data.items_path, Path)
         assert isinstance(cfg.data.metadata_path, Path)
         assert isinstance(cfg.data.panel_path, Path)
         assert cfg.head.num_hidden_layers == 0
@@ -103,10 +128,12 @@ def test_train_configs_use_expected_panel_defaults():
 
     for path in beat_paths:
         cfg = Config.from_yaml(path)
+        assert cfg.data.items_path == Path('all.json')
         assert cfg.data.panel_path == Path('default.yaml')
 
     for path in hest1k_paths:
         cfg = Config.from_yaml(path)
+        assert cfg.data.items_path == Path('all.json')
         assert cfg.data.panel_path == Path('hvg-default-default-outer=0-seed=0.yaml')
 
 
@@ -119,7 +146,7 @@ def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
 
         for path in paths:
             cfg = Config.from_yaml(path)
-            assert cfg.data.items_path == Path(f'items/{organ}.json')
+            assert cfg.data.items_path == Path(f'{organ}.json')
             assert cfg.data.metadata_path == Path(f'{organ}/outer=0-seed=0.parquet')
             assert cfg.data.panel_path == Path(f'hvg-{organ}-default-outer=0-seed=0.yaml')
             assert cfg.wandb.tags == [organ]

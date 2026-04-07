@@ -177,7 +177,7 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     module = _load_script('scripts/data/create_hvg_panel.py', 'create_hvg_panel_script')
     module.main('hest1k', config_path=config_path, overwrite=True)
 
-    panel_path = tmp_path / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-seed=0.yaml'
+    panel_path = output_dir / 'panels' / 'hvg-default-default-outer=0-seed=0.yaml'
     assert panel_path.exists()
     panel = __import__('yaml').safe_load(panel_path.read_text())
     assert panel['source_panel'] == ['A']

@@ -184,7 +184,7 @@ def get_managed_paths(name: str) -> ManagedPaths:
 
 
 def get_panels_dir(name: str) -> Path:
-    return get_repo_root() / 'panels' / name
+    return get_managed_paths(name).output_dir / 'panels'
 
 
 def infer_dataset(name: str) -> str:

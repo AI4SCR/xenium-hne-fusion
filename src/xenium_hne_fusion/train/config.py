@@ -49,8 +49,9 @@ class DataConfig:
     panel_path: Path | None = None
     source_panel: list[str] | None = None
     target_panel: list[str] | None = None
-    # Relative item/cache paths resolve under DATA_DIR/03_output/<name>/.
-    # Relative metadata paths resolve under DATA_DIR/03_output/<name>/splits/.
+    # Relative items/metadata/panel paths resolve under DATA_DIR/03_output/<name>/
+    # within the items/, splits/, and panels/ subfolders respectively.
+    # Relative cache paths resolve under DATA_DIR/03_output/<name>/cache/.
     items_path: Path | None = None
     metadata_path: Path | None = None
     cache_dir: Path | None = None

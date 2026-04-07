@@ -22,6 +22,7 @@ data:
   name: hest1k
   batch_size: 256
   expr_pool: token
+  items_path: all.json
   metadata_path: default/outer=0-seed=0.parquet
   panel_path: hvg-default-default-outer=0-seed=0.yaml
 

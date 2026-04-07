@@ -21,7 +21,7 @@ data:
   name: hest1k
   batch_size: 256
   expr_pool: token
-  items_path: items/lung.json
+  items_path: lung.json
   metadata_path: lung/outer=0-seed=0.parquet
   panel_path: hvg-lung-default-outer=0-seed=0.yaml
 

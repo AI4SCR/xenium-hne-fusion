@@ -20,17 +20,16 @@ def set_fast_dev_run_settings(cfg: Config) -> Config:
 def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
     name = cfg.data.name
     assert name is not None, 'cfg.data.name must be set'
-
-    output_dir = get_managed_paths(name).output_dir
-    splits_dir = output_dir / 'splits'
-    panels_dir = get_panels_dir(name)
-    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir, default=output_dir / 'items' / 'all.json')
-    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=splits_dir)
-    cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=panels_dir)
-    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir, default=output_dir / 'cache')
-
     assert cfg.data.items_path is not None, 'cfg.data.items_path must be set'
     assert cfg.data.metadata_path is not None, 'cfg.data.metadata_path must be set'
+    assert cfg.data.panel_path is not None, 'cfg.data.panel_path must be set'
+
+    output_dir = get_managed_paths(name).output_dir
+    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir / 'items')
+    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir / 'splits')
+    cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=get_panels_dir(name))
+    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir / 'cache', default=output_dir / 'cache')
+
     assert cfg.data.cache_dir is not None, 'cfg.data.cache_dir must be set'
     return cfg, output_dir
 

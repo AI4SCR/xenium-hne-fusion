@@ -72,7 +72,7 @@ def test_hest1k_organ_panels_match_selected_items_when_data_available():
 
     for organ in ['breast', 'lung', 'pancreas']:
         items_path = Path(f'data/03_output/hest1k/items/{organ}.json')
-        panel_path = Path(f'panels/hest1k/hvg-{organ}-default-outer=0-seed=0.yaml')
+        panel_path = Path(f'data/03_output/hest1k/panels/hvg-{organ}-default-outer=0-seed=0.yaml')
         if not items_path.exists() or not panel_path.exists():
             pytest.skip(f'Missing data for {organ}')
 
