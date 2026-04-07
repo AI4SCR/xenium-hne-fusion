@@ -65,7 +65,10 @@ mkdir -p "${LOG_DIR}"
     exit 1
 }
 
-mapfile -t SAMPLE_IDS < <(
+SAMPLE_IDS=()
+while IFS= read -r sample_id; do
+    SAMPLE_IDS+=("${sample_id}")
+done < <(
     uv run python -c '
 from pathlib import Path
 import os
