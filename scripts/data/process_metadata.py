@@ -13,12 +13,12 @@ from xenium_hne_fusion.utils.getters import load_pipeline_config, resolve_sample
 
 def main(dataset: str, config_path: Path | None = None) -> None:
     cfg = load_pipeline_config(dataset, config_path)
-    metadata_path = get_structured_metadata_path(cfg.structured_dir)
-    sample_ids = cfg.filter.sample_ids if cfg.name == 'beat' else resolve_samples(cfg, metadata_path)
+    metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
+    sample_ids = cfg.processing.filter.sample_ids if cfg.processing.name == 'beat' else resolve_samples(cfg, metadata_path)
     process_dataset_metadata(
-        dataset=cfg.name,
+        dataset=cfg.processing.name,
         metadata_path=metadata_path,
-        output_path=cfg.processed_dir / 'metadata.parquet',
+        output_path=cfg.paths.processed_dir / 'metadata.parquet',
         sample_ids=sample_ids,
     )
 

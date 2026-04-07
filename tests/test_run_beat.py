@@ -131,15 +131,15 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path, source_items_name, overwrite: (
-            calls.append(("filtered", items_config_path.name, source_items_name, overwrite)),
+        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 5),
         )[1],
     )
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, split_config_path, items_path, overwrite: calls.append(("split", split_config_path.name, items_path, overwrite)),
+        lambda cfg, items_path, split_config_path=None, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
     )
 
     module.main(
@@ -162,8 +162,8 @@ def test_run_beat_runs_full_pipeline_in_training_order(
         ("metadata", ["S1", "S2"]),
         ("items", 32, True),
         ("stats", "ct", True),
-        ("filtered", "default.yaml", "all", True),
-        ("split", "beat.yaml", output_dir / "items" / "default.json", True),
+        ("filtered", "default", "all", True),
+        ("split", "default", output_dir / "items" / "default.json", True),
     ]
 
 
@@ -203,7 +203,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path, source_items_name, overwrite: (cfg.output_dir / "items" / "default.json", 0),
+        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
     )
 
     cfg = module.load_pipeline_config("beat", config_path)
@@ -264,8 +264,8 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path, source_items_name, overwrite: (
-            calls.append(("filtered", items_config_path.name, source_items_name, overwrite)),
+        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 0),
         )[1],
     )

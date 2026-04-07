@@ -15,7 +15,7 @@ def main(dataset: str = "beat", config_path: Path | None = None) -> None:
 
     metadata_path = cfg.raw_dir / "metadata.parquet"
     if metadata_path.exists():
-        structure_metadata(metadata_path, cfg.structured_dir)
+        structure_metadata(metadata_path, cfg.paths.structured_dir)
 
     sample_dirs = sorted(p for p in cfg.raw_dir.iterdir() if p.is_dir())
     logger.info(f"Found {len(sample_dirs)} samples in {cfg.raw_dir}")
@@ -23,7 +23,7 @@ def main(dataset: str = "beat", config_path: Path | None = None) -> None:
         sample_id = sample_dir.name
         wsi_path = sample_dir / "region.tiff"
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
-        structure_sample(sample_id, wsi_path, tx_path, cfg.structured_dir)
+        structure_sample(sample_id, wsi_path, tx_path, cfg.paths.structured_dir)
 
 
 if __name__ == "__main__":

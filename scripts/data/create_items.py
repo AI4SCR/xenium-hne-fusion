@@ -47,12 +47,12 @@ def _iter_tile_dirs(sample_dir: Path) -> list[Path]:
 def main(dataset: str, config_path: Path | None = None, overwrite: bool = False) -> None:
     load_dotenv()
     cfg = load_pipeline_config(dataset, config_path)
-    processed_dir = cfg.processed_dir
-    items_path = cfg.output_dir / 'items' / f'{DEFAULT_ITEMS_NAME}.json'
+    processed_dir = cfg.paths.processed_dir
+    items_path = cfg.paths.output_dir / 'items' / f'{DEFAULT_ITEMS_NAME}.json'
 
     if items_path.exists() and not overwrite:
         logger.info(f'Items already exist: {items_path}')
-        _ensure_output_scaffold(cfg.output_dir)
+        _ensure_output_scaffold(cfg.paths.output_dir)
         return
 
     sample_dirs = sorted([p for p in processed_dir.iterdir() if p.is_dir()])
@@ -66,7 +66,7 @@ def main(dataset: str, config_path: Path | None = None, overwrite: bool = False)
             item = _tile_item(tile_dir, sample_id, int(tile_dir.name))
             (items if item is not None else skipped).append(item or tile_dir)
 
-    _ensure_output_scaffold(cfg.output_dir)
+    _ensure_output_scaffold(cfg.paths.output_dir)
     items_path.parent.mkdir(parents=True, exist_ok=True)
     with open(items_path, 'w') as f:
         json.dump(items, f, indent=2)

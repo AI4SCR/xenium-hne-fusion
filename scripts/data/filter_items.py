@@ -42,13 +42,13 @@ def main(
     cfg = load_pipeline_config(dataset, config_path)
     filter_cfg = load_items_filter_config(items_config_path)
 
-    output_path = cfg.output_dir / 'items' / f'{filter_cfg.name}.json'
+    output_path = cfg.paths.output_dir / 'items' / f'{filter_cfg.name}.json'
     if output_path.exists() and not overwrite:
         logger.info(f'Filtered items already exist: {output_path}')
         return
 
-    items_path = cfg.output_dir / 'items' / f'{source_items_name}.json'
-    stats_path = cfg.output_dir / 'statistics' / f'{source_items_name}.parquet'
+    items_path = cfg.paths.output_dir / 'items' / f'{source_items_name}.json'
+    stats_path = cfg.paths.output_dir / 'statistics' / f'{source_items_name}.parquet'
 
     assert items_path.exists(), f'Source items not found: {items_path}'
     assert stats_path.exists(), (
@@ -58,7 +58,7 @@ def main(
     items_df = load_items_dataframe(items_path)
 
     if filter_cfg.organs is not None:
-        meta = pd.read_parquet(cfg.processed_dir / 'metadata.parquet')
+        meta = pd.read_parquet(cfg.paths.processed_dir / 'metadata.parquet')
         allowed_samples = set(meta.loc[meta.organ.isin(filter_cfg.organs), 'sample_id'])
         items_df = items_df[items_df['sample_id'].isin(allowed_samples)]
 

@@ -34,27 +34,26 @@ from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
     ItemsFilterConfig,
     PipelineConfig,
-    load_items_filter_config,
     load_pipeline_config,
 )
 
-DEFAULT_ITEMS_CONFIG_PATH = Path("configs/items/beat/default.yaml")
-DEFAULT_SPLIT_CONFIG_PATH = Path("configs/splits/beat.yaml")
 DEFAULT_CELL_TYPE_COL = "Level3_grouped"
 DEFAULT_SOURCE_ITEMS_NAME = "all"
 STAT_COLS = ["num_transcripts", "num_unique_transcripts", "num_cells", "num_unique_cells"]
 
 
 def structured_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
-    return cfg.structured_dir / sample_id / ".structured.done"
+    return cfg.paths.structured_dir / sample_id / ".structured.done"
 
 
 def processed_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
-    return cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}" / ".processed.done"
+    tiles = cfg.processing.tiles
+    return cfg.paths.processed_dir / sample_id / f"{tiles.tile_px}_{tiles.stride_px}" / ".processed.done"
 
 
 def processed_sample_dir(cfg: PipelineConfig, sample_id: str) -> Path:
-    return cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+    tiles = cfg.processing.tiles
+    return cfg.paths.processed_dir / sample_id / f"{tiles.tile_px}_{tiles.stride_px}"
 
 
 def is_sample_structured(cfg: PipelineConfig, sample_id: str) -> bool:
@@ -91,18 +90,18 @@ def resolve_beat_samples(cfg: PipelineConfig, sample_id: str | None = None) -> l
     if sample_id is not None:
         assert sample_id in raw_sample_ids, f"Unknown sample_id: {sample_id}"
         return [sample_id]
-    if cfg.filter.sample_ids is None:
+    if cfg.processing.filter.sample_ids is None:
         return raw_sample_ids
 
-    missing = sorted(set(cfg.filter.sample_ids) - set(raw_sample_ids))
+    missing = sorted(set(cfg.processing.filter.sample_ids) - set(raw_sample_ids))
     assert not missing, f"Missing raw sample dirs: {missing}"
-    return sorted(cfg.filter.sample_ids)
+    return sorted(cfg.processing.filter.sample_ids)
 
 
 def structure_beat_metadata(cfg: PipelineConfig) -> None:
     metadata_path = cfg.raw_dir / "metadata.parquet"
     if metadata_path.exists():
-        structure_metadata(metadata_path, cfg.structured_dir)
+        structure_metadata(metadata_path, cfg.paths.structured_dir)
 
 
 def structure_sample_stage(cfg: PipelineConfig, sample_id: str) -> None:
@@ -111,13 +110,13 @@ def structure_sample_stage(cfg: PipelineConfig, sample_id: str) -> None:
     transcripts_path = raw_sample_dir / "transcripts" / "transcripts.parquet"
     assert wsi_path.exists(), f"Missing WSI: {wsi_path}"
     assert transcripts_path.exists(), f"Missing transcripts: {transcripts_path}"
-    structure_sample(sample_id, wsi_path, transcripts_path, cfg.structured_dir)
+    structure_sample(sample_id, wsi_path, transcripts_path, cfg.paths.structured_dir)
     mark_sample_structured(cfg, sample_id)
 
 
 def detect_sample_tissues(cfg: PipelineConfig, sample_id: str) -> None:
     logger.info(f"Detecting tissues for BEAT sample {sample_id}")
-    structured_dir = cfg.structured_dir / sample_id
+    structured_dir = cfg.paths.structured_dir / sample_id
     wsi_path = structured_dir / "wsi.tiff"
     tissues_path = structured_dir / "tissues.parquet"
     detect_tissues(wsi_path, tissues_path)
@@ -131,36 +130,37 @@ def process_sample(
     overwrite: bool = False,
 ) -> None:
     logger.info(f"Processing BEAT sample {sample_id}")
-    structured_dir = cfg.structured_dir / sample_id
+    structured_dir = cfg.paths.structured_dir / sample_id
+    tiles_cfg = cfg.processing.tiles
     wsi_path = structured_dir / "wsi.tiff"
     transcripts_path = structured_dir / "transcripts.parquet"
     cells_path = structured_dir / "cells.parquet"
     tissues_path = structured_dir / "tissues.parquet"
-    tiles_path = structured_dir / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
+    tiles_path = structured_dir / "tiles" / f"{tiles_cfg.tile_px}_{tiles_cfg.stride_px}.parquet"
     processed_dir = processed_sample_dir(cfg, sample_id)
 
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
     tile_tissues(
         wsi_path,
         tissues_parquet=tissues_path,
-        tile_px=cfg.tile_px,
-        stride_px=cfg.stride_px,
-        mpp=cfg.tile_mpp,
+        tile_px=tiles_cfg.tile_px,
+        stride_px=tiles_cfg.stride_px,
+        mpp=tiles_cfg.mpp,
         output_parquet=tiles_path,
     )
     tiles = gpd.read_parquet(tiles_path)
-    extract_tiles(wsi_path, tiles, processed_dir, cfg.tile_mpp)
+    extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp)
     tile_transcripts(tiles, transcripts_path, processed_dir, predicate)
     process_tiles(
         tiles,
         processed_dir,
         transcripts_path,
-        img_size=cfg.tile_px,
+        img_size=tiles_cfg.tile_px,
         kernel_size=kernel_size,
     )
     if cells_path.exists():
         tile_cells(tiles, cells_path, processed_dir, predicate)
-        process_cells(tiles, processed_dir, img_size=cfg.tile_px)
+        process_cells(tiles, processed_dir, img_size=tiles_cfg.tile_px)
 
 
 def _tile_item(tile_dir: Path, sample_id: str, tile_id: int, kernel_size: int) -> dict | None:
@@ -193,12 +193,12 @@ def _iter_tile_dirs(sample_dir: Path) -> list[Path]:
 
 
 def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool = False) -> Path:
-    items_path = cfg.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
+    items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     if items_path.exists() and not overwrite:
         logger.info(f"Items already exist: {items_path}")
         return items_path
 
-    sample_dirs = sorted(path for path in cfg.processed_dir.iterdir() if path.is_dir())
+    sample_dirs = sorted(path for path in cfg.paths.processed_dir.iterdir() if path.is_dir())
     logger.info(f"Building items from {len(sample_dirs)} processed samples")
 
     items = []
@@ -243,12 +243,12 @@ def compute_all_tile_stats(
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
 ) -> Path:
-    stats_path = cfg.output_dir / "statistics" / f"{DEFAULT_SOURCE_ITEMS_NAME}.parquet"
+    stats_path = cfg.paths.output_dir / "statistics" / f"{DEFAULT_SOURCE_ITEMS_NAME}.parquet"
     if stats_path.exists() and not overwrite:
         logger.info(f"Statistics already exist: {stats_path}")
         return stats_path
 
-    items_path = cfg.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
+    items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     items = load_items_dataframe(items_path).to_dict("records")
     rows = [_compute_item_stats(item, cell_type_col) for item in tqdm(items, desc="Tiles")]
     stats = pd.DataFrame(rows).set_index("id")
@@ -272,18 +272,25 @@ def _apply_filter(stats: pd.DataFrame, cfg: ItemsFilterConfig) -> pd.Series:
 
 def create_filtered_items(
     cfg: PipelineConfig,
-    items_config_path: Path,
+    items_config_path: Path | None = None,
     source_items_name: str = DEFAULT_SOURCE_ITEMS_NAME,
     overwrite: bool = False,
 ) -> tuple[Path, int]:
-    filter_cfg = load_items_filter_config(items_config_path)
-    output_path = cfg.output_dir / "items" / f"{filter_cfg.name}.json"
+    filter_cfg = ItemsFilterConfig(
+        name=cfg.processing.items.name,
+        organs=cfg.processing.items.filter.organs,
+        num_transcripts=cfg.processing.items.filter.num_transcripts,
+        num_unique_transcripts=cfg.processing.items.filter.num_unique_transcripts,
+        num_cells=cfg.processing.items.filter.num_cells,
+        num_unique_cells=cfg.processing.items.filter.num_unique_cells,
+    )
+    output_path = cfg.paths.output_dir / "items" / f"{filter_cfg.name}.json"
     if output_path.exists() and not overwrite:
         logger.info(f"Filtered items already exist: {output_path}")
         return output_path, len(load_items_dataframe(output_path))
 
-    items_path = cfg.output_dir / "items" / f"{source_items_name}.json"
-    stats_path = cfg.output_dir / "statistics" / f"{source_items_name}.parquet"
+    items_path = cfg.paths.output_dir / "items" / f"{source_items_name}.json"
+    stats_path = cfg.paths.output_dir / "statistics" / f"{source_items_name}.parquet"
     assert items_path.exists(), f"Source items not found: {items_path}"
     assert stats_path.exists(), f"Statistics not found: {stats_path}"
 
@@ -300,17 +307,17 @@ def create_filtered_items(
 
 def create_split_collection(
     cfg: PipelineConfig,
-    split_config_path: Path,
     items_path: Path,
+    split_config_path: Path | None = None,
     overwrite: bool = False,
 ) -> Path:
-    split_cfg = load_split_config(split_config_path)
-    split_dir = cfg.output_dir / "splits" / split_cfg.split_name
+    split_cfg = cfg.processing.split
+    split_dir = cfg.paths.output_dir / "splits" / split_cfg.split_name
     if split_dir.exists() and not overwrite:
         logger.info(f"Split metadata already exists: {split_dir}")
         return split_dir
 
-    joined = join_items_with_metadata(items_path, cfg.processed_dir / "metadata.parquet")
+    joined = join_items_with_metadata(items_path, cfg.paths.processed_dir / "metadata.parquet")
     save_split_metadata(joined, split_dir, split_cfg, overwrite=overwrite)
     return split_dir
 
@@ -478,50 +485,48 @@ def run_samples_ray(
 def finalize_dataset(
     cfg: PipelineConfig,
     retained_sample_ids: list[str],
-    items_config_path: Path,
-    split_config_path: Path,
     kernel_size: int,
     cell_type_col: str,
     overwrite: bool,
 ) -> None:
     process_dataset_metadata(
         dataset="beat",
-        metadata_path=cfg.structured_dir / "metadata.parquet",
-        output_path=cfg.processed_dir / "metadata.parquet",
+        metadata_path=cfg.paths.structured_dir / "metadata.parquet",
+        output_path=cfg.paths.processed_dir / "metadata.parquet",
         sample_ids=retained_sample_ids,
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
     filtered_items_path, num_items = create_filtered_items(
         cfg,
-        items_config_path,
+        None,
         source_items_name=DEFAULT_SOURCE_ITEMS_NAME,
         overwrite=overwrite,
     )
     if num_items == 0:
-        logger.warning(f"No items kept for {items_config_path.stem}, skipping split creation")
+        logger.warning(f"No items kept for {cfg.processing.items.name}, skipping split creation")
         return
     create_split_collection(
         cfg,
-        split_config_path,
         filtered_items_path,
+        None,
         overwrite=overwrite,
     )
 
 
 def main(
     dataset: str = "beat",
-    config_path: Path | None = None,
+    config_path: Path = Path("config/local/beat.yaml"),
     sample_id: str | None = None,
-    items_config_path: Path = DEFAULT_ITEMS_CONFIG_PATH,
-    split_config_path: Path = DEFAULT_SPLIT_CONFIG_PATH,
-    kernel_size: int = 16,
-    predicate: str = "within",
+    kernel_size: int | None = None,
+    predicate: str | None = None,
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
     executor: Literal["serial", "ray"] = "serial",
 ) -> None:
     cfg, sample_ids = prepare_driver_context(dataset, config_path, sample_id)
+    kernel_size = cfg.processing.tiles.kernel_size if kernel_size is None else kernel_size
+    predicate = cfg.processing.tiles.predicate if predicate is None else predicate
 
     if executor == "serial":
         retained_sample_ids = run_samples_serial(cfg, sample_ids, kernel_size, predicate, overwrite)
@@ -531,8 +536,6 @@ def main(
     finalize_dataset(
         cfg,
         retained_sample_ids,
-        items_config_path,
-        split_config_path,
         kernel_size,
         cell_type_col,
         overwrite,

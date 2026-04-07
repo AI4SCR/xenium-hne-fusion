@@ -28,9 +28,9 @@ def main(
     split_config_path = split_config_path or Path('configs/splits') / f'{dataset}.yaml'
     split_cfg = load_split_config(split_config_path)
 
-    items_path = items_path or (cfg.output_dir / 'items' / 'all.json')
-    metadata_path = metadata_path or (cfg.processed_dir / 'metadata.parquet')
-    split_dir = cfg.output_dir / 'splits' / split_cfg.split_name
+    items_path = items_path or (cfg.paths.output_dir / 'items' / 'all.json')
+    metadata_path = metadata_path or (cfg.paths.processed_dir / 'metadata.parquet')
+    split_dir = cfg.paths.output_dir / 'splits' / split_cfg.split_name
 
     if split_dir.exists() and not overwrite:
         logger.info(f'Split metadata already exists: {split_dir}')

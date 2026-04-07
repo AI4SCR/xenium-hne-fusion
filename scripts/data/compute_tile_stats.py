@@ -97,13 +97,13 @@ def main(
 ) -> None:
     load_dotenv()
     cfg = load_pipeline_config(dataset, config_path)
-    stats_path = cfg.output_dir / 'statistics' / f'{items_name}.parquet'
+    stats_path = cfg.paths.output_dir / 'statistics' / f'{items_name}.parquet'
 
     if stats_path.exists() and not overwrite:
         logger.info(f'Statistics already exist: {stats_path}')
         return
 
-    items_path = cfg.output_dir / 'items' / f'{items_name}.json'
+    items_path = cfg.paths.output_dir / 'items' / f'{items_name}.json'
     items_df = load_items_dataframe(items_path)
     items = items_df.to_dict('records')
     logger.info(f'Computing stats for {len(items)} tiles from {items_path}')
@@ -115,7 +115,7 @@ def main(
     stats.to_parquet(stats_path)
     logger.info(f'Saved statistics → {stats_path}')
 
-    figures_dir = Path('figures') / cfg.name / 'tile_stats' / items_name
+    figures_dir = Path('figures') / cfg.processing.name / 'tile_stats' / items_name
     plot_tile_stats(stats, figures_dir)
 
 

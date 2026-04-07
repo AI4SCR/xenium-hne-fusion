@@ -35,12 +35,12 @@ def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
 def main(dataset: str, config_path: Path | None = None) -> None:
     cfg = load_pipeline_config(dataset, config_path)
     metadata_csv = get_hest_metadata_path(cfg.raw_dir)
-    create_structured_metadata_symlink(metadata_csv, cfg.structured_dir)
+    create_structured_metadata_symlink(metadata_csv, cfg.paths.structured_dir)
     samples = resolve_samples(cfg, metadata_csv)
     for sample_id in samples:
         ensure_hest_sample_downloaded(sample_id, cfg.raw_dir)
         validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_csv)
-        create_structured_symlinks(sample_id, cfg.raw_dir, cfg.structured_dir)
+        create_structured_symlinks(sample_id, cfg.raw_dir, cfg.paths.structured_dir)
 
 
 if __name__ == "__main__":
