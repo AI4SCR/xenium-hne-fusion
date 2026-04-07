@@ -1,3 +1,5 @@
+Code for the paper [Linking gene expression to morphology with vision-language models in spatial transcriptomics](https://openreview.net/forum?id=h2GcySraTP).
+
 # xenium-hne-fusion
 
 Research codebase for fusing Xenium spatial transcriptomics with H&E whole-slide images.
@@ -374,7 +376,7 @@ Examples:
 
 ```bash
 bash ray/submit.sh "python scripts/data/process_metadata.py --dataset hest1k"
-bash ray/submit.sh "python scripts/train/supervised.py --cfg configs/train/hest1k/expression/early-fusion.yaml"
+bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/early-fusion.yaml"
 ```
 
 For the end-to-end HEST1K pipeline there is also a small wrapper that forwards its arguments to

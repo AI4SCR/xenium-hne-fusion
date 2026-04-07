@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
-from pathlib import Path
 from typing import Literal
 
 import lightning as L
@@ -286,5 +285,5 @@ def train(cfg: Config, debug: bool | None = None):
     }
 
 
-def main(cfg: Path, debug: bool = False) -> None:
-    train(Config.from_yaml(cfg), debug=debug)
+def main(cfg: Config, debug: bool | None = None) -> None:
+    train(cfg, debug=debug)
