@@ -229,6 +229,85 @@ HEST1K_RAW_DIR=data/00_raw/hest1k
 BEAT_RAW_DIR=/path/to/beat/raw
 ```
 
+### Path resolution
+
+Processing configs bind to storage through `name` plus the raw-root env vars.
+
+- `name` determines both the dataset family and the managed output root.
+- `infer_dataset(name)` maps `beat... -> beat` and `hest1k... -> hest1k`.
+- Raw inputs come from the matching env var:
+  - `beat -> BEAT_RAW_DIR`
+  - `hest1k -> HEST1K_RAW_DIR`
+- Managed paths are always derived from `DATA_DIR` and `name`:
+  - `DATA_DIR/01_structured/<name>/`
+  - `DATA_DIR/02_processed/<name>/`
+  - `DATA_DIR/03_output/<name>/`
+
+So for `name: hest1k`, the pipeline reads raw data from `HEST1K_RAW_DIR` and writes derived
+artifacts under:
+
+```text
+DATA_DIR/01_structured/hest1k/
+DATA_DIR/02_processed/hest1k/
+DATA_DIR/03_output/hest1k/
+```
+
+For `name: beat`, it reads from `BEAT_RAW_DIR` and writes under the same `DATA_DIR` layout with
+`beat/` as the dataset root.
+
+Relative paths inside downstream configs are resolved as follows:
+
+- training `data.metadata_path`:
+  - absolute path: used as-is
+  - relative path: resolved under `DATA_DIR/03_output/<name>/splits/`
+- training `data.panel_path`:
+  - resolved under repo `panels/<name>/`
+- training `data.cache_dir`:
+  - resolved under `DATA_DIR/03_output/<name>/`
+- panel recipe `split_path`:
+  - resolved under `DATA_DIR/03_output/<dataset>/splits/`
+
+The processing pipeline itself reserves these canonical outputs:
+
+- `DATA_DIR/03_output/<name>/items/all.json`
+- `DATA_DIR/03_output/<name>/splits/<split_name>/`
+- `panels/<name>/...` for panel YAMLs referenced by training
+
+## SLURM Processing
+
+For per-sample processing on a Slurm cluster, use the small submission wrappers in `scripts/data/`.
+They load `.env`, enumerate sample IDs, and submit one job per sample by overriding
+`filter.sample_ids` to `[current_sample_id]`.
+
+Both wrappers currently request:
+
+- `8` CPUs
+- `64G` RAM
+- `08:00:00` wall time
+- logs at `$HOME/logs/%j.log`
+- errors at `$HOME/logs/%j.err`
+
+BEAT:
+
+```bash
+scripts/data/run_beat_slurm.sh --config configs/data/remote/beat.yaml
+```
+
+HEST1K:
+
+```bash
+scripts/data/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
+```
+
+Notes:
+
+- The scripts create `$HOME/logs` if it does not already exist.
+- `run_beat_slurm.sh` enumerates samples from directories under `BEAT_RAW_DIR`.
+- `run_hest1k_slurm.sh` resolves sample IDs from `HEST_v1_3_0.csv` using the same config filter
+  logic as `run_hest1k.py`.
+- Each submitted job runs the serial entrypoint for exactly one sample, e.g.
+  `uv run scripts/data/run_hest1k.py ... --filter.sample_ids '[TENX95]'`.
+
 ## Training
 
 Training configs stay model-focused. Dataset binding lives under `data.name`, and

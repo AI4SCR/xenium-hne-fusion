@@ -33,6 +33,8 @@ done
 
 cd "${REPO_ROOT}"
 
+CONFIG_PATH="$(realpath "${CONFIG_PATH}")"
+
 if [[ -f "${REPO_ROOT}/.env" ]]; then
     set -a
     # shellcheck disable=SC1091
