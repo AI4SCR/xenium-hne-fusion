@@ -123,10 +123,13 @@ def _load_partitioned_points(points_dir: Path) -> gpd.GeoDataFrame:
 
 
 def _load_transcript_batch(batch) -> gpd.GeoDataFrame:
-    chunk = batch.to_pandas()
-    assert {"he_x", "he_y"} <= set(chunk.columns), f"Missing he_x/he_y: {chunk.columns.tolist()}"
-    chunk["geometry"] = gpd.points_from_xy(chunk["he_x"], chunk["he_y"])
-    return gpd.GeoDataFrame(chunk, geometry="geometry")
+    if {"he_x", "he_y"} <= set(batch.schema.names):
+        chunk = batch.to_pandas()
+        chunk["geometry"] = gpd.points_from_xy(chunk["he_x"], chunk["he_y"])
+        return gpd.GeoDataFrame(chunk, geometry="geometry")
+
+    assert "geometry" in batch.schema.names, f"Missing transcript coordinates: {batch.schema.names}"
+    return gpd.GeoDataFrame.from_arrow(batch)
 
 
 def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir: Path, predicate: str = "within") -> None:
@@ -137,6 +140,13 @@ def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir
     logger.info(
         f"Tiling transcripts (num_tiles={len(tiles)}, num_transcripts={transcripts.metadata.num_rows})..."
     )
+    schema_names = set(transcripts.schema_arrow.names)
+    columns = ["transcript_id", "cell_id", "feature_name"]
+    if {"he_x", "he_y"} <= schema_names:
+        columns.extend(["he_x", "he_y"])
+    else:
+        assert "geometry" in schema_names, f"Missing transcript coordinates: {transcripts.schema_arrow.names}"
+        columns.append("geometry")
 
     with tempfile.TemporaryDirectory(prefix="xhf-transcripts-") as tmpdir:
         tmpdir_path = Path(tmpdir)
@@ -145,7 +155,7 @@ def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir
         for j, batch in enumerate(
             transcripts.iter_batches(
                 batch_size=chunk_size,
-                columns=["transcript_id", "cell_id", "feature_name", "he_x", "he_y"],
+                columns=columns,
             ),
             start=1,
         ):

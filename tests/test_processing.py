@@ -229,6 +229,32 @@ def test_tile_transcripts_supports_coordinate_only_hest_parquet(tmp_path: Path):
     assert stored.geometry.y.tolist() == [20.0, 40.0]
 
 
+def test_tile_transcripts_supports_geometry_only_beat_parquet(tmp_path: Path):
+    tiles = gpd.GeoDataFrame(
+        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
+        geometry=[box(0, 0, 100, 100)],
+    )
+    transcripts = gpd.GeoDataFrame(
+        {
+            'transcript_id': [1, 2],
+            'cell_id': [10, 11],
+            'feature_name': [b'A', b'B'],
+        },
+        geometry=[Point(10, 20), Point(60, 40)],
+    )
+
+    transcripts_path = tmp_path / 'transcripts.parquet'
+    transcripts.to_parquet(transcripts_path)
+
+    output_dir = tmp_path / 'processed'
+    tile_transcripts(tiles, transcripts_path, output_dir)
+
+    stored = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
+    assert stored['transcript_id'].tolist() == [1, 2]
+    assert stored.geometry.x.tolist() == [10.0, 60.0]
+    assert stored.geometry.y.tolist() == [20.0, 40.0]
+
+
 def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: Path):
     tiles = gpd.GeoDataFrame(
         [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
