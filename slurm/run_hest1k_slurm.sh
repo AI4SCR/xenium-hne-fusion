@@ -95,7 +95,6 @@ for sample_id in "${SAMPLE_IDS[@]}"; do
         uv run
         scripts/data/run_hest1k.py
         --config "${CONFIG_PATH}"
-        --name hest1k
         --executor serial
         --filter.sample_ids "[${sample_id}]"
     )
