@@ -124,7 +124,6 @@ def process_sample(
     processed_dir = processed_sample_dir(cfg, sample_id)
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
 
-    detect_tissues(wsi_path, tissues_path)
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
     tile_tissues(
         wsi_path,
@@ -394,6 +393,14 @@ def structure_sample(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -
     mark_sample_structured(cfg, sample_id)
 
 
+def detect_sample_tissues(cfg: PipelineConfig, sample_id: str) -> None:
+    logger.info(f"Detecting tissues for HEST1K sample {sample_id}")
+    structured_dir = cfg.structured_dir / sample_id
+    wsi_path = structured_dir / "wsi.tiff"
+    tissues_path = structured_dir / "tissues.parquet"
+    detect_tissues(wsi_path, tissues_path)
+
+
 def process_sample_stage(
     cfg: PipelineConfig,
     sample_id: str,
@@ -430,6 +437,7 @@ def run_sample_serial(
         logger.info(f"Skipping {sample_id}: already processed")
         return sample_id
 
+    detect_sample_tissues(cfg, sample_id)
     process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
     return sample_id
 
@@ -440,7 +448,13 @@ def build_remote_sample_functions(ray):
         structure_sample(cfg, sample_id, metadata_path)
         return sample_id
 
-    @ray.remote(num_cpus=1, num_gpus=0)
+    @ray.remote(num_cpus=4, num_gpus=1)
+    def detect_tissues_remote(ref: object, cfg: PipelineConfig, sample_id: str) -> str:
+        del ref
+        detect_sample_tissues(cfg, sample_id)
+        return sample_id
+
+    @ray.remote(num_cpus=8, num_gpus=0)
     def process_sample_remote(
         ref: object,
         cfg: PipelineConfig,
@@ -454,7 +468,7 @@ def build_remote_sample_functions(ray):
         process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
         return sample_id
 
-    return structure_sample_remote, process_sample_remote
+    return structure_sample_remote, detect_tissues_remote, process_sample_remote
 
 
 def wait_for_ray_samples(ray, futures: list[tuple[str, object]]) -> None:
@@ -497,7 +511,7 @@ def run_samples_ray(
     if not ray.is_initialized():
         ray.init()
 
-    structure_sample_remote, process_sample_remote = build_remote_sample_functions(ray)
+    structure_sample_remote, detect_tissues_remote, process_sample_remote = build_remote_sample_functions(ray)
 
     retained_sample_ids = []
     futures = []
@@ -513,8 +527,9 @@ def run_samples_ray(
         if not is_sample_structured(cfg, current_sample_id):
             structure_ref = structure_sample_remote.remote(cfg, current_sample_id, metadata_path)
 
+        detect_ref = detect_tissues_remote.remote(structure_ref, cfg, current_sample_id)
         process_ref = process_sample_remote.remote(
-            structure_ref,
+            detect_ref,
             cfg,
             current_sample_id,
             metadata_path,

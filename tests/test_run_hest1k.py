@@ -27,7 +27,7 @@ class _FakeFuture:
         if self._resolved:
             return self._result
 
-        if self.name == "process_sample_remote" and isinstance(self.args[0], _FakeFuture):
+        if self.args and isinstance(self.args[0], _FakeFuture):
             self.args[0].resolve()
 
         if self.name == "process_sample_remote" and self.sample_id in self.fake_ray.fail_samples:
@@ -46,8 +46,13 @@ class _FakeRemoteFunction:
         self.name = name
 
     def remote(self, *args):
-        sample_id = args[1] if self.name == "structure_sample_remote" else args[2]
-        depends_on_future = self.name == "process_sample_remote" and isinstance(args[0], _FakeFuture)
+        if self.name == "structure_sample_remote":
+            sample_id = args[1]
+        elif self.name == "detect_tissues_remote":
+            sample_id = args[2]
+        else:
+            sample_id = args[2]
+        depends_on_future = bool(args) and isinstance(args[0], _FakeFuture)
         self.fake_ray.calls.append(("submit", self.name, sample_id, depends_on_future))
         return _FakeFuture(self.fake_ray, self.fn, self.name, args, sample_id)
 
@@ -178,6 +183,7 @@ def test_run_hest1k_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", fake_ensure_hest_sample_downloaded)
     monkeypatch.setattr(module, "validate_hest_sample_mpp", fake_validate_hest_sample_mpp)
     monkeypatch.setattr(module, "create_structured_symlinks", fake_create_structured_symlinks)
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(module, "process_sample", fake_process_sample)
     monkeypatch.setattr(module, "process_dataset_metadata", fake_process_dataset_metadata)
     monkeypatch.setattr(module, "create_all_items", fake_create_all_items)
@@ -261,6 +267,7 @@ def test_run_hest1k_skips_split_creation_for_empty_filtered_items(
         "create_structured_symlinks",
         lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -325,6 +332,7 @@ def test_run_hest1k_organ_flag_only_filters_final_items_and_splits(
         "create_structured_symlinks",
         lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -488,6 +496,7 @@ def test_run_hest1k_skips_processing_for_completed_samples_and_keeps_metadata(
             calls.append(("symlink", sample_id)),
         ),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -565,6 +574,7 @@ def test_run_hest1k_skips_structuring_but_processes_when_only_structured_marker_
             calls.append(("symlink", sample_id)),
         ),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -634,6 +644,7 @@ def test_run_hest1k_overwrite_reprocesses_and_recreates_markers(
             calls.append(("symlink", sample_id)),
         ),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -712,6 +723,7 @@ def test_run_hest1k_excludes_ineligible_samples_before_processing(
             calls.append(("symlink", sample_id)),
         ),
     )
+    monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
@@ -791,6 +803,11 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     )
     monkeypatch.setattr(
         module,
+        "detect_sample_tissues",
+        lambda cfg, sample_id: calls.append(("detect_tissues", sample_id)),
+    )
+    monkeypatch.setattr(
+        module,
         "process_sample",
         lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
@@ -836,16 +853,21 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     )
 
     assert ("submit", "structure_sample_remote", "L1", False) in calls
+    assert ("submit", "detect_tissues_remote", "L1", True) in calls
     assert ("submit", "process_sample_remote", "L1", True) in calls
-    assert ("submit", "process_sample_remote", "P1", False) in calls
+    assert ("submit", "detect_tissues_remote", "P1", False) in calls
+    assert ("submit", "process_sample_remote", "P1", True) in calls
     assert ("ensure", "L1") in calls
     assert ("validate", "L1") in calls
     assert ("symlink", "L1") in calls
+    assert ("detect_tissues", "L1") in calls
+    assert ("detect_tissues", "P1") in calls
     assert ("process", "L1", 32, "intersects", False) in calls
     assert ("process", "P1", 32, "intersects", False) in calls
     assert ("metadata", ["DONE", "L1", "P1"]) in calls
     assert ("items", 32, False) in calls
     assert ("stats", "ct", False) in calls
+    assert calls.index(("resolve", "detect_tissues_remote", "L1")) > calls.index(("resolve", "structure_sample_remote", "L1"))
     assert calls.index(("metadata", ["DONE", "L1", "P1"])) > calls.index(("resolve", "process_sample_remote", "L1"))
     assert calls.index(("metadata", ["DONE", "L1", "P1"])) > calls.index(("resolve", "process_sample_remote", "P1"))
 
@@ -887,6 +909,11 @@ def test_run_hest1k_ray_aborts_finalization_when_any_sample_fails(
         module,
         "create_structured_symlinks",
         lambda sample_id, raw_dir_arg, structured_dir_arg: (structured_dir_arg / sample_id).mkdir(parents=True, exist_ok=True),
+    )
+    monkeypatch.setattr(
+        module,
+        "detect_sample_tissues",
+        lambda cfg, sample_id: None,
     )
     monkeypatch.setattr(
         module,
@@ -966,6 +993,11 @@ def test_run_hest1k_ray_skips_structuring_for_structured_resume_sample(
     )
     monkeypatch.setattr(
         module,
+        "detect_sample_tissues",
+        lambda cfg, sample_id: calls.append(("detect_tissues", sample_id)),
+    )
+    monkeypatch.setattr(
+        module,
         "process_sample",
         lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
@@ -993,9 +1025,11 @@ def test_run_hest1k_ray_skips_structuring_for_structured_resume_sample(
     )
 
     assert ("submit", "structure_sample_remote", "B1", False) not in calls
-    assert ("submit", "process_sample_remote", "B1", False) in calls
+    assert ("submit", "detect_tissues_remote", "B1", False) in calls
+    assert ("submit", "process_sample_remote", "B1", True) in calls
     assert ("ensure", "B1") not in calls
     assert ("validate", "B1") not in calls
     assert ("symlink", "B1") not in calls
+    assert ("detect_tissues", "B1") in calls
     assert ("process", "B1") in calls
     assert module.is_sample_processed(cfg, "B1")
