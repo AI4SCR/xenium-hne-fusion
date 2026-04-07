@@ -14,7 +14,7 @@ items:
   name: default
   filter:
     organs: null
-    num_transcripts: null
+    num_transcripts: 200
     num_unique_transcripts: null
     num_cells: null
     num_unique_cells: null

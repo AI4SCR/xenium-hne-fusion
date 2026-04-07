@@ -1,6 +1,6 @@
 name: beat
 tiles:
-  tile_px: 512
+  tile_px: 256
   stride_px: 256
   mpp: 0.5
   kernel_size: 16
