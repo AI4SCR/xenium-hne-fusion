@@ -4,12 +4,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-CONFIG_PATH="${REPO_ROOT}/configs/data/remote/beat.yaml"
+CONFIG_PATH="${REPO_ROOT}/configs/data/remote/hest1k.yaml"
 
 usage() {
     cat <<'EOF'
 Usage:
-  scripts/data/run_beat_slurm.sh [--config configs/data/remote/beat.yaml]
+  scripts/data/run_hest1k_slurm.sh [--config configs/data/remote/hest1k.yaml]
 EOF
 }
 
@@ -48,31 +48,47 @@ mkdir -p "${LOG_DIR}"
     exit 1
 }
 
-[[ -n "${BEAT_RAW_DIR:-}" ]] || {
-    echo "BEAT_RAW_DIR is not set." >&2
+[[ -n "${HEST1K_RAW_DIR:-}" ]] || {
+    echo "HEST1K_RAW_DIR is not set." >&2
     exit 1
 }
 
-[[ -d "${BEAT_RAW_DIR}" ]] || {
-    echo "BEAT_RAW_DIR does not exist: ${BEAT_RAW_DIR}" >&2
+[[ -d "${HEST1K_RAW_DIR}" ]] || {
+    echo "HEST1K_RAW_DIR does not exist: ${HEST1K_RAW_DIR}" >&2
+    exit 1
+}
+
+[[ -f "${HEST1K_RAW_DIR}/HEST_v1_3_0.csv" ]] || {
+    echo "Missing HEST metadata: ${HEST1K_RAW_DIR}/HEST_v1_3_0.csv" >&2
     exit 1
 }
 
 mapfile -t SAMPLE_IDS < <(
-    find "${BEAT_RAW_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+    uv run python -c '
+from pathlib import Path
+import os
+import sys
+from xenium_hne_fusion.utils.getters import load_processing_config, resolve_samples
+
+config_path = Path(sys.argv[1])
+metadata_path = Path(os.environ["HEST1K_RAW_DIR"]) / "HEST_v1_3_0.csv"
+cfg = load_processing_config(config_path)
+for sample_id in resolve_samples(cfg, metadata_path):
+    print(sample_id)
+' "${CONFIG_PATH}"
 )
 
 [[ ${#SAMPLE_IDS[@]} -gt 0 ]] || {
-    echo "No BEAT sample directories found in ${BEAT_RAW_DIR}" >&2
+    echo "No HEST1K sample IDs resolved from ${CONFIG_PATH}" >&2
     exit 1
 }
 
 for sample_id in "${SAMPLE_IDS[@]}"; do
     cmd=(
         uv run
-        scripts/data/run_beat.py
+        scripts/data/run_hest1k.py
         --config "${CONFIG_PATH}"
-        --name beat
+        --name hest1k
         --executor serial
         --filter.sample_ids "[${sample_id}]"
     )
@@ -82,7 +98,7 @@ for sample_id in "${SAMPLE_IDS[@]}"; do
 
     echo "Submitting ${sample_id}"
     sbatch \
-        --job-name "beat_${sample_id}" \
+        --job-name "hest1k_${sample_id}" \
         --cpus-per-task 8 \
         --mem 64G \
         --time 08:00:00 \
