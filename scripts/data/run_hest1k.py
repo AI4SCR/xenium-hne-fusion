@@ -47,17 +47,26 @@ from xenium_hne_fusion.processing import (
 )
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
+    DEFAULT_CELL_TYPE_COL,
+    DEFAULT_SOURCE_ITEMS_NAME,
+    STAT_COLS,
     ItemsFilterConfig,
     PipelineConfig,
+    apply_filter,
     build_pipeline_config,
+    clear_sample_markers,
+    compute_item_stats,
     infer_dataset,
+    is_sample_processed,
+    is_sample_structured,
+    iter_tile_dirs,
     load_pipeline_config,
+    mark_sample_processed,
+    mark_sample_structured,
+    processed_sample_dir,
     resolve_samples,
+    tile_item,
 )
-
-DEFAULT_CELL_TYPE_COL = "Level3_grouped"
-DEFAULT_SOURCE_ITEMS_NAME = "all"
-STAT_COLS = ["num_transcripts", "num_unique_transcripts", "num_cells", "num_unique_cells"]
 
 
 def get_hest_metadata_path(raw_dir: Path) -> Path:
@@ -73,45 +82,6 @@ def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
     if len(wsi_files) == 1 and len(tx_files) == 1:
         return
     download_sample(sample_id, raw_dir)
-
-
-def structured_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
-    return cfg.paths.structured_dir / sample_id / ".structured.done"
-
-
-def processed_done_path(cfg: PipelineConfig, sample_id: str) -> Path:
-    tiles = cfg.processing.tiles
-    return cfg.paths.processed_dir / sample_id / f"{tiles.tile_px}_{tiles.stride_px}" / ".processed.done"
-
-
-def processed_sample_dir(cfg: PipelineConfig, sample_id: str) -> Path:
-    tiles = cfg.processing.tiles
-    return cfg.paths.processed_dir / sample_id / f"{tiles.tile_px}_{tiles.stride_px}"
-
-
-def is_sample_structured(cfg: PipelineConfig, sample_id: str) -> bool:
-    return structured_done_path(cfg, sample_id).exists()
-
-
-def is_sample_processed(cfg: PipelineConfig, sample_id: str) -> bool:
-    return processed_done_path(cfg, sample_id).exists()
-
-
-def mark_sample_structured(cfg: PipelineConfig, sample_id: str) -> None:
-    path = structured_done_path(cfg, sample_id)
-    assert path.parent.exists(), f"Structured sample dir missing: {path.parent}"
-    path.write_text(f"sample_id={sample_id}\nstage=structured\n")
-
-
-def mark_sample_processed(cfg: PipelineConfig, sample_id: str) -> None:
-    path = processed_done_path(cfg, sample_id)
-    assert path.parent.exists(), f"Processed sample dir missing: {path.parent}"
-    path.write_text(f"sample_id={sample_id}\nstage=processed\n")
-
-
-def clear_sample_markers(cfg: PipelineConfig, sample_id: str) -> None:
-    structured_done_path(cfg, sample_id).unlink(missing_ok=True)
-    processed_done_path(cfg, sample_id).unlink(missing_ok=True)
 
 
 def process_sample(
@@ -176,35 +146,6 @@ def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], 
     return eligible_sample_ids
 
 
-def _tile_item(tile_dir: Path, sample_id: str, tile_id: int, kernel_size: int) -> dict | None:
-    if not (tile_dir / "tile.pt").exists():
-        return None
-    if not (tile_dir / f"expr-kernel_size={kernel_size}.parquet").exists():
-        return None
-    if not (tile_dir / "transcripts.parquet").exists():
-        return None
-    return {
-        "id": f"{sample_id}_{tile_id}",
-        "sample_id": sample_id,
-        "tile_id": tile_id,
-        "tile_dir": str(tile_dir),
-    }
-
-
-def _iter_tile_dirs(sample_dir: Path) -> list[Path]:
-    direct_tile_dirs = [path for path in sample_dir.iterdir() if path.is_dir() and path.name.isdigit()]
-    if direct_tile_dirs:
-        return sorted(direct_tile_dirs, key=lambda path: int(path.name))
-
-    config_dirs = [path for path in sample_dir.iterdir() if path.is_dir()]
-    assert len(config_dirs) == 1, f"Expected exactly one tile-config dir in {sample_dir}, found {config_dirs}"
-    tile_root = config_dirs[0]
-    return sorted(
-        [path for path in tile_root.iterdir() if path.is_dir() and path.name.isdigit()],
-        key=lambda path: int(path.name),
-    )
-
-
 def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool = False) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     if items_path.exists() and not overwrite:
@@ -218,8 +159,8 @@ def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool
     skipped = []
     for sample_dir in tqdm(sample_dirs, desc="Samples"):
         sample_id = sample_dir.name
-        for tile_dir in _iter_tile_dirs(sample_dir):
-            item = _tile_item(tile_dir, sample_id, int(tile_dir.name), kernel_size)
+        for tile_dir in iter_tile_dirs(sample_dir):
+            item = tile_item(tile_dir, sample_id, int(tile_dir.name), kernel_size)
             (items if item is not None else skipped).append(item or tile_dir)
 
     items_path.parent.mkdir(parents=True, exist_ok=True)
@@ -228,27 +169,6 @@ def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool
     if skipped:
         logger.warning(f"Skipped {len(skipped)} incomplete tile dirs")
     return items_path
-
-
-def _compute_item_stats(item: dict, cell_type_col: str) -> dict:
-    tile_dir = Path(item["tile_dir"])
-    transcripts = pd.read_parquet(tile_dir / "transcripts.parquet", columns=["feature_name"])
-
-    num_cells = float("nan")
-    num_unique_cells = float("nan")
-    cells_path = tile_dir / "cells.parquet"
-    if cells_path.exists():
-        cells = pd.read_parquet(cells_path, columns=[cell_type_col])
-        num_cells = len(cells)
-        num_unique_cells = cells[cell_type_col].nunique()
-
-    return {
-        "id": item["id"],
-        "num_transcripts": len(transcripts),
-        "num_unique_transcripts": transcripts["feature_name"].nunique(),
-        "num_cells": num_cells,
-        "num_unique_cells": num_unique_cells,
-    }
 
 
 def compute_all_tile_stats(
@@ -263,7 +183,7 @@ def compute_all_tile_stats(
 
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     items = load_items_dataframe(items_path).to_dict("records")
-    rows = [_compute_item_stats(item, cell_type_col) for item in tqdm(items, desc="Tiles")]
+    rows = [compute_item_stats(item, cell_type_col) for item in tqdm(items, desc="Tiles")]
     stats = pd.DataFrame(rows).set_index("id")
     assert list(stats.columns) == STAT_COLS, f"Unexpected stats columns: {stats.columns.tolist()}"
 
@@ -271,16 +191,6 @@ def compute_all_tile_stats(
     stats.to_parquet(stats_path)
     logger.info(f"Saved statistics -> {stats_path}")
     return stats_path
-
-
-def _apply_filter(stats: pd.DataFrame, cfg: ItemsFilterConfig) -> pd.Series:
-    mask = pd.Series(True, index=stats.index)
-    for field in STAT_COLS:
-        threshold = getattr(cfg, field)
-        if threshold is None:
-            continue
-        mask &= stats[field].isna() | (stats[field] >= threshold)
-    return mask
 
 
 def create_filtered_items(
@@ -313,7 +223,7 @@ def create_filtered_items(
         items_df = items_df[items_df["sample_id"].isin(allowed_samples)]
 
     stats = pd.read_parquet(stats_path)
-    filtered = items_df[items_df["id"].isin(set(stats.index[_apply_filter(stats, filter_cfg)]))]
+    filtered = items_df[items_df["id"].isin(set(stats.index[apply_filter(stats, filter_cfg)]))]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(filtered.to_dict("records"), indent=2))
