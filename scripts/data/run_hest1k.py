@@ -114,6 +114,68 @@ def process_sample(
         process_cells(tiles, processed_dir, img_size=cfg.tile_px)
 
 
+def can_extract_sample_at_tile_mpp(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> bool:
+    slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
+    if slide_mpp > cfg.tile_mpp:
+        logger.warning(
+            f"Skipping {sample_id}: slide_mpp={slide_mpp:.4f} is coarser than tile_mpp={cfg.tile_mpp:.4f}"
+        )
+        return False
+    return True
+
+
+def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], metadata_path: Path) -> list[str]:
+    eligible_sample_ids = []
+    for sample_id in sample_ids:
+        if can_extract_sample_at_tile_mpp(cfg, sample_id, metadata_path):
+            eligible_sample_ids.append(sample_id)
+    return eligible_sample_ids
+
+
+def is_hest_sample_processed(
+    cfg: PipelineConfig,
+    sample_id: str,
+    kernel_size: int,
+) -> bool:
+    tiles_path = cfg.structured_dir / sample_id / "tiles" / f"{cfg.tile_px}_{cfg.stride_px}.parquet"
+    if not tiles_path.exists():
+        return False
+
+    try:
+        tiles = pd.read_parquet(tiles_path, columns=["tile_id"])
+    except Exception as exc:
+        logger.warning(f"Failed to read tiles parquet for {sample_id}: {exc}")
+        return False
+
+    assert "tile_id" in tiles.columns, f"tile_id missing from {tiles_path}"
+    expected_tile_ids = {str(int(tile_id)) for tile_id in tiles["tile_id"].tolist()}
+    if not expected_tile_ids:
+        logger.warning(f"Tiles parquet is empty for {sample_id}: {tiles_path}")
+        return False
+
+    processed_dir = cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}"
+    if not processed_dir.exists():
+        return False
+
+    observed_tile_ids = {path.name for path in processed_dir.iterdir() if path.is_dir()}
+    if observed_tile_ids != expected_tile_ids:
+        return False
+
+    required_filenames = {
+        "tile.pt",
+        "transcripts.parquet",
+        f"expr-kernel_size={kernel_size}.parquet",
+    }
+    for tile_id in expected_tile_ids:
+        tile_dir = processed_dir / tile_id
+        if not tile_dir.is_dir():
+            return False
+        if any(not (tile_dir / filename).exists() for filename in required_filenames):
+            return False
+
+    return True
+
+
 def _tile_item(tile_dir: Path, sample_id: str, tile_id: int, kernel_size: int) -> dict | None:
     if not (tile_dir / "tile.pt").exists():
         return None
@@ -320,11 +382,19 @@ def main(
     metadata_path = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_path, cfg.structured_dir)
     sample_ids = [sample_id] if sample_id is not None else resolve_samples(cfg, metadata_path)
-    logger.info(f"Running HEST1K pipeline for {len(sample_ids)} human Xenium samples")
+    eligible_sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
+    logger.info(f"Running HEST1K pipeline for {len(eligible_sample_ids)} eligible human Xenium samples")
 
-    for current_sample_id in sample_ids:
+    retained_sample_ids = []
+    for current_sample_id in eligible_sample_ids:
+        if not overwrite and is_hest_sample_processed(cfg, current_sample_id, kernel_size):
+            logger.info(f"Skipping {current_sample_id}: already processed")
+            retained_sample_ids.append(current_sample_id)
+            continue
+
         ensure_hest_sample_downloaded(current_sample_id, cfg.raw_dir)
         validate_hest_sample_mpp(current_sample_id, cfg.raw_dir, metadata_path)
+        assert can_extract_sample_at_tile_mpp(cfg, current_sample_id, metadata_path), f"Ineligible sample: {current_sample_id}"
         create_structured_symlinks(current_sample_id, cfg.raw_dir, cfg.structured_dir)
         process_sample(
             cfg,
@@ -334,12 +404,13 @@ def main(
             predicate=predicate,
             overwrite=overwrite,
         )
+        retained_sample_ids.append(current_sample_id)
 
     process_dataset_metadata(
         dataset="hest1k",
         metadata_path=metadata_path,
         output_path=cfg.processed_dir / "metadata.parquet",
-        sample_ids=sample_ids,
+        sample_ids=retained_sample_ids,
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
