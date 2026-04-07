@@ -33,6 +33,13 @@ done
 
 cd "${REPO_ROOT}"
 
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/.env"
+    set +a
+fi
+
 [[ -f "${CONFIG_PATH}" ]] || {
     echo "Missing config: ${CONFIG_PATH}" >&2
     exit 1
