@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from xenium_hne_fusion.utils.getters import load_processing_config
+
 
 def _load_script(path: str, module_name: str):
     script_path = Path(path).resolve()
@@ -131,7 +133,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+        lambda cfg, source_items_name="all", overwrite=False: (
             calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 5),
         )[1],
@@ -139,16 +141,13 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, items_path, split_config_path=None, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
+        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
     )
 
-    module.main(
-        config_path=config_path,
-        kernel_size=32,
-        predicate="intersects",
-        cell_type_col="ct",
-        overwrite=True,
-    )
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.tiles.kernel_size = 32
+    processing_cfg.tiles.predicate = "intersects"
+    module.main(processing_cfg=processing_cfg, cell_type_col="ct", overwrite=True)
 
     output_dir = data_dir / "03_output" / "beat"
     assert calls == [
@@ -203,7 +202,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
+        lambda cfg, source_items_name="all", overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
     )
 
     cfg = module.load_pipeline_config("beat", config_path)
@@ -212,7 +211,8 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     module.mark_sample_structured(cfg, "DONE")
     module.mark_sample_processed(cfg, "DONE")
 
-    module.main(config_path=config_path, overwrite=False)
+    processing_cfg = load_processing_config(config_path)
+    module.main(processing_cfg=processing_cfg, overwrite=False)
 
     assert calls == [
         ("structure", "S2"),
@@ -264,7 +264,7 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+        lambda cfg, source_items_name="all", overwrite=False: (
             calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 0),
         )[1],
@@ -278,14 +278,10 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     (cfg.structured_dir / "S2").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "S2")
 
-    module.main(
-        config_path=config_path,
-        kernel_size=32,
-        predicate="intersects",
-        cell_type_col="ct",
-        overwrite=False,
-        executor="ray",
-    )
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.tiles.kernel_size = 32
+    processing_cfg.tiles.predicate = "intersects"
+    module.main(processing_cfg=processing_cfg, cell_type_col="ct", overwrite=False, executor="ray")
 
     assert ("submit", "structure_sample_remote", "S1", False) in calls
     assert ("submit", "detect_tissues_remote", "S1", True) in calls
@@ -342,7 +338,8 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     )
 
     with pytest.raises(RuntimeError, match=r"Failed samples: \['S1'\]"):
-        module.main(config_path=config_path, overwrite=False, executor="ray")
+        processing_cfg = load_processing_config(config_path)
+        module.main(processing_cfg=processing_cfg, overwrite=False, executor="ray")
 
     assert ("metadata", ["S1", "S2"]) not in calls
     assert ("items",) not in calls

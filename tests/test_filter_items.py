@@ -29,6 +29,11 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
         'filter:\n'
         '  sample_ids: null\n'
     )
+    items_config_path = tmp_path / 'beat-items.yaml'
+    items_config_path.write_text(
+        'name: default\n'
+        'num_transcripts: 200\n'
+    )
 
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
@@ -57,7 +62,7 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     module = _load_filter_items_module()
     module.main(
         'beat',
-        items_config_path=Path('configs/items/beat/default.yaml'),
+        items_config_path=items_config_path,
         config_path=config_path,
         overwrite=True,
     )

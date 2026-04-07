@@ -3,18 +3,27 @@
 import importlib
 import json
 import shutil
+import sys
 from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
 import pandas as pd
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
+from jsonargparse import ArgumentParser
 from loguru import logger
 from tqdm import tqdm
 
 load_dotenv()
 
+from xenium_hne_fusion.config import (
+    FilterConfig,
+    ItemsConfig,
+    ItemsThresholdConfig,
+    ProcessingConfig,
+    SplitConfig,
+    TilesConfig,
+)
 from xenium_hne_fusion.download import (
     create_structured_metadata_symlink,
     create_structured_symlinks,
@@ -26,7 +35,6 @@ from xenium_hne_fusion.download import (
 from xenium_hne_fusion.metadata import (
     join_items_with_metadata,
     load_items_dataframe,
-    load_split_config,
     process_dataset_metadata,
     save_split_metadata,
 )
@@ -41,6 +49,8 @@ from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
     ItemsFilterConfig,
     PipelineConfig,
+    build_pipeline_config,
+    infer_dataset,
     load_pipeline_config,
     resolve_samples,
 )
@@ -275,7 +285,6 @@ def _apply_filter(stats: pd.DataFrame, cfg: ItemsFilterConfig) -> pd.Series:
 
 def create_filtered_items(
     cfg: PipelineConfig,
-    items_config_path: Path | None = None,
     source_items_name: str = DEFAULT_SOURCE_ITEMS_NAME,
     overwrite: bool = False,
 ) -> tuple[Path, int]:
@@ -316,7 +325,6 @@ def create_filtered_items(
 def create_split_collection(
     cfg: PipelineConfig,
     items_path: Path,
-    split_config_path: Path | None = None,
     overwrite: bool = False,
 ) -> Path:
     split_cfg = cfg.processing.split
@@ -328,27 +336,88 @@ def create_split_collection(
     joined = join_items_with_metadata(items_path, cfg.paths.processed_dir / "metadata.parquet")
     save_split_metadata(joined, split_dir, split_cfg, overwrite=overwrite)
     return split_dir
-
-
-def get_split_config_path_for_items(items_config_path: Path) -> Path:
-    return items_config_path
-
-
 def load_ray_module():
     return importlib.import_module("ray")
 
 
+def _build_parser() -> ArgumentParser:
+    parser = ArgumentParser()
+    parser.add_argument("--config", action="config", required=True, help="Path to a YAML config file.")
+    parser.add_argument("--name", type=str, required=True)
+    parser.add_class_arguments(TilesConfig, nested_key="tiles")
+    parser.add_class_arguments(FilterConfig, nested_key="filter")
+    parser.add_class_arguments(ItemsConfig, nested_key="items")
+    parser.add_class_arguments(SplitConfig, nested_key="split")
+    parser.add_argument("--overwrite", type=bool, default=False)
+    parser.add_argument("--executor", type=Literal["serial", "ray"], default="serial")
+    return parser
+
+
+def _namespace_to_processing_config(ns) -> ProcessingConfig:
+    data = ns.as_dict()
+    items_filter = data["items"]["filter"]
+    split = data["split"]
+    return ProcessingConfig(
+        name=data["name"],
+        tiles=TilesConfig(**data["tiles"]),
+        filter=FilterConfig(**data["filter"]),
+        items=ItemsConfig(
+            name=data["items"]["name"],
+            filter=ItemsThresholdConfig(**items_filter),
+        ),
+        split=SplitConfig(**split),
+    )
+
+
+def _run(
+    processing_cfg: ProcessingConfig,
+    overwrite: bool,
+    executor: Literal["serial", "ray"],
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+) -> None:
+    cfg, metadata_path, eligible_sample_ids = prepare_driver_context(processing_cfg)
+    kernel_size = cfg.processing.tiles.kernel_size
+    predicate = cfg.processing.tiles.predicate
+
+    if executor == "serial":
+        retained_sample_ids = run_samples_serial(
+            cfg,
+            eligible_sample_ids,
+            metadata_path,
+            kernel_size,
+            predicate,
+            overwrite,
+        )
+    else:
+        retained_sample_ids = run_samples_ray(
+            cfg,
+            eligible_sample_ids,
+            metadata_path,
+            kernel_size,
+            predicate,
+            overwrite,
+        )
+
+    finalize_dataset(
+        cfg,
+        metadata_path,
+        retained_sample_ids,
+        kernel_size,
+        cell_type_col,
+        overwrite,
+    )
+
+
 def prepare_driver_context(
-    dataset: str,
-    config_path: Path | None,
-    sample_id: str | None,
+    config: ProcessingConfig,
 ) -> tuple[PipelineConfig, Path, list[str]]:
+    dataset = infer_dataset(config.name)
     assert dataset == "hest1k", f"Expected dataset='hest1k', got {dataset!r}"
-    cfg = load_pipeline_config(dataset, config_path)
+    cfg = build_pipeline_config(config)
 
     metadata_path = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_path, cfg.paths.structured_dir)
-    sample_ids = [sample_id] if sample_id is not None else resolve_samples(cfg, metadata_path)
+    sample_ids = resolve_samples(cfg, metadata_path)
     eligible_sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     logger.info(f"Running HEST1K pipeline for {len(eligible_sample_ids)} eligible human Xenium samples")
     return cfg, metadata_path, eligible_sample_ids
@@ -540,7 +609,6 @@ def finalize_dataset(
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
     filtered_items_path, num_items = create_filtered_items(
         cfg,
-        None,
         source_items_name=DEFAULT_SOURCE_ITEMS_NAME,
         overwrite=overwrite,
     )
@@ -550,56 +618,26 @@ def finalize_dataset(
     create_split_collection(
         cfg,
         filtered_items_path,
-        None,
         overwrite=overwrite,
     )
 
 
 def main(
-    dataset: str = "hest1k",
-    config_path: Path = Path("config/local/hest1k.yaml"),
-    sample_id: str | None = None,
-    organ: str | list[str] | None = None,
-    items_config_dir: Path | None = None,
-    kernel_size: int | None = None,
-    predicate: str | None = None,
+    processing_cfg: ProcessingConfig | None = None,
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
     executor: Literal["serial", "ray"] = "serial",
 ) -> None:
-    del organ, items_config_dir
-    cfg, metadata_path, eligible_sample_ids = prepare_driver_context(dataset, config_path, sample_id)
-    kernel_size = cfg.processing.tiles.kernel_size if kernel_size is None else kernel_size
-    predicate = cfg.processing.tiles.predicate if predicate is None else predicate
+    assert processing_cfg is not None, "processing_cfg is required"
+    _run(processing_cfg, overwrite=overwrite, executor=executor, cell_type_col=cell_type_col)
 
-    if executor == "serial":
-        retained_sample_ids = run_samples_serial(
-            cfg,
-            eligible_sample_ids,
-            metadata_path,
-            kernel_size,
-            predicate,
-            overwrite,
-        )
-    else:
-        retained_sample_ids = run_samples_ray(
-            cfg,
-            eligible_sample_ids,
-            metadata_path,
-            kernel_size,
-            predicate,
-            overwrite,
-        )
 
-    finalize_dataset(
-        cfg,
-        metadata_path,
-        retained_sample_ids,
-        kernel_size,
-        cell_type_col,
-        overwrite,
-    )
+def cli(argv: list[str] | None = None) -> None:
+    parser = _build_parser()
+    ns = parser.parse_args(argv)
+    processing_cfg = _namespace_to_processing_config(ns)
+    _run(processing_cfg, overwrite=ns.overwrite, executor=ns.executor)
 
 
 if __name__ == "__main__":
-    auto_cli(main)
+    cli(sys.argv[1:])

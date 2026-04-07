@@ -25,8 +25,7 @@ def main(
     overwrite: bool = False,
 ) -> None:
     cfg = load_pipeline_config(dataset, config_path)
-    split_config_path = split_config_path or Path('configs/splits') / f'{dataset}.yaml'
-    split_cfg = load_split_config(split_config_path)
+    split_cfg = cfg.processing.split if split_config_path is None else load_split_config(split_config_path)
 
     items_path = items_path or (cfg.paths.output_dir / 'items' / 'all.json')
     metadata_path = metadata_path or (cfg.paths.processed_dir / 'metadata.parquet')

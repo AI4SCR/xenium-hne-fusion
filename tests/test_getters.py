@@ -93,12 +93,12 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
 
 
 def test_repo_hest_config_pins_three_sample_ids():
-    cfg = load_dataset_config(Path('config/local/hest1k.yaml'))
+    cfg = load_dataset_config(Path('configs/data/local/hest1k.yaml'))
 
     assert cfg.filter.sample_ids == ['NCBI783', 'NCBI856', 'TENX116']
 
 
 def test_repo_remote_hest_config_processes_all_samples():
-    cfg = load_dataset_config(Path('config/remote/hest1k.yaml'))
+    cfg = load_dataset_config(Path('configs/data/remote/hest1k.yaml'))
 
     assert cfg.filter.sample_ids is None

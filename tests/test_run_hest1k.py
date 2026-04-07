@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from xenium_hne_fusion.utils.getters import ManagedPaths, PipelineConfig, ProcessingConfig, TilesConfig
+from xenium_hne_fusion.utils.getters import ManagedPaths, PipelineConfig, ProcessingConfig, TilesConfig, load_processing_config
 
 
 def _load_script(path: str, module_name: str):
@@ -173,7 +173,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+        lambda cfg, source_items_name="all", overwrite=False: (
             calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 5),
         )[1],
@@ -181,12 +181,15 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, items_path, split_config_path=None, overwrite=False: calls.append(
+        lambda cfg, items_path, overwrite=False: calls.append(
             ("split", cfg.split.split_name, items_path, overwrite)
         ),
     )
 
-    module.main(config_path=config_path, kernel_size=32, predicate="intersects", cell_type_col="ct", overwrite=True)
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.tiles.kernel_size = 32
+    processing_cfg.tiles.predicate = "intersects"
+    module.main(processing_cfg=processing_cfg, cell_type_col="ct", overwrite=True)
 
     processed_metadata_path = data_dir / "02_processed" / "hest1k" / "metadata.parquet"
     output_dir = data_dir / "03_output" / "hest1k"
@@ -216,8 +219,8 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
 def test_run_hest1k_local_and_remote_configs_define_sample_scope():
     from xenium_hne_fusion.utils.getters import load_dataset_config
 
-    local_cfg = load_dataset_config(Path("config/local/hest1k.yaml"))
-    remote_cfg = load_dataset_config(Path("config/remote/hest1k.yaml"))
+    local_cfg = load_dataset_config(Path("configs/data/local/hest1k.yaml"))
+    remote_cfg = load_dataset_config(Path("configs/data/remote/hest1k.yaml"))
 
     assert local_cfg.filter.sample_ids == ["NCBI783", "NCBI856", "TENX116"]
     assert remote_cfg.filter.sample_ids is None
@@ -336,7 +339,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, items_config_path=None, source_items_name="all", overwrite=False: (
+        lambda cfg, source_items_name="all", overwrite=False: (
             calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 1),
         )[1],
@@ -344,7 +347,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, items_path, split_config_path=None, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
+        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
     )
 
     cfg = module.load_pipeline_config("hest1k", config_path)
@@ -355,7 +358,8 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     (cfg.structured_dir / "P1").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "P1")
 
-    module.main(config_path=config_path, overwrite=False, executor="ray")
+    processing_cfg = load_processing_config(config_path)
+    module.main(processing_cfg=processing_cfg, overwrite=False, executor="ray")
 
     assert ("metadata", ["DONE", "L1", "P1"]) in calls
     assert ("items", 16, False) in calls

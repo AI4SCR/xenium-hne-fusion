@@ -28,5 +28,5 @@ split:
   nan_value: -1
   use_filtered_targets_for_train: false
   include_targets: null
-  group_column_name: null
+  group_column_name: sample_id
   random_state: 0

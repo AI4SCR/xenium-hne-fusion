@@ -1,7 +1,6 @@
 
 import json
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -9,20 +8,7 @@ import yaml
 from ai4bmr_learn.data.splits import save_splits
 from loguru import logger
 
-
-@dataclass
-class SplitConfig:
-    split_name: str
-    test_size: float | None = None
-    val_size: float | None = None
-    stratify: bool = False
-    target_column_name: str | None = None
-    encode_targets: bool = False
-    nan_value: int = -1
-    use_filtered_targets_for_train: bool = False
-    include_targets: list[str] | None = None
-    group_column_name: str | None = None
-    random_state: int | None = None
+from xenium_hne_fusion.config import SplitConfig
 
 
 def link_structured_metadata(metadata_path: Path, structured_dir: Path) -> Path:

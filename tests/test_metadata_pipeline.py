@@ -5,9 +5,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from xenium_hne_fusion.metadata import load_split_config
-
 from xenium_hne_fusion.metadata import link_structured_metadata
+from xenium_hne_fusion.utils.getters import load_processing_config
 
 
 def _load_script(path: str, module_name: str):
@@ -167,8 +166,8 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
 
 
 def test_beat_default_split_groups_by_sample_id():
-    cfg = load_split_config(Path('configs/splits/beat.yaml'))
-    assert cfg.group_column_name == 'sample_id'
+    cfg = load_processing_config(Path('configs/data/local/beat.yaml'))
+    assert cfg.split.group_column_name == 'sample_id'
 
 
 def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(

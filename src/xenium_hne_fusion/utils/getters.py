@@ -1,11 +1,12 @@
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
-from xenium_hne_fusion.metadata import SplitConfig, normalize_sample_metadata, read_metadata_table
+from xenium_hne_fusion.config import FilterConfig, ItemsConfig, ItemsThresholdConfig, ProcessingConfig, SplitConfig, TilesConfig
+from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
 
 
 def get_repo_root() -> Path:
@@ -16,47 +17,6 @@ def get_repo_root() -> Path:
     root = Path(__file__).resolve().parents[3]
     assert (root / 'pyproject.toml').exists(), f'Could not resolve repo root from {__file__}'
     return root
-
-
-@dataclass
-class FilterConfig:
-    organ: str | list[str] | None = None
-    disease_type: str | None = None
-    species: str | None = None
-    sample_ids: list[str] | None = None
-
-
-@dataclass
-class TilesConfig:
-    tile_px: int
-    stride_px: int
-    mpp: float
-    kernel_size: int = 16
-    predicate: str = 'within'
-
-
-@dataclass
-class ItemsThresholdConfig:
-    organs: list[str] | None = None
-    num_transcripts: int | None = None
-    num_unique_transcripts: int | None = None
-    num_cells: int | None = None
-    num_unique_cells: int | None = None
-
-
-@dataclass
-class ItemsConfig:
-    name: str
-    filter: ItemsThresholdConfig = field(default_factory=ItemsThresholdConfig)
-
-
-@dataclass
-class ProcessingConfig:
-    name: str
-    tiles: TilesConfig
-    filter: FilterConfig = field(default_factory=FilterConfig)
-    items: ItemsConfig = field(default_factory=lambda: ItemsConfig(name='default'))
-    split: SplitConfig = field(default_factory=lambda: SplitConfig(split_name='default', test_size=0.25, val_size=0.25))
 
 
 @dataclass(frozen=True)
@@ -205,7 +165,7 @@ def load_dataset_config(path: Path) -> ProcessingConfig:
 
 
 def get_processing_config_path(dataset: str, config_root: Path | None = None) -> Path:
-    root = config_root or Path('config/local')
+    root = config_root or Path('configs/data/local')
     return root / f'{dataset}.yaml'
 
 
@@ -227,13 +187,14 @@ def get_panels_dir(name: str) -> Path:
     return get_repo_root() / 'panels' / name
 
 
-def load_pipeline_config(
-    dataset: str,
-    config_path: Path | None = None,
-    config_root: Path | None = None,
-) -> PipelineConfig:
-    config_path = config_path or get_processing_config_path(dataset, config_root=config_root)
-    cfg = load_processing_config(config_path)
+def infer_dataset(name: str) -> str:
+    dataset = name.split('-', 1)[0]
+    assert dataset in {'beat', 'hest1k'}, f'Unknown dataset for config name: {name!r}'
+    return dataset
+
+
+def build_pipeline_config(cfg: ProcessingConfig) -> PipelineConfig:
+    dataset = infer_dataset(cfg.name)
     managed = get_managed_paths(cfg.name)
     raw_dir = _require_env_path(f'{dataset.upper()}_RAW_DIR')
     return PipelineConfig(
@@ -242,6 +203,20 @@ def load_pipeline_config(
         paths=managed,
         processing=cfg,
     )
+
+
+def load_pipeline_config(
+    dataset: str | None = None,
+    config_path: Path | None = None,
+    config_root: Path | None = None,
+) -> PipelineConfig:
+    assert dataset is not None or config_path is not None, 'dataset or config_path is required'
+    if config_path is None:
+        config_path = get_processing_config_path(dataset, config_root=config_root)
+    cfg = load_processing_config(config_path)
+    if dataset is not None:
+        assert dataset == infer_dataset(cfg.name), f"Config name {cfg.name!r} does not match dataset {dataset!r}"
+    return build_pipeline_config(cfg)
 
 
 def resolve_dataset_paths(dataset: str, name: str) -> tuple[Path, Path, Path, Path]:

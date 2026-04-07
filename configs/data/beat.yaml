@@ -1,9 +1,0 @@
-name: beat
-tile_px: 512
-stride_px: 256
-tile_mpp: 0.5
-filter:
-  species: Homo sapiens
-  organ: null
-  disease_type: null
-  sample_ids: null   # null = all samples matching filter
