@@ -1,4 +1,4 @@
-split_name: lung
+split_name: pancreas
 test_size: 0.25
 val_size: 0.25
 stratify: false
