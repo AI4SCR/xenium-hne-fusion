@@ -79,7 +79,6 @@ for sample_id in "${SAMPLE_IDS[@]}"; do
         uv run
         scripts/data/run_beat.py
         --config "${CONFIG_PATH}"
-        --name beat
         --executor serial
         --filter.sample_ids "[${sample_id}]"
     )

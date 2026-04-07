@@ -1,8 +1,6 @@
 """Run the end-to-end HEST1K human Xenium pipeline."""
 
-import importlib
 import json
-import shutil
 import sys
 from pathlib import Path
 from typing import Literal
@@ -11,18 +9,10 @@ import geopandas as gpd
 import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
-from tqdm import tqdm
 
 load_dotenv()
 
-from xenium_hne_fusion.config import (
-    FilterConfig,
-    ItemsConfig,
-    ItemsThresholdConfig,
-    ProcessingConfig,
-    SplitConfig,
-    TilesConfig,
-)
+from xenium_hne_fusion.config import ProcessingConfig
 from xenium_hne_fusion.download import (
     create_structured_metadata_symlink,
     create_structured_symlinks,
@@ -32,10 +22,16 @@ from xenium_hne_fusion.download import (
     validate_hest_sample_mpp,
 )
 from xenium_hne_fusion.metadata import (
-    join_items_with_metadata,
     load_items_dataframe,
     process_dataset_metadata,
-    save_split_metadata,
+)
+from xenium_hne_fusion.pipeline import (
+    compute_all_tile_stats,
+    create_all_items,
+    create_split_collection,
+    load_ray_module,
+    maybe_reset_sample,
+    wait_for_ray_samples,
 )
 from xenium_hne_fusion.processing_cli import parse_processing_args
 from xenium_hne_fusion.processing import (
@@ -49,23 +45,17 @@ from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
     DEFAULT_SOURCE_ITEMS_NAME,
-    STAT_COLS,
     ItemsFilterConfig,
     PipelineConfig,
     apply_filter,
     build_pipeline_config,
-    clear_sample_markers,
-    compute_item_stats,
     infer_dataset,
     is_sample_processed,
     is_sample_structured,
-    iter_tile_dirs,
-    load_pipeline_config,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
     resolve_samples,
-    tile_item,
 )
 
 
@@ -146,53 +136,6 @@ def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], 
     return eligible_sample_ids
 
 
-def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool = False) -> Path:
-    items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    if items_path.exists() and not overwrite:
-        logger.info(f"Items already exist: {items_path}")
-        return items_path
-
-    sample_dirs = sorted(path for path in cfg.paths.processed_dir.iterdir() if path.is_dir())
-    logger.info(f"Building items from {len(sample_dirs)} processed samples")
-
-    items = []
-    skipped = []
-    for sample_dir in tqdm(sample_dirs, desc="Samples"):
-        sample_id = sample_dir.name
-        for tile_dir in iter_tile_dirs(sample_dir):
-            item = tile_item(tile_dir, sample_id, int(tile_dir.name), kernel_size)
-            (items if item is not None else skipped).append(item or tile_dir)
-
-    items_path.parent.mkdir(parents=True, exist_ok=True)
-    items_path.write_text(json.dumps(items, indent=2))
-    logger.info(f"Saved {len(items)} items -> {items_path}")
-    if skipped:
-        logger.warning(f"Skipped {len(skipped)} incomplete tile dirs")
-    return items_path
-
-
-def compute_all_tile_stats(
-    cfg: PipelineConfig,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
-    overwrite: bool = False,
-) -> Path:
-    stats_path = cfg.paths.output_dir / "statistics" / f"{DEFAULT_SOURCE_ITEMS_NAME}.parquet"
-    if stats_path.exists() and not overwrite:
-        logger.info(f"Statistics already exist: {stats_path}")
-        return stats_path
-
-    items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    items = load_items_dataframe(items_path).to_dict("records")
-    rows = [compute_item_stats(item, cell_type_col) for item in tqdm(items, desc="Tiles")]
-    stats = pd.DataFrame(rows).set_index("id")
-    assert list(stats.columns) == STAT_COLS, f"Unexpected stats columns: {stats.columns.tolist()}"
-
-    stats_path.parent.mkdir(parents=True, exist_ok=True)
-    stats.to_parquet(stats_path)
-    logger.info(f"Saved statistics -> {stats_path}")
-    return stats_path
-
-
 def create_filtered_items(
     cfg: PipelineConfig,
     source_items_name: str = DEFAULT_SOURCE_ITEMS_NAME,
@@ -231,23 +174,6 @@ def create_filtered_items(
     logger.info(f"Saved filtered items -> {output_path}")
     return output_path, len(filtered)
 
-
-def create_split_collection(
-    cfg: PipelineConfig,
-    items_path: Path,
-    overwrite: bool = False,
-) -> Path:
-    split_cfg = cfg.processing.split
-    split_dir = cfg.paths.output_dir / "splits" / split_cfg.split_name
-    if split_dir.exists() and not overwrite:
-        logger.info(f"Split metadata already exists: {split_dir}")
-        return split_dir
-
-    joined = join_items_with_metadata(items_path, cfg.paths.processed_dir / "metadata.parquet")
-    save_split_metadata(joined, split_dir, split_cfg, overwrite=overwrite)
-    return split_dir
-def load_ray_module():
-    return importlib.import_module("ray")
 
 
 def _run(
@@ -302,15 +228,6 @@ def prepare_driver_context(
     eligible_sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     logger.info(f"Running HEST1K pipeline for {len(eligible_sample_ids)} eligible human Xenium samples")
     return cfg, metadata_path, eligible_sample_ids
-
-
-def maybe_reset_sample(cfg: PipelineConfig, sample_id: str, overwrite: bool) -> None:
-    if not overwrite:
-        return
-    clear_sample_markers(cfg, sample_id)
-    processed_dir = processed_sample_dir(cfg, sample_id)
-    if processed_dir.exists():
-        shutil.rmtree(processed_dir)
 
 
 def structure_sample(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> None:
@@ -397,18 +314,6 @@ def build_remote_sample_functions(ray):
         return sample_id
 
     return structure_sample_remote, detect_tissues_remote, process_sample_remote
-
-
-def wait_for_ray_samples(ray, futures: list[tuple[str, object]]) -> None:
-    failed_sample_ids = []
-    for sample_id, future in futures:
-        try:
-            ray.get(future)
-        except Exception as exc:
-            logger.error(f"{sample_id} failed: {exc}")
-            failed_sample_ids.append(sample_id)
-    if failed_sample_ids:
-        raise RuntimeError(f"Failed samples: {failed_sample_ids}")
 
 
 def run_samples_serial(
