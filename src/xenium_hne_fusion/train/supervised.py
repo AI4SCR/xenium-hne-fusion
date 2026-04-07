@@ -19,6 +19,7 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
+from xenium_hne_fusion.models.encoders import log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
@@ -207,6 +208,7 @@ def train(cfg: Config, debug: bool | None = None):
         target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=morph_encoder is not None,
         include_expr=expr_encoder is not None,
+        target_transform=log1p_transform,
         image_transform=image_transform,
         expr_transform=expr_transform,
         expr_pool=cfg.data.expr_pool,
