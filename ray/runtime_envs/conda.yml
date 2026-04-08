@@ -16,7 +16,6 @@ dependencies:
       - huggingface-hub
       - jsonargparse
       - lazyslide
-      - lightning
       - loguru
       - matplotlib
       - opencv-python
@@ -34,8 +33,12 @@ dependencies:
       - scipy
       - spatialdata
       - tiffslide
-      - torch
+      - lightning==2.5.1.post0
+      - torch==2.7.0
+      - torchvision==0.22.0
+      - torchmetrics==1.6.1
       - torchinfo
       - tqdm
       - wsidata
       - zarr
+      - --extra-index-url https://download.pytorch.org/whl/cu128
