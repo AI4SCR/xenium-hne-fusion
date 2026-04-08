@@ -3,7 +3,7 @@ Code for the paper [Linking gene expression to morphology with vision-language m
 # xenium-hne-fusion
 
 Research codebase for fusing Xenium spatial transcriptomics with H&E whole-slide images.
-The current code supports two dataset families:
+Supports two dataset families:
 
 - `hest1k`: HEST-1k human Xenium data downloaded from Hugging Face
 - `beat`: internal BEAT data arranged under a local raw root
@@ -11,16 +11,14 @@ The current code supports two dataset families:
 ## Setup
 
 ```bash
-# Install uv if needed
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
 git clone <repo>
 cd xenium-hne-fusion
 uv sync
 cp .env.example .env
 ```
 
-`.env` holds machine-specific paths:
+`.env` holds machine-specific paths and tokens:
 
 ```bash
 HF_TOKEN=hf_...
@@ -31,7 +29,7 @@ HEST1K_RAW_DIR=
 BEAT_RAW_DIR=
 ```
 
-`uv run ...` loads `.env` automatically. In notebooks or ad hoc Python sessions:
+`uv run ...` loads `.env` automatically. For notebooks or ad hoc sessions:
 
 ```python
 from dotenv import load_dotenv
@@ -46,11 +44,11 @@ xenium-hne-fusion/
 ├── src/xenium_hne_fusion/      # importable package
 ├── scripts/data/               # data pipeline entrypoints
 ├── scripts/train/              # training entrypoints
-├── configs/data/               # fully specified dataset processing configs
-├── configs/train/              # model/training configs
-├── panels/                     # checked-in reference panel artifacts
-├── slurm/                      # Slurm submission wrappers
-├── ray/                        # Kaiko Ray submission helpers
+├── configs/data/               # processing configs
+├── configs/train/              # training configs
+├── panels/                     # checked-in panel artifacts
+├── slurm/                      # Slurm wrappers
+├── ray/                        # Ray submission helpers
 ├── tests/
 ├── data/                       # managed raw/structured/processed/output data
 └── results/                    # local experiment outputs
@@ -58,7 +56,7 @@ xenium-hne-fusion/
 
 ## Managed data layout
 
-All managed paths are derived from `DATA_DIR` plus the dataset `name` in the config.
+Managed paths are derived from `DATA_DIR` and the dataset `name`.
 For `name: hest1k`:
 
 ```text
@@ -124,18 +122,17 @@ data/
     └── logs/
 ```
 
-Notes:
+Key outputs:
 
-- `items/all.json` is the complete tile set built from processed tiles.
-- `items/<items_name>.json` is a filtered subset, usually driven by `items.filter.*`.
-- tile-stat diagnostics live under `DATA_DIR/03_output/<name>/figures/tile_stats/<items_name>/`.
-- split parquet files are tile-level tables produced by joining `items/*.json` with sample-level `02_processed/<name>/metadata.parquet`.
-- generated panel YAMLs live under `DATA_DIR/03_output/<name>/panels/`.
-- fully specified processing configs under `configs/data/` can generate those runtime panel YAMLs.
+- `items/all.json`: complete tile set
+- `items/<items_name>.json`: filtered subset
+- `figures/tile_stats/<items_name>/`: tile-stat plots
+- `splits/<split_name>/`: split parquet files
+- `panels/`: generated panel YAMLs
 
 ## Processing config schema
 
-The data pipeline now uses one nested config schema for both datasets:
+The data pipeline uses one nested config schema for both datasets:
 
 ```yaml
 name: hest1k
@@ -201,9 +198,9 @@ Examples:
 
 ## Data pipeline CLI
 
-### Manual stage entrypoints
+### Manual stages
 
-HEST1K structure and download:
+HEST1K structure:
 
 ```bash
 uv run scripts/data/structure_hest1k.py hest1k \
@@ -217,14 +214,14 @@ uv run scripts/data/structure_beat.py beat \
   --config_path configs/data/local/beat.yaml
 ```
 
-Sample-level metadata cleaning:
+Metadata:
 
 ```bash
 uv run python scripts/data/process_metadata.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Per-sample HEST1K processing:
+Per-sample processing:
 
 ```bash
 uv run scripts/data/process_hest1k.py hest1k \
@@ -232,53 +229,53 @@ uv run scripts/data/process_hest1k.py hest1k \
   --sample_id TENX116
 ```
 
-Build the base item set:
+Items:
 
 ```bash
 uv run python scripts/data/create_items.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Compute per-tile filtering statistics:
+Tile stats:
 
 ```bash
 uv run scripts/data/compute_tile_stats.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Generate a filtered item set:
+Filtered items:
 
 ```bash
 uv run scripts/data/filter_items.py \
   --config configs/data/local/hest1k-breast.yaml
 ```
 
-Create split parquet files from an item set plus sample metadata:
+Splits:
 
 ```bash
 uv run scripts/data/create_splits.py \
   --config configs/data/local/hest1k-breast.yaml
 ```
 
-Create a panel from a fully specified organ config:
+Panel:
 
 ```bash
 uv run scripts/data/create_panel.py \
-  --config_path configs/data/local/hest1k-breast.yaml
+  --config configs/data/local/hest1k-breast.yaml
 ```
 
-### End-to-end dataset runners
+### End-to-end runners
 
-The dataset runners execute the full pipeline in order:
+The dataset runners execute the full pipeline:
 
 1. structure raw inputs
 2. detect tissues
 3. tile and process samples
-4. write cleaned sample metadata
+4. clean sample metadata
 5. build `items/all.json`
 6. compute `statistics/all.parquet`
-7. write the filtered item set named by `items.name`
-8. write the split collection named by `split.name`
+7. write the filtered item set
+8. write the split collection
 
 HEST1K:
 
@@ -310,11 +307,10 @@ uv run scripts/data/run_hest1k.py \
 
 ## Panel recipes and training path resolution
 
-There is one panel concept in the repo:
+Panels are runtime YAML files consumed by training:
+- `DATA_DIR/03_output/<name>/panels/*.yaml`
 
-- `DATA_DIR/03_output/<name>/panels/*.yaml`: runtime panel files consumed by training
-
-Fully specified processing configs under `configs/data/` also carry the panel settings used to generate those runtime panel files.
+Processing configs under `configs/data/` also carry the panel settings used to generate them.
 
 Training configs under `configs/train/` resolve relative data paths as follows:
 
@@ -330,14 +326,14 @@ Examples:
 - BEAT configs live under `configs/train/beat/...`
 - HEST1K expression configs are organ-specific and live under `configs/train/hest1k/expression/<organ>/...`
 
-Train a model with:
+Train a model:
 
 ```bash
 uv run scripts/train/supervised.py \
   --config configs/train/beat/expression/early-fusion.yaml
 ```
 
-The panel YAML loaded by training must contain:
+The panel YAML must contain:
 
 ```yaml
 source_panel:
@@ -348,14 +344,14 @@ target_panel:
 
 ## Slurm
 
-The Slurm submission wrappers live in `slurm/`:
+Slurm wrappers live in `slurm/`:
 
 ```bash
 slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
 slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
 ```
 
-They currently submit one sample per job with:
+They submit one sample per job with:
 
 - `8` CPUs
 - `64G` RAM
@@ -364,18 +360,18 @@ They currently submit one sample per job with:
 
 ### Full pipeline on Slurm
 
-The Slurm wrappers only submit the per-sample processing stage. To run the full pipeline, use the commands below in order.
+The wrappers only submit per-sample processing. Run the rest in order below.
 
 HEST1K:
 
-1. Structure and download the samples selected by the data config:
+1. Structure and download the selected samples:
 
 ```bash
 uv run python scripts/data/structure_hest1k.py hest1k \
   --config_path configs/data/remote/hest1k.yaml
 ```
 
-2. Submit one per-sample processing job per resolved sample:
+2. Submit one per-sample job per resolved sample:
 
 ```bash
 ./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
@@ -390,11 +386,10 @@ uv run python scripts/data/process_hest1k.py \
   --sample_id SAMPLE_ID
 ```
 
-3. After all sample jobs finish, finalize the dataset outputs:
+3. Finalize dataset outputs:
 
 ```bash
 DATASET_NAME=hest1k
-DATASET_NAME=beat
 
 uv run python scripts/data/process_metadata.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
@@ -412,14 +407,14 @@ uv run python scripts/data/create_splits.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
 ```
 
-4. If training needs a panel file, generate it after splits exist:
+4. If training needs a panel, generate it after splits exist:
 
 ```bash
 uv run python scripts/data/create_panel.py \
-  --config_path configs/data/local/hest1k-pancreas.yaml
+  --config configs/data/local/hest1k-pancreas.yaml
 ```
 
-5. Launch training once the data outputs, splits, and panel are ready:
+5. Launch training once data outputs, splits, and panel are ready:
 
 ```bash
 uv run scripts/train/supervised.py \
@@ -434,14 +429,14 @@ Or use the existing HEST1K early-fusion wrapper:
 
 BEAT:
 
-1. Structure the raw dataset into the canonical layout:
+1. Structure the raw dataset:
 
 ```bash
 uv run python scripts/data/structure_beat.py beat \
   --config_path configs/data/remote/beat.yaml
 ```
 
-2. Submit one per-sample processing job per raw sample directory:
+2. Submit one per-sample job per raw sample directory:
 
 ```bash
 ./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
@@ -479,7 +474,7 @@ When `cells.parquet` exists, the wrapper adds:
 --cells_path CELLS_PATH
 ```
 
-3. After all sample jobs finish, finalize the dataset outputs:
+3. Finalize dataset outputs:
 
 ```bash
 DATASET_NAME=beat
@@ -507,7 +502,7 @@ uv run scripts/train/supervised.py \
   --config configs/train/beat/expression/early-fusion.yaml
 ```
 
-For organ-specific or thresholded HEST1K runs, keep using the same `--config` file and override only the shared processing fields you need during finalization, for example:
+For organ-specific or thresholded HEST1K runs, reuse the same config and override only what changes:
 
 ```bash
 uv run python scripts/data/filter_items.py \
@@ -519,13 +514,13 @@ uv run python scripts/data/create_splits.py \
 
 ## Kaiko Ray
 
-Ray submission helpers live under `ray/`. The main entrypoint is:
+Ray helpers live under `ray/`:
 
 ```bash
 bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
 ```
 
-For `hest1k-breast`, submit each data-preparation step individually:
+For `hest1k-breast`, submit each step individually:
 
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k-breast.yaml"'
@@ -533,7 +528,8 @@ For `hest1k-breast`, submit each data-preparation step individually:
 ./ray/submit.sh 'python scripts/data/compute_tile_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
-./ray/submit.sh 'python scripts/data/create_panel.py --config_path configs/data/remote/hest1k-breast.yaml'
+./ray/submit.sh 'python scripts/data/create_panel.py --config configs/data/remote/hest1k-breast.yaml'
+./ray/submit.sh 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
 Useful helpers:
@@ -544,11 +540,10 @@ bash ray/scripts/disk_space.sh
 bash ray/submit.sh "bash ray/scripts/test_env.sh"
 ```
 
-To test the other canonical configs, use the same sequence with the matching config path:
+To run the same sequence for other canonical configs:
 
 ```bash
 export CONFIG=configs/data/remote/hest1k-breast.yaml
-export CONFIG=configs/data/remote/hest1k-lung.yaml
 
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
@@ -556,7 +551,10 @@ export CONFIG=configs/data/remote/hest1k-lung.yaml
 ./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_panel.py --config $CONFIG"
+./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
+
+Swap `hest1k-breast.yaml` for `hest1k-lung.yaml` to run the lung config.
 
 ## Development
 
