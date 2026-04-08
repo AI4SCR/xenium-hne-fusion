@@ -371,7 +371,7 @@ def finalize_dataset(
         dataset="hest1k",
         metadata_path=metadata_path,
         output_path=cfg.paths.processed_dir / "metadata.parquet",
-        sample_ids=retained_sample_ids,
+        selected_sample_ids=retained_sample_ids,
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)

@@ -9,7 +9,8 @@ filter:
   species: Homo sapiens
   organ: null
   disease_type: null
-  sample_ids: null
+  include_ids: null
+  exclude_ids: null
 items:
   name: default
   filter:

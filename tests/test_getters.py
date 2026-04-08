@@ -2,7 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from xenium_hne_fusion.utils.getters import build_pipeline_config, load_dataset_config, load_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import (
+    build_pipeline_config,
+    load_dataset_config,
+    load_pipeline_config,
+    resolve_samples,
+    select_sample_ids,
+)
 
 
 def test_load_dataset_config_requires_name(tmp_path: Path):
@@ -12,7 +18,7 @@ def test_load_dataset_config_requires_name(tmp_path: Path):
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - TENX95\n'
     )
 
@@ -30,7 +36,7 @@ def test_load_pipeline_config_resolves_name_scoped_paths(monkeypatch: pytest.Mon
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - TENX95\n'
     )
 
@@ -54,7 +60,8 @@ def test_load_pipeline_config_requires_env_vars(monkeypatch: pytest.MonkeyPatch,
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
 
     monkeypatch.delenv('DATA_DIR', raising=False)
@@ -129,7 +136,8 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
         'filter:\n'
         '  species: Homo sapiens\n'
         '  disease_type: Cancer\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
     metadata_path.write_text(
         'id,st_technology,species,organ,disease_state\n'
@@ -143,13 +151,34 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
     assert resolve_samples(cfg, metadata_path) == ['TENX95']
 
 
-def test_repo_hest_config_pins_three_sample_ids():
+def test_repo_hest_config_pins_three_include_ids():
     cfg = load_dataset_config(Path('configs/data/local/hest1k.yaml'))
 
-    assert cfg.filter.sample_ids == ['NCBI783', 'NCBI856', 'TENX116']
+    assert cfg.filter.include_ids == ['NCBI783', 'NCBI856', 'TENX116']
+    assert cfg.filter.exclude_ids is None
 
 
 def test_repo_remote_hest_config_processes_all_samples():
     cfg = load_dataset_config(Path('configs/data/remote/hest1k.yaml'))
 
-    assert cfg.filter.sample_ids is None
+    assert cfg.filter.include_ids is None
+    assert cfg.filter.exclude_ids is None
+
+
+def test_select_sample_ids_supports_include_and_exclude():
+    cfg = load_dataset_config(Path('configs/data/remote/hest1k.yaml'))
+    cfg.filter.include_ids = ['S2', 'S1']
+    assert select_sample_ids(['S1', 'S2', 'S3'], cfg.filter) == ['S1', 'S2']
+
+    cfg.filter.include_ids = None
+    cfg.filter.exclude_ids = ['S2']
+    assert select_sample_ids(['S1', 'S2', 'S3'], cfg.filter) == ['S1', 'S3']
+
+
+def test_select_sample_ids_rejects_mutually_exclusive_filters():
+    cfg = load_dataset_config(Path('configs/data/remote/hest1k.yaml'))
+    cfg.filter.include_ids = ['S1']
+    cfg.filter.exclude_ids = ['S2']
+
+    with pytest.raises(AssertionError, match='mutually exclusive'):
+        select_sample_ids(['S1', 'S2'], cfg.filter)

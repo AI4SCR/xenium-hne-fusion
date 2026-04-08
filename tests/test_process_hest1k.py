@@ -30,7 +30,7 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - NCBI856\n'
     )
 

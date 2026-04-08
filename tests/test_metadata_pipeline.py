@@ -42,9 +42,10 @@ def test_process_metadata_writes_cleaned_sample_metadata(monkeypatch: pytest.Mon
         'tile_mpp: 0.5\n'
         'filter:\n'
         '  species: Homo sapiens\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - TENX95\n'
         '    - TENX96\n'
+        '  exclude_ids: null\n'
     )
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
@@ -83,8 +84,9 @@ def test_process_metadata_writes_beat_metadata_to_processed(monkeypatch: pytest.
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - S2\n'
+        '  exclude_ids: null\n'
     )
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
@@ -116,7 +118,8 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
     sample_rows = []
     items = []
@@ -183,7 +186,8 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
     sample_rows = []
     items = []

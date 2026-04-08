@@ -98,9 +98,10 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         "  predicate: within\n"
         "filter:\n"
         "  species: Homo sapiens\n"
-        "  sample_ids:\n"
+        "  include_ids:\n"
         "    - NCBI783\n"
         "    - NCBI856\n"
+        "  exclude_ids: null\n"
         "items:\n"
         "  name: default\n"
         "  filter:\n"
@@ -129,7 +130,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         module,
         "resolve_samples",
         lambda cfg, metadata_path_arg: (
-            calls.append(("resolve_samples", cfg.filter.sample_ids, cfg.filter.species, cfg.filter.organ, metadata_path_arg)),
+            calls.append(("resolve_samples", cfg.filter.include_ids, cfg.filter.exclude_ids, cfg.filter.species, cfg.filter.organ, metadata_path_arg)),
             ["B1", "L1"],
         )[1],
     )
@@ -164,8 +165,8 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
-        lambda dataset, metadata_path=None, output_path=None, sample_ids=None: calls.append(
-            ("metadata", dataset, metadata_path, output_path, sample_ids)
+        lambda dataset, metadata_path=None, output_path=None, selected_sample_ids=None: calls.append(
+            ("metadata", dataset, metadata_path, output_path, selected_sample_ids)
         ),
     )
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
@@ -196,7 +197,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     structured_dir = data_dir / "01_structured" / "hest1k"
     assert calls == [
         ("structured_metadata", metadata_path, structured_dir.resolve()),
-        ("resolve_samples", ["NCBI783", "NCBI856"], "Homo sapiens", None, metadata_path),
+        ("resolve_samples", ["NCBI783", "NCBI856"], None, "Homo sapiens", None, metadata_path),
         ("filter_hest_samples_by_tile_mpp", ["B1", "L1"], metadata_path),
         ("ensure", "B1"),
         ("validate", "B1"),
@@ -222,8 +223,10 @@ def test_run_hest1k_local_and_remote_configs_define_sample_scope():
     local_cfg = load_dataset_config(Path("configs/data/local/hest1k.yaml"))
     remote_cfg = load_dataset_config(Path("configs/data/remote/hest1k.yaml"))
 
-    assert local_cfg.filter.sample_ids == ["NCBI783", "NCBI856", "TENX116"]
-    assert remote_cfg.filter.sample_ids is None
+    assert local_cfg.filter.include_ids == ["NCBI783", "NCBI856", "TENX116"]
+    assert local_cfg.filter.exclude_ids is None
+    assert remote_cfg.filter.include_ids is None
+    assert remote_cfg.filter.exclude_ids is None
 
 
 def test_filter_hest_samples_by_tile_mpp_keeps_only_eligible_samples(
@@ -290,7 +293,8 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
         "  mpp: 0.5\n"
         "filter:\n"
         "  species: Homo sapiens\n"
-        "  sample_ids: null\n"
+        "  include_ids: null\n"
+        "  exclude_ids: null\n"
         "items:\n"
         "  name: default\n"
         "  filter:\n"
@@ -333,7 +337,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
             calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
         ),
     )
-    monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)))
+    monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)))
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats", cell_type_col, overwrite)))
     monkeypatch.setattr(

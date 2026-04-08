@@ -96,7 +96,8 @@ def test_cache_hescape_split_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_p
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))

@@ -31,7 +31,8 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
         'stride_px: 512\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
     items_config_path = tmp_path / 'beat-items.yaml'
     items_config_path.write_text(
@@ -92,7 +93,8 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
 
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)

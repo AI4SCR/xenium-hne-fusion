@@ -163,7 +163,8 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids: null\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
     )
 
     def fake_hvg(adata, n_top_genes, flavor, inplace):

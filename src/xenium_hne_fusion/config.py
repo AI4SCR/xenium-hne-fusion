@@ -6,7 +6,8 @@ class FilterConfig:
     organ: str | list[str] | None = None
     disease_type: str | None = None
     species: str | None = None
-    sample_ids: list[str] | None = None
+    include_ids: list[str] | None = None
+    exclude_ids: list[str] | None = None
 
 
 @dataclass

@@ -29,15 +29,15 @@ def get_structured_metadata_path(structured_dir: Path) -> Path:
     return candidates[0]
 
 
-def clean_sample_metadata(metadata_path: Path, output_path: Path, sample_ids: list[str] | None = None) -> Path:
+def clean_sample_metadata(metadata_path: Path, output_path: Path, selected_sample_ids: list[str] | None = None) -> Path:
     metadata = read_metadata_table(metadata_path)
     metadata = normalize_sample_metadata(metadata)
 
-    if sample_ids is not None:
-        keep = metadata['sample_id'].isin(sample_ids)
+    if selected_sample_ids is not None:
+        keep = metadata['sample_id'].isin(selected_sample_ids)
         metadata = metadata.loc[keep].copy()
 
-    missing = sorted(set(sample_ids or []) - set(metadata['sample_id']))
+    missing = sorted(set(selected_sample_ids or []) - set(metadata['sample_id']))
     assert not missing, f'Some requested sample_ids are missing from metadata: {missing}'
     assert metadata['sample_id'].is_unique, 'Processed metadata must have one row per sample_id'
 
@@ -50,26 +50,26 @@ def clean_sample_metadata(metadata_path: Path, output_path: Path, sample_ids: li
 def process_hest1k_metadata(
     metadata_path: Path,
     output_path: Path,
-    sample_ids: list[str] | None = None,
+    selected_sample_ids: list[str] | None = None,
 ) -> Path:
-    return clean_sample_metadata(metadata_path, output_path, sample_ids=sample_ids)
+    return clean_sample_metadata(metadata_path, output_path, selected_sample_ids=selected_sample_ids)
 
 
 def process_beat_metadata(
     metadata_path: Path,
     output_path: Path,
-    sample_ids: list[str] | None = None,
+    selected_sample_ids: list[str] | None = None,
 ) -> Path:
     metadata = read_metadata_table(metadata_path)
     if 'sample_id' not in metadata.columns:
         assert metadata.index.name == 'sample_id', 'BEAT metadata must use sample_id index'
         metadata = metadata.reset_index()
 
-    if sample_ids is not None:
-        keep = metadata['sample_id'].isin(sample_ids)
+    if selected_sample_ids is not None:
+        keep = metadata['sample_id'].isin(selected_sample_ids)
         metadata = metadata.loc[keep].copy()
 
-    missing = sorted(set(sample_ids or []) - set(metadata['sample_id']))
+    missing = sorted(set(selected_sample_ids or []) - set(metadata['sample_id']))
     assert not missing, f'Some requested sample_ids are missing from metadata: {missing}'
     assert metadata['sample_id'].is_unique, 'Processed metadata must have one row per sample_id'
 
@@ -83,13 +83,13 @@ def process_dataset_metadata(
     dataset: str,
     metadata_path: Path,
     output_path: Path,
-    sample_ids: list[str] | None = None,
+    selected_sample_ids: list[str] | None = None,
 ) -> Path:
     match dataset:
         case 'hest1k':
-            return process_hest1k_metadata(metadata_path, output_path, sample_ids=sample_ids)
+            return process_hest1k_metadata(metadata_path, output_path, selected_sample_ids=selected_sample_ids)
         case 'beat':
-            return process_beat_metadata(metadata_path, output_path, sample_ids=sample_ids)
+            return process_beat_metadata(metadata_path, output_path, selected_sample_ids=selected_sample_ids)
         case _:
             raise ValueError(f'Unsupported dataset for metadata processing: {dataset}')
 

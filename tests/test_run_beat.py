@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from xenium_hne_fusion.utils.getters import load_processing_config
+from xenium_hne_fusion.utils.getters import ManagedPaths, load_processing_config
+from xenium_hne_fusion.config import ProcessingConfig, TilesConfig
 
 
 def _load_script(path: str, module_name: str):
@@ -97,9 +98,10 @@ def test_run_beat_runs_full_pipeline_in_training_order(
         "stride_px: 256\n"
         "tile_mpp: 0.5\n"
         "filter:\n"
-        "  sample_ids:\n"
+        "  include_ids:\n"
         "    - S1\n"
         "    - S2\n"
+        "  exclude_ids: null\n"
     )
     monkeypatch.setenv("DATA_DIR", str(data_dir))
     monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
@@ -122,7 +124,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
-        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+        lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(
@@ -166,6 +168,40 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     ]
 
 
+def test_resolve_beat_samples_supports_include_and_exclude(tmp_path: Path):
+    module = _load_script("scripts/data/run_beat.py", "run_beat_resolve_script")
+    raw_dir = tmp_path / "raw"
+    for sample_id in ["S1", "S2", "S3"]:
+        (raw_dir / sample_id).mkdir(parents=True, exist_ok=True)
+
+    cfg = module.PipelineConfig(
+        dataset="beat",
+        raw_dir=raw_dir,
+        paths=ManagedPaths(
+            data_dir=tmp_path / "data",
+            structured_dir=tmp_path / "structured",
+            processed_dir=tmp_path / "processed",
+            output_dir=tmp_path / "output",
+        ),
+        processing=ProcessingConfig(
+            name="beat",
+            tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5),
+        ),
+    )
+
+    cfg.processing.filter.include_ids = ["S3", "S1"]
+    assert module.resolve_beat_samples(cfg) == ["S1", "S3"]
+
+    cfg.processing.filter.include_ids = None
+    cfg.processing.filter.exclude_ids = ["S2"]
+    assert module.resolve_beat_samples(cfg) == ["S1", "S3"]
+
+    cfg.processing.filter.include_ids = ["S1"]
+    cfg.processing.filter.exclude_ids = ["S2"]
+    with pytest.raises(AssertionError, match="mutually exclusive"):
+        module.resolve_beat_samples(cfg)
+
+
 def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -195,7 +231,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
-        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+        lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: None)
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: None)
@@ -253,7 +289,7 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
-        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+        lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(
@@ -327,7 +363,7 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     monkeypatch.setattr(
         module,
         "process_dataset_metadata",
-        lambda dataset, metadata_path, output_path, sample_ids=None: calls.append(("metadata", sample_ids)),
+        lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
     monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items",)))
     monkeypatch.setattr(module, "compute_all_tile_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats",)))

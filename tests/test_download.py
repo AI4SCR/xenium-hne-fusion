@@ -192,7 +192,7 @@ def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.Monke
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - NCBI783\n'
     )
 
@@ -226,6 +226,7 @@ def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.Monke
     monkeypatch.setattr(module, 'download_sample', fake_download_sample)
     monkeypatch.setattr(module, 'validate_hest_sample_mpp', fake_validate_hest_sample_mpp)
     monkeypatch.setattr(module, 'create_structured_symlinks', fake_create_structured_symlinks)
+    monkeypatch.setattr(module, 'resolve_samples', lambda cfg, metadata_csv: ['NCBI783'])
 
     module.main('hest1k', config_path=config_path)
 
@@ -249,7 +250,7 @@ def test_structure_hest1k_reuses_existing_raw_files(monkeypatch: pytest.MonkeyPa
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - NCBI783\n'
     )
 

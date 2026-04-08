@@ -45,6 +45,7 @@ from xenium_hne_fusion.utils.getters import (
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
+    select_sample_ids,
 )
 
 
@@ -57,12 +58,7 @@ def resolve_beat_samples(cfg: PipelineConfig, sample_id: str | None = None) -> l
     if sample_id is not None:
         assert sample_id in raw_sample_ids, f"Unknown sample_id: {sample_id}"
         return [sample_id]
-    if cfg.processing.filter.sample_ids is None:
-        return raw_sample_ids
-
-    missing = sorted(set(cfg.processing.filter.sample_ids) - set(raw_sample_ids))
-    assert not missing, f"Missing raw sample dirs: {missing}"
-    return sorted(cfg.processing.filter.sample_ids)
+    return select_sample_ids(raw_sample_ids, cfg.processing.filter)
 
 
 def structure_beat_metadata(cfg: PipelineConfig) -> None:
@@ -320,7 +316,7 @@ def finalize_dataset(
         dataset="beat",
         metadata_path=cfg.paths.structured_dir / "metadata.parquet",
         output_path=cfg.paths.processed_dir / "metadata.parquet",
-        sample_ids=retained_sample_ids,
+        selected_sample_ids=retained_sample_ids,
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)

@@ -132,7 +132,8 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             organ=filter_data.get('organ'),
             disease_type=filter_data.get('disease_type'),
             species=filter_data.get('species'),
-            sample_ids=filter_data.get('sample_ids'),
+            include_ids=filter_data.get('include_ids'),
+            exclude_ids=filter_data.get('exclude_ids'),
         ),
         items=ItemsConfig(
             name=items_data['name'],
@@ -185,6 +186,33 @@ def get_managed_paths(name: str) -> ManagedPaths:
 
 def get_panels_dir(name: str) -> Path:
     return get_managed_paths(name).output_dir / 'panels'
+
+
+def validate_filter_ids(filter_cfg: FilterConfig) -> None:
+    assert filter_cfg.include_ids is None or filter_cfg.exclude_ids is None, 'include_ids and exclude_ids are mutually exclusive'
+
+
+def select_sample_ids(
+    available_sample_ids: list[str],
+    filter_cfg: FilterConfig,
+) -> list[str]:
+    validate_filter_ids(filter_cfg)
+    available = sorted(available_sample_ids)
+    available_set = set(available)
+
+    if filter_cfg.include_ids is not None:
+        missing = sorted(set(filter_cfg.include_ids) - available_set)
+        assert not missing, f'Unknown sample_ids in include_ids: {missing}'
+        selected = sorted(filter_cfg.include_ids)
+    elif filter_cfg.exclude_ids is not None:
+        missing = sorted(set(filter_cfg.exclude_ids) - available_set)
+        assert not missing, f'Unknown sample_ids in exclude_ids: {missing}'
+        selected = [sample_id for sample_id in available if sample_id not in set(filter_cfg.exclude_ids)]
+    else:
+        selected = available
+
+    assert selected, f'No Xenium samples match filter: {filter_cfg}'
+    return selected
 
 
 def build_pipeline_config(cfg: ProcessingConfig) -> PipelineConfig:
@@ -337,9 +365,7 @@ def apply_filter(stats: pd.DataFrame, cfg: 'ItemsFilterConfig') -> pd.Series:
 
 def resolve_samples(cfg: ProcessingConfig | PipelineConfig, metadata_path: Path) -> list[str]:
     filter_cfg = cfg.processing.filter if isinstance(cfg, PipelineConfig) else cfg.filter
-
-    if filter_cfg.sample_ids is not None:
-        return sorted(filter_cfg.sample_ids)
+    validate_filter_ids(filter_cfg)
 
     meta = normalize_sample_metadata(read_metadata_table(metadata_path))
     mask = pd.Series(True, index=meta.index)
@@ -358,6 +384,4 @@ def resolve_samples(cfg: ProcessingConfig | PipelineConfig, metadata_path: Path)
         mask &= meta[disease_col] == filter_cfg.disease_type
 
     samples = sorted(meta.loc[mask, 'sample_id'].tolist())
-    if not samples:
-        raise ValueError(f'No Xenium samples match filter: {filter_cfg}')
-    return samples
+    return select_sample_ids(samples, filter_cfg)

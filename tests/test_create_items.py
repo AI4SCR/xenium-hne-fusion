@@ -34,7 +34,7 @@ def test_create_items_writes_dataset_scoped_output(monkeypatch: pytest.MonkeyPat
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
         'filter:\n'
-        '  sample_ids:\n'
+        '  include_ids:\n'
         '    - TENX95\n'
     )
 

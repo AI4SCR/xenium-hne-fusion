@@ -151,7 +151,8 @@ filter:
   species: Homo sapiens
   organ: null
   disease_type: null
-  sample_ids: null
+  include_ids: null
+  exclude_ids: null
 items:
   name: default
   filter:
@@ -180,10 +181,10 @@ Examples:
 - [configs/data/remote/hest1k.yaml](configs/data/remote/hest1k.yaml)
 - [configs/data/local/beat.yaml](configs/data/local/beat.yaml)
 
-`scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/data/filter_items.py`, and `scripts/data/create_splits.py` all use this schema and accept nested CLI overrides such as:
+`scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/data/filter_items.py`, and `scripts/data/create_splits.py` all use this schema. `filter.include_ids` and `filter.exclude_ids` are mutually exclusive:
 
 ```bash
---filter.sample_ids '[TENX116]'
+--filter.include_ids '[TENX116]'
 --items.name breast
 --items.filter.organs '[Breast]'
 --split.split_name breast
@@ -303,7 +304,7 @@ uv run scripts/data/run_hest1k.py \
   --config configs/data/local/hest1k.yaml \
   --name hest1k \
   --executor serial \
-  --filter.sample_ids '[TENX116]'
+  --filter.include_ids '[TENX116]'
 ```
 
 ## Panel recipes and training path resolution
@@ -545,7 +546,7 @@ Useful helpers:
 bash ray/submit.sh
 bash ray/scripts/disk_space.sh
 bash ray/submit.sh "bash ray/scripts/test_env.sh"
-bash ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml --name hest1k --filter.sample_ids '[TENX116]'
+bash ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml --name hest1k --filter.include_ids '[TENX116]'
 bash ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml --name beat
 ```
 
