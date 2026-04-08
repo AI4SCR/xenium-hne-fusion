@@ -364,6 +364,7 @@ Quick Slurm runs:
 
 ```bash
 export CONFIG=configs/data/remote/hest1k-breast.yaml
+export CONFIG=configs/data/remote/beat.yaml
 
 ./slurm/run_hest1k_slurm.sh --config "$CONFIG"
 uv run python scripts/data/process_metadata.py --config "$CONFIG"
