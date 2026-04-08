@@ -125,6 +125,10 @@ def load_items_dataframe(items_path: Path) -> pd.DataFrame:
     if items_df.empty:
         return pd.DataFrame(columns=['id', 'sample_id', 'tile_id', 'tile_dir'])
 
+    required = {'id', 'sample_id', 'tile_id', 'tile_dir'}
+    missing = required - set(items_df.columns)
+    assert not missing, f'Items missing required columns: {sorted(missing)}'
+    assert items_df['id'].is_unique, 'Item ids must be unique'
     return items_df
 
 
