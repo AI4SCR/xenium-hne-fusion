@@ -38,7 +38,3 @@ split:
   include_targets: null
   group_column_name: null
   random_state: 0
-panel:
-  name: hvg-pancreas-pancreas-outer=0-seed=0
-  n_top_genes: 128
-  flavor: seurat_v3

@@ -168,10 +168,6 @@ split:
   include_targets: null
   group_column_name: null
   random_state: 0
-panel:
-  name: default
-  n_top_genes: null
-  flavor: null
 ```
 
 Examples:
@@ -260,7 +256,7 @@ Panel:
 
 ```bash
 uv run scripts/data/create_panel.py \
-  --config configs/data/local/hest1k-breast.yaml
+  --config configs/train/hest1k/expression/breast/early-fusion.yaml
 ```
 
 ### End-to-end runners
@@ -309,7 +305,22 @@ uv run scripts/data/run_hest1k.py \
 Panels are runtime YAML files consumed by training:
 - `DATA_DIR/03_output/<name>/panels/*.yaml`
 
-Processing configs under `configs/data/` also carry the panel settings used to generate them.
+Panel creation is defined in the training config, not the data config. Keep the output filename in `data.panel_path`, and keep the recipe in a dedicated top-level `panel:` section:
+
+```yaml
+data:
+  name: hest1k
+  items_path: breast.json
+  metadata_path: breast/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-breast-breast-outer=0-seed=0.yaml
+
+panel:
+  name: hvg-breast-breast-outer=0-seed=0
+  n_top_genes: 16
+  flavor: seurat_v3
+```
+
+`scripts/data/create_panel.py` accepts a training config only. It resolves the current training config, uses the fit split referenced by `data.metadata_path`, and writes the panel YAML to `data.panel_path`.
 
 Training configs under `configs/train/` resolve relative data paths as follows:
 
@@ -324,6 +335,20 @@ Examples:
 
 - BEAT configs live under `configs/train/beat/...`
 - HEST1K expression configs are organ-specific and live under `configs/train/hest1k/expression/<organ>/...`
+
+Create panels:
+
+```bash
+uv run python scripts/data/create_panel.py \
+  --config configs/train/hest1k/expression/breast/early-fusion.yaml \
+  --overwrite true
+
+uv run python scripts/data/create_panel.py \
+  --config configs/train/beat/expression/early-fusion.yaml \
+  --overwrite true
+```
+
+HEST1K expression configs already define a `panel:` recipe. For BEAT, the command is the same, but the chosen training config must also define a `panel:` recipe if you want `create_panel.py` to generate a panel instead of only checking that `data.panel_path` already exists.
 
 Train a model:
 
@@ -424,7 +449,7 @@ For `hest1k-breast`, submit each step individually:
 ./ray/submit.sh 'python scripts/data/compute_tile_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
-./ray/submit.sh 'python scripts/data/create_panel.py --config configs/data/remote/hest1k-breast.yaml'
+./ray/submit.sh 'python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
@@ -446,7 +471,7 @@ export CONFIG=configs/data/remote/hest1k-breast.yaml
 ./ray/submit.sh "python scripts/data/filter_items.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/create_panel.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
 

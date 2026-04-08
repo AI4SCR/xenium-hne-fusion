@@ -53,17 +53,9 @@ class SplitConfig:
 
 
 @dataclass
-class PanelConfig:
-    name: str
-    n_top_genes: int | None = None
-    flavor: str | None = None
-
-
-@dataclass
 class ProcessingConfig:
     name: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
     items: ItemsConfig = field(default_factory=lambda: ItemsConfig(name='default'))
     split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
-    panel: PanelConfig | None = None

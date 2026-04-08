@@ -58,6 +58,13 @@ class DataConfig:
 
 
 @dataclass
+class PanelConfig:
+    name: str | None = None
+    n_top_genes: int | None = None
+    flavor: str | None = None
+
+
+@dataclass
 class LitConfig:
     target_key: str | None = None
     lr_head: float = 1e-4
@@ -95,6 +102,7 @@ class Config:
     head: HeadConfig = field(default_factory=HeadConfig)
     backbone: BackboneConfig = field(default_factory=BackboneConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    panel: PanelConfig = field(default_factory=PanelConfig)
     lit: LitConfig = field(default_factory=LitConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     wandb: WandbConfig = field(default_factory=WandbConfig)

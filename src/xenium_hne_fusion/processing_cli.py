@@ -7,7 +7,6 @@ from xenium_hne_fusion.config import (
     FilterConfig,
     ItemsConfig,
     ItemsThresholdConfig,
-    PanelConfig,
     ProcessingConfig,
     SplitConfig,
     TilesConfig,
@@ -22,7 +21,6 @@ def build_processing_parser(*, include_executor: bool = True) -> ArgumentParser:
     parser.add_class_arguments(FilterConfig, nested_key="filter")
     parser.add_class_arguments(ItemsConfig, nested_key="items")
     parser.add_class_arguments(SplitConfig, nested_key="split")
-    parser.add_class_arguments(PanelConfig, nested_key="panel")
     parser.add_argument("--overwrite", type=bool, default=False)
     parser.add_argument("--stage", type=Literal["all", "samples", "finalize"], default="all")
     if include_executor:
@@ -35,7 +33,6 @@ def namespace_to_processing_config(ns) -> ProcessingConfig:
     items = _drop_internal_keys(data["items"])
     items_filter = _drop_internal_keys(items["filter"])
     split = _drop_internal_keys(data["split"])
-    panel = _drop_internal_keys(data["panel"]) if data.get("panel") else None
     assert data["tiles"].get("img_size") is not None, "tiles.img_size is required"
     return ProcessingConfig(
         name=data["name"],
@@ -46,7 +43,6 @@ def namespace_to_processing_config(ns) -> ProcessingConfig:
             filter=ItemsThresholdConfig(**items_filter),
         ),
         split=SplitConfig(**split),
-        panel=None if panel is None else PanelConfig(**panel),
     )
 
 

@@ -9,6 +9,7 @@ from xenium_hne_fusion.train.config import (
     DataConfig,
     HeadConfig,
     LitConfig,
+    PanelConfig,
     TaskConfig,
     TrainerConfig,
     WandbConfig,
@@ -36,6 +37,7 @@ def _build_parser() -> ArgumentParser:
     parser.add_class_arguments(HeadConfig, nested_key="head")
     parser.add_class_arguments(BackboneConfig, nested_key="backbone")
     parser.add_class_arguments(DataConfig, nested_key="data")
+    parser.add_class_arguments(PanelConfig, nested_key="panel")
     parser.add_class_arguments(LitConfig, nested_key="lit")
     parser.add_class_arguments(TrainerConfig, nested_key="trainer")
     parser.add_class_arguments(WandbConfig, nested_key="wandb")
@@ -50,6 +52,7 @@ def _namespace_to_config(ns) -> Config:
         head=HeadConfig(**data["head"]),
         backbone=BackboneConfig(**data["backbone"]),
         data=DataConfig(**data["data"]),
+        panel=PanelConfig(**data.get("panel", {})),
         lit=LitConfig(**data["lit"]),
         trainer=TrainerConfig(**data["trainer"]),
         wandb=WandbConfig(**data["wandb"]),
