@@ -7,7 +7,7 @@ from shapely.geometry import Point
 
 from scripts.data import compute_tile_stats as module
 from xenium_hne_fusion.pipeline import compute_tile_stats_from_items
-from xenium_hne_fusion.utils.getters import compute_item_stats
+from xenium_hne_fusion.utils.getters import compute_item_stats, load_processing_config
 
 
 def _write_expr_tile_inputs(
@@ -84,10 +84,14 @@ def test_plot_tile_stats_writes_transcript_scatter_plots(tmp_path: Path):
     assert (tmp_path / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
 
 
-def test_main_accepts_explicit_items_path(tmp_path: Path, monkeypatch):
-    output_dir = tmp_path / '03_output' / 'hest1k'
+def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
+    data_dir = tmp_path / 'data'
+    output_dir = data_dir / '03_output' / 'hest1k'
     tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
+    config_path = tmp_path / 'hest1k.yaml'
     items_path = output_dir / 'items' / 'subset.json'
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(tmp_path / 'raw' / 'hest1k'))
     items_path.parent.mkdir(parents=True)
     items_path.write_text(json.dumps([
         {
@@ -113,7 +117,23 @@ def test_main_accepts_explicit_items_path(tmp_path: Path, monkeypatch):
         feature_universe=['A', 'B', 'C'],
     )
 
-    module.main(dataset='hest1k', items_path=items_path, output_dir=output_dir, batch_size=2, num_workers=0)
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 512\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'items:\n'
+        '  name: subset\n'
+        'split:\n'
+        '  name: default\n'
+        'panel:\n'
+        '  name: default\n'
+        '  n_top_genes: null\n'
+        '  flavor: null\n'
+    )
+    processing_cfg = load_processing_config(config_path)
+
+    module.main(processing_cfg, overwrite=True, batch_size=2, num_workers=0)
 
     assert (output_dir / 'statistics' / 'subset.parquet').exists()
     figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'

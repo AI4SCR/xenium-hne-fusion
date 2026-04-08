@@ -1,23 +1,24 @@
 """Create or validate a panel from a processing config."""
 
-from pathlib import Path
+import sys
 
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
 from loguru import logger
 
 load_dotenv()
 
 from xenium_hne_fusion.hvg import create_panel
+from xenium_hne_fusion.config import ProcessingConfig
 from xenium_hne_fusion.metadata import get_default_split_path
-from xenium_hne_fusion.utils.getters import get_panels_dir, load_pipeline_config
+from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.utils.getters import build_pipeline_config, get_panels_dir
 
 
 def main(
-    config_path: Path,
+    processing_cfg: ProcessingConfig,
     overwrite: bool = False,
 ) -> None:
-    cfg = load_pipeline_config(config_path=config_path)
+    cfg = build_pipeline_config(processing_cfg)
     panel_cfg = cfg.processing.panel
     assert panel_cfg is not None, 'panel config is required'
 
@@ -46,4 +47,5 @@ def main(
 
 
 if __name__ == '__main__':
-    auto_cli(main)
+    processing_cfg, overwrite, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    main(processing_cfg=processing_cfg, overwrite=overwrite)

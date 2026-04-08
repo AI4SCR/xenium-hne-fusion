@@ -1,28 +1,26 @@
-"""Compute per-tile statistics from an explicit items artifact."""
-
-from pathlib import Path
+"""Compute per-tile statistics for the items artifact defined by the config."""
 
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
 
+from xenium_hne_fusion.config import ProcessingConfig
 from xenium_hne_fusion.pipeline import compute_tile_stats_from_items, plot_tile_stats
-from xenium_hne_fusion.utils.getters import load_pipeline_config
+from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.utils.getters import build_pipeline_config
+
 
 def main(
-    dataset: str,
-    items_path: Path,
-    output_dir: Path | None = None,
-    config_path: Path | None = None,
+    processing_cfg: ProcessingConfig,
     overwrite: bool = False,
     batch_size: int = 256,
     num_workers: int = 10,
 ) -> None:
     load_dotenv()
-    if output_dir is None:
-        output_dir = load_pipeline_config(dataset, config_path).paths.output_dir
+    cfg = build_pipeline_config(processing_cfg)
+    items_path = cfg.paths.output_dir / 'items' / f'{cfg.processing.items.name}.json'
+    assert items_path.exists(), f'Items not found: {items_path}'
     compute_tile_stats_from_items(
         items_path,
-        output_dir,
+        cfg.paths.output_dir,
         overwrite=overwrite,
         batch_size=batch_size,
         num_workers=num_workers,
@@ -30,4 +28,5 @@ def main(
 
 
 if __name__ == '__main__':
-    auto_cli(main)
+    processing_cfg, overwrite_arg, _ = parse_processing_args(include_executor=False)
+    main(processing_cfg, overwrite=overwrite_arg)

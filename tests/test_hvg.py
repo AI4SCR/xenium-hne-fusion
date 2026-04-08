@@ -12,6 +12,7 @@ from xenium_hne_fusion.hvg import (
     get_common_genes,
     load_fit_items,
 )
+from xenium_hne_fusion.utils.getters import load_processing_config
 
 
 def _load_script(path: str, module_name: str):
@@ -174,7 +175,8 @@ def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_panel.py', 'create_panel_script')
-    module.main(config_path=config_path, overwrite=True)
+    processing_cfg = load_processing_config(config_path)
+    module.main(processing_cfg=processing_cfg, overwrite=True)
 
     panel_path = output_dir / 'panels' / 'hvg-default-default-outer=0-seed=0.yaml'
     assert panel_path.exists()
@@ -211,7 +213,8 @@ def test_create_panel_script_accepts_predefined_panel(monkeypatch: pytest.Monkey
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_panel.py', 'create_panel_predefined_script')
-    module.main(config_path=config_path, overwrite=False)
+    processing_cfg = load_processing_config(config_path)
+    module.main(processing_cfg=processing_cfg, overwrite=False)
 
     assert panel_path.exists()
 
@@ -240,8 +243,9 @@ def test_create_panel_script_rejects_missing_predefined_panel(monkeypatch: pytes
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_panel.py', 'create_panel_missing_predefined_script')
+    processing_cfg = load_processing_config(config_path)
     with pytest.raises(AssertionError, match='Panel not found'):
-        module.main(config_path=config_path, overwrite=False)
+        module.main(processing_cfg=processing_cfg, overwrite=False)
 
 
 def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -268,8 +272,9 @@ def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.Monkey
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/create_panel.py', 'create_panel_mixed_mode_script')
+    processing_cfg = load_processing_config(config_path)
     with pytest.raises(AssertionError, match='panel config must set both n_top_genes and flavor'):
-        module.main(config_path=config_path, overwrite=False)
+        module.main(processing_cfg=processing_cfg, overwrite=False)
 
 
 def test_build_hvg_anndata_uses_one_row_per_tile(tmp_path: Path):

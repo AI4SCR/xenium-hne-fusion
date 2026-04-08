@@ -1,10 +1,12 @@
 import importlib.util
 import json
+import io
 from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from loguru import logger
 
 from xenium_hne_fusion.pipeline import filter_items_from_items_path
 from xenium_hne_fusion.utils.getters import load_processing_config
@@ -237,3 +239,103 @@ def test_filter_items_from_items_path_supports_sample_exclude_ids(tmp_path: Path
     assert n_kept == 1
     filtered = json.loads(output_path.read_text())
     assert [item['id'] for item in filtered] == ['S1_0']
+
+
+def test_filter_items_from_items_path_drops_items_with_missing_threshold_stats(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'beat'
+    items_path = output_dir / 'items' / 'all.json'
+    output_path = output_dir / 'items' / 'default.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
+
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': '/tmp/S1/0'},
+                {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': '/tmp/S1/1'},
+            ]
+        )
+    )
+    pd.DataFrame(
+        {
+            'num_transcripts': [200, None],
+            'num_unique_transcripts': [None, None],
+            'num_cells': [None, None],
+            'num_unique_cells': [None, None],
+        },
+        index=pd.Index(['S1_0', 'S1_1'], name='id'),
+    ).to_parquet(output_dir / 'statistics' / 'all.parquet')
+
+    output_path, n_kept = filter_items_from_items_path(
+        items_path=items_path,
+        output_path=output_path,
+        items_filter_cfg=SimpleNamespace(
+            name='default',
+            organs=None,
+            include_ids=None,
+            exclude_ids=None,
+            num_transcripts=200,
+            num_unique_transcripts=None,
+            num_cells=None,
+            num_unique_cells=None,
+        ),
+        overwrite=True,
+    )
+
+    assert output_path == output_dir / 'items' / 'default.json'
+    assert n_kept == 1
+    filtered = json.loads(output_path.read_text())
+    assert [item['id'] for item in filtered] == ['S1_0']
+
+
+def test_filter_items_logs_stage_counts(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'beat'
+    items_path = output_dir / 'items' / 'all.json'
+    output_path = output_dir / 'items' / 'default.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
+
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': '/tmp/S1/0'},
+                {'id': 'S2_0', 'sample_id': 'S2', 'tile_id': 0, 'tile_dir': '/tmp/S2/0'},
+            ]
+        )
+    )
+    pd.DataFrame(
+        {
+            'num_transcripts': [200, 199],
+            'num_unique_transcripts': [None, None],
+            'num_cells': [None, None],
+            'num_unique_cells': [None, None],
+        },
+        index=pd.Index(['S1_0', 'S2_0'], name='id'),
+    ).to_parquet(output_dir / 'statistics' / 'all.parquet')
+
+    sink = io.StringIO()
+    sink_id = logger.add(sink, level='INFO')
+    try:
+        output_path, n_kept = filter_items_from_items_path(
+            items_path=items_path,
+            output_path=output_path,
+            items_filter_cfg=SimpleNamespace(
+                name='default',
+                organs=None,
+                include_ids=None,
+                exclude_ids=None,
+                num_transcripts=200,
+                num_unique_transcripts=None,
+                num_cells=None,
+                num_unique_cells=None,
+            ),
+            overwrite=True,
+        )
+    finally:
+        logger.remove(sink_id)
+
+    assert output_path == output_dir / 'items' / 'default.json'
+    assert n_kept == 1
+    log_output = sink.getvalue()
+    assert 'Loaded 2 items from' in log_output
+    assert 'Stats filter all.parquet: 2 -> 1 tiles (1 removed)' in log_output

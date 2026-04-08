@@ -318,12 +318,21 @@ def filter_items_from_items_path(
     assert stats_path.exists(), f"Statistics not found: {stats_path}"
 
     items_df = load_items_dataframe(items_path)
+    loaded_count = len(items_df)
+    logger.info(f"Loaded {loaded_count} items from {items_path}")
+
     if items_filter_cfg.organs is not None:
         assert metadata_path is not None, "metadata_path is required for organ filtering"
         meta = pd.read_parquet(metadata_path)
+        before = len(items_df)
         allowed_samples = set(meta.loc[meta.organ.isin(items_filter_cfg.organs), "sample_id"])
         items_df = items_df[items_df["sample_id"].isin(allowed_samples)]
+        logger.info(
+            f"Organ filter {items_filter_cfg.organs}: {before} -> {len(items_df)} tiles "
+            f"({before - len(items_df)} removed)"
+        )
     if items_filter_cfg.include_ids is not None or items_filter_cfg.exclude_ids is not None:
+        before = len(items_df)
         selected_sample_ids = select_sample_ids(
             sorted(items_df["sample_id"].unique().tolist()),
             FilterConfig(
@@ -332,14 +341,23 @@ def filter_items_from_items_path(
             ),
         )
         items_df = items_df[items_df["sample_id"].isin(selected_sample_ids)]
+        logger.info(
+            f"Sample filter include_ids={items_filter_cfg.include_ids} exclude_ids={items_filter_cfg.exclude_ids}: "
+            f"{before} -> {len(items_df)} tiles ({before - len(items_df)} removed)"
+        )
 
     stats = pd.read_parquet(stats_path)
+    before = len(items_df)
     kept_ids = set(stats.index[apply_filter(stats, items_filter_cfg)])
     filtered = items_df[items_df["id"].isin(kept_ids)]
+    logger.info(
+        f"Stats filter {stats_path.name}: {before} -> {len(filtered)} tiles "
+        f"({before - len(filtered)} removed)"
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(filtered.to_dict("records"), indent=2))
-    logger.info(f"Filter {items_filter_cfg.name}: {len(items_df)} -> {len(filtered)} tiles")
+    logger.info(f"Filter {items_filter_cfg.name}: {loaded_count} loaded -> {len(filtered)} kept")
     logger.info(f"Saved filtered items -> {output_path}")
     return output_path, len(filtered)
 

@@ -242,9 +242,8 @@ uv run python scripts/data/create_items.py \
 Compute per-tile filtering statistics:
 
 ```bash
-uv run scripts/data/compute_tile_stats.py hest1k \
-  --config_path configs/data/local/hest1k.yaml \
-  data/03_output/hest1k/items/all.json
+uv run scripts/data/compute_tile_stats.py \
+  --config configs/data/local/hest1k.yaml
 ```
 
 Generate a filtered item set:
@@ -403,9 +402,8 @@ uv run python scripts/data/process_metadata.py \
 uv run python scripts/data/create_items.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
-  --config_path "configs/data/remote/$DATASET_NAME.yaml" \
-  "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
+uv run python scripts/data/compute_tile_stats.py \
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/filter_items.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
@@ -492,9 +490,8 @@ uv run python scripts/data/process_metadata.py \
 uv run python scripts/data/create_items.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
-  --config_path "configs/data/remote/$DATASET_NAME.yaml" \
-  "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
+uv run python scripts/data/compute_tile_stats.py \
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/filter_items.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
@@ -533,7 +530,7 @@ For `hest1k-breast`, submit each data-preparation step individually:
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/data/compute_tile_stats.py hest1k "$DATA_DIR/03_output/hest1k/items/all.json" --config_path "configs/data/remote/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/data/compute_tile_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_panel.py --config_path configs/data/remote/hest1k-breast.yaml'
@@ -550,12 +547,14 @@ bash ray/submit.sh "bash ray/scripts/test_env.sh"
 To test the other canonical configs, use the same sequence with the matching config path:
 
 ```bash
-./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/data/compute_tile_stats.py hest1k "$DATA_DIR/03_output/hest1k/items/all.json" --config_path "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k.yaml" --overwrite=true'
-./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k.yaml" --overwrite=true'
-./ray/submit.sh 'python scripts/data/create_panel.py --config_path configs/data/remote/hest1k.yaml'
+export CONFIG=configs/data/remote/hest1k-breast.yaml
+
+./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/filter_items.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/create_panel.py --config $CONFIG"
 ```
 
 ## Development

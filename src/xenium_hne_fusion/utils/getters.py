@@ -371,7 +371,7 @@ def apply_filter(stats: pd.DataFrame, cfg: 'ItemsFilterConfig') -> pd.Series:
         threshold = getattr(cfg, field)
         if threshold is None:
             continue
-        mask &= stats[field].isna() | (stats[field] >= threshold)
+        mask &= stats[field].notna() & (stats[field] >= threshold)
     return mask
 
 
