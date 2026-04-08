@@ -520,6 +520,8 @@ Ray helpers live under `ray/`:
 bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
 ```
 
+Pass `--entrypoint-num-gpus N` to reserve GPUs for the Ray entrypoint itself.
+
 For `hest1k-breast`, submit each step individually:
 
 ```bash
@@ -529,7 +531,7 @@ For `hest1k-breast`, submit each step individually:
 ./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
 ./ray/submit.sh 'python scripts/data/create_panel.py --config configs/data/remote/hest1k-breast.yaml'
-./ray/submit.sh 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
+./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
 Useful helpers:
