@@ -211,8 +211,8 @@ uv run scripts/data/structure_beat.py beat \
 Sample-level metadata cleaning:
 
 ```bash
-uv run scripts/data/process_metadata.py hest1k \
-  --config_path configs/data/local/hest1k.yaml
+uv run python scripts/data/process_metadata.py \
+  --config configs/data/local/hest1k.yaml
 ```
 
 Per-sample HEST1K processing:
@@ -359,6 +359,168 @@ They currently submit one sample per job with:
 - `64G` RAM
 - `08:00:00` wall time
 - logs in `$HOME/logs`
+
+### Full pipeline on Slurm
+
+The Slurm wrappers only submit the per-sample processing stage. To run the full pipeline, use the commands below in order.
+
+HEST1K:
+
+1. Structure and download the samples selected by the data config:
+
+```bash
+uv run python scripts/data/structure_hest1k.py hest1k \
+  --config_path configs/data/remote/hest1k.yaml
+```
+
+2. Submit one per-sample processing job per resolved sample:
+
+```bash
+./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
+```
+
+The wrapped per-sample command is:
+
+```bash
+uv run python scripts/data/process_hest1k.py \
+  --dataset hest1k \
+  --config_path configs/data/remote/hest1k.yaml \
+  --sample_id SAMPLE_ID
+```
+
+3. After all sample jobs finish, finalize the dataset outputs:
+
+```bash
+uv run python scripts/data/process_metadata.py \
+  --config configs/data/remote/hest1k.yaml
+
+uv run python scripts/data/create_items.py hest1k \
+  --config_path configs/data/remote/hest1k.yaml
+
+uv run python scripts/data/compute_tile_stats.py hest1k \
+  --config_path configs/data/remote/hest1k.yaml
+
+uv run python scripts/data/filter_items.py \
+  --config configs/data/remote/hest1k.yaml \
+  --name hest1k
+
+uv run python scripts/data/create_splits.py \
+  --config configs/data/remote/hest1k.yaml \
+  --name hest1k
+```
+
+4. If training needs a panel file, generate it after splits exist:
+
+```bash
+uv run python scripts/data/create_hvg_panel.py hest1k \
+  --config_path configs/data/remote/hest1k.yaml \
+  --recipe_path configs/panels/hest1k/hvg-default-default-outer=0-seed=0.yaml
+```
+
+5. Launch training once the data outputs, splits, and panel are ready:
+
+```bash
+uv run scripts/train/supervised.py \
+  --config configs/train/hest1k/expression/pancreas/early-fusion.yaml
+```
+
+Or use the existing HEST1K early-fusion wrapper:
+
+```bash
+./slurm/train_hest1k_early_fusion_organ.sh pancreas
+```
+
+BEAT:
+
+1. Structure the raw dataset into the canonical layout:
+
+```bash
+uv run python scripts/data/structure_beat.py beat \
+  --config_path configs/data/remote/beat.yaml
+```
+
+2. Submit one per-sample processing job per raw sample directory:
+
+```bash
+./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
+```
+
+The wrapper expands each sample job into:
+
+```bash
+uv run python scripts/data/detect_tissues.py \
+  --wsi_path WSI_PATH \
+  --output_parquet TISSUES_PATH
+
+uv run python scripts/data/tile.py \
+  --wsi_path WSI_PATH \
+  --tissues_parquet TISSUES_PATH \
+  --output_parquet TILES_PATH \
+  --tile_px TILE_PX \
+  --stride_px STRIDE_PX \
+  --mpp TILE_MPP
+
+uv run python scripts/data/process.py \
+  --wsi_path WSI_PATH \
+  --tiles_parquet TILES_PATH \
+  --transcripts_path TRANSCRIPTS_PATH \
+  --output_dir PROCESSED_DIR \
+  --mpp TILE_MPP \
+  --predicate PREDICATE \
+  --img_size TILE_PX \
+  --kernel_size KERNEL_SIZE
+```
+
+When `cells.parquet` exists, the wrapper adds:
+
+```bash
+--cells_path CELLS_PATH
+```
+
+3. After all sample jobs finish, finalize the dataset outputs:
+
+```bash
+uv run python scripts/data/process_metadata.py \
+  --config configs/data/remote/beat.yaml
+
+uv run python scripts/data/create_items.py beat \
+  --config_path configs/data/remote/beat.yaml
+
+uv run python scripts/data/compute_tile_stats.py beat \
+  --config_path configs/data/remote/beat.yaml
+
+uv run python scripts/data/filter_items.py \
+  --config configs/data/remote/beat.yaml \
+  --name beat
+
+uv run python scripts/data/create_splits.py \
+  --config configs/data/remote/beat.yaml \
+  --name beat
+```
+
+4. Train once the dataset outputs are ready:
+
+```bash
+uv run scripts/train/supervised.py \
+  --config configs/train/beat/expression/early-fusion.yaml
+```
+
+For organ-specific or thresholded HEST1K runs, keep using the same `--config` file and override only the shared processing fields you need during finalization, for example:
+
+```bash
+uv run python scripts/data/filter_items.py \
+  --config configs/data/remote/hest1k.yaml \
+  --name hest1k \
+  --items.name breast \
+  --items.filter.organs '[Breast]'
+
+uv run python scripts/data/create_splits.py \
+  --config configs/data/remote/hest1k.yaml \
+  --name hest1k \
+  --items.name breast \
+  --items.filter.organs '[Breast]' \
+  --split.split_name breast
+```
 
 ## Kaiko Ray
 
