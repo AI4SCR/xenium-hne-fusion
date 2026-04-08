@@ -234,7 +234,8 @@ Compute per-tile filtering statistics:
 
 ```bash
 uv run scripts/data/compute_tile_stats.py hest1k \
-  --config_path configs/data/local/hest1k.yaml
+  --config_path configs/data/local/hest1k.yaml \
+  --items_path data/03_output/hest1k/items/all.json
 ```
 
 Generate a filtered item set:
@@ -398,7 +399,8 @@ uv run python scripts/data/create_items.py hest1k \
   --config_path configs/data/remote/hest1k.yaml
 
 uv run python scripts/data/compute_tile_stats.py hest1k \
-  --config_path configs/data/remote/hest1k.yaml
+  --config_path configs/data/remote/hest1k.yaml \
+  --items_path "$DATA_DIR/03_output/hest1k/items/all.json"
 
 uv run python scripts/data/filter_items.py \
   --config configs/data/remote/hest1k.yaml \
@@ -487,7 +489,8 @@ uv run python scripts/data/create_items.py beat \
   --config_path configs/data/remote/beat.yaml
 
 uv run python scripts/data/compute_tile_stats.py beat \
-  --config_path configs/data/remote/beat.yaml
+  --config_path configs/data/remote/beat.yaml \
+  --items_path "$DATA_DIR/03_output/beat/items/all.json"
 
 uv run python scripts/data/filter_items.py \
   --config configs/data/remote/beat.yaml \
