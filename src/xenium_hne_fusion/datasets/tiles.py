@@ -57,6 +57,9 @@ class TileDataset(Items):
         self.cell_type_col = cell_type_col
 
         assert target == 'expression' and target_panel is not None or target == 'cell_types', "target_panel must be specified when target is 'expression'"
+        if target == 'expression' and source_panel is not None:
+            assert target_panel is not None
+            assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
 
     def __getitem__(self, idx) -> dict:
         item = deepcopy(self.items[idx])

@@ -548,11 +548,12 @@ To test the other canonical configs, use the same sequence with the matching con
 
 ```bash
 export CONFIG=configs/data/remote/hest1k-breast.yaml
+export CONFIG=configs/data/remote/hest1k-lung.yaml
 
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/filter_items.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_panel.py --config $CONFIG"
 ```
