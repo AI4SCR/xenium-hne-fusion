@@ -194,14 +194,14 @@ def test_repo_remote_hest_config_processes_all_samples():
 
 
 @pytest.mark.parametrize(
-    ('path', 'items_name', 'split_name', 'panel_name'),
+    ('path', 'items_name', 'split_name', 'panel_name', 'n_top_genes'),
     [
-        ('configs/data/local/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0'),
-        ('configs/data/local/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0'),
-        ('configs/data/local/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0'),
-        ('configs/data/remote/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0'),
-        ('configs/data/remote/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0'),
-        ('configs/data/remote/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0'),
+        ('configs/data/local/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0', 16),
+        ('configs/data/local/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0', 8),
+        ('configs/data/local/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0', 128),
+        ('configs/data/remote/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0', 16),
+        ('configs/data/remote/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0', 8),
+        ('configs/data/remote/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0', 128),
     ],
 )
 def test_repo_hest_organ_configs_are_fully_specified(
@@ -209,6 +209,7 @@ def test_repo_hest_organ_configs_are_fully_specified(
     items_name: str,
     split_name: str,
     panel_name: str,
+    n_top_genes: int,
 ):
     cfg = load_dataset_config(Path(path))
 
@@ -217,7 +218,7 @@ def test_repo_hest_organ_configs_are_fully_specified(
     assert cfg.split.name == split_name
     assert cfg.panel is not None
     assert cfg.panel.name == panel_name
-    assert cfg.panel.n_top_genes == 128
+    assert cfg.panel.n_top_genes == n_top_genes
     assert cfg.panel.flavor == 'seurat_v3'
 
 

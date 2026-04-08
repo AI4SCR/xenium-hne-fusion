@@ -36,5 +36,5 @@ split:
   random_state: 0
 panel:
   name: hvg-lung-lung-outer=0-seed=0
-  n_top_genes: 128
+  n_top_genes: 8
   flavor: seurat_v3
