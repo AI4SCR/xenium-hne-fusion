@@ -32,7 +32,7 @@ lit:
   lr_backbone: 1.0e-5
 
 wandb:
-  project: debug
+  project: xe-hne-fus-expr
   name: vision
   tags: [pancreas]
 
