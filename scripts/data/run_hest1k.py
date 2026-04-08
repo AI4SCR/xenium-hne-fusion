@@ -260,7 +260,7 @@ def build_remote_sample_functions(ray):
         structure_sample(cfg, sample_id, metadata_path)
         return sample_id
 
-    @ray.remote(num_cpus=4, num_gpus=1)
+    @ray.remote(num_cpus=8, num_gpus=0)
     def detect_tissues_remote(ref: object, cfg: PipelineConfig, sample_id: str) -> str:
         del ref
         detect_sample_tissues(cfg, sample_id)
