@@ -1,8 +1,0 @@
-name: pancreas
-filter:
-  organs:
-    - Pancreas
-  num_transcripts: 100
-  num_unique_transcripts: null
-  num_cells: null
-  num_unique_cells: null

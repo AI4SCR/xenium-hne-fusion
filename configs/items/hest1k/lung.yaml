@@ -1,8 +1,0 @@
-name: lung
-filter:
-  organs:
-    - Lung
-  num_transcripts: 100
-  num_unique_transcripts: null
-  num_cells: null
-  num_unique_cells: null

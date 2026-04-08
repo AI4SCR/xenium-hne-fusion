@@ -146,13 +146,13 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
 
     module = _load_script('scripts/data/create_splits.py', 'create_splits_script')
     processing_cfg = load_processing_config(config_path)
-    processing_cfg.split.split_name = 'default'
+    processing_cfg.split.name = 'default'
     processing_cfg.split.test_size = 0.2
     processing_cfg.split.val_size = None
     processing_cfg.split.stratify = False
     processing_cfg.split.group_column_name = 'sample_id'
     processing_cfg.split.random_state = 0
-    module.main('hest1k', config_path=None, overwrite=True, processing_cfg=processing_cfg)
+    module.main(processing_cfg, overwrite=True, with_metadata=True)
 
     split_dir = output_dir / 'splits' / 'default'
     assert split_dir.exists()
@@ -214,19 +214,14 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
 
     module = _load_script('scripts/data/create_splits.py', 'create_splits_lung_script')
     processing_cfg = load_processing_config(config_path)
-    processing_cfg.split.split_name = 'lung'
+    processing_cfg.items.name = 'lung'
+    processing_cfg.split.name = 'lung'
     processing_cfg.split.test_size = 0.2
     processing_cfg.split.val_size = None
     processing_cfg.split.stratify = False
     processing_cfg.split.group_column_name = None
     processing_cfg.split.random_state = 0
-    module.main(
-        'hest1k',
-        config_path=None,
-        items_path=output_dir / 'items' / 'lung.json',
-        overwrite=True,
-        processing_cfg=processing_cfg,
-    )
+    module.main(processing_cfg, overwrite=True)
 
     split_path = output_dir / 'splits' / 'lung' / 'outer=0-seed=0.parquet'
     assert split_path.exists()
@@ -234,3 +229,117 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
     split_metadata = pd.read_parquet(split_path)
     assert set(split_metadata['sample_id']) == {'S0', 'S1'}
     assert split_metadata.groupby('sample_id')['split'].nunique().max() > 1
+
+
+def test_create_splits_without_metadata_keeps_item_columns_only(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    output_dir = data_dir / '03_output' / 'hest1k'
+    processed_dir = data_dir / '02_processed' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
+    )
+    items = []
+    sample_rows = []
+    for sample_idx in range(9):
+        sample_id = f'S{sample_idx}'
+        sample_rows.append({'sample_id': sample_id, 'patient': f'P{sample_idx}', 'cohort': sample_idx % 2})
+        for tile_id in range(2):
+            items.append(
+                {
+                    'id': f'{sample_id}_{tile_id}',
+                    'sample_id': sample_id,
+                    'tile_id': tile_id,
+                    'tile_dir': f'/tmp/{sample_id}/{tile_id}',
+                    'organ': 'Lung',
+                }
+            )
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'items').mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(sample_rows).to_parquet(processed_dir / 'metadata.parquet', index=False)
+    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_splits.py', 'create_splits_no_metadata_script')
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.split.name = 'default'
+    processing_cfg.split.test_size = 0.2
+    processing_cfg.split.val_size = None
+    processing_cfg.split.stratify = False
+    processing_cfg.split.group_column_name = 'sample_id'
+    processing_cfg.split.random_state = 0
+    module.main(processing_cfg, overwrite=True, with_metadata=False)
+
+    split_path = output_dir / 'splits' / 'default' / 'outer=0-seed=0.parquet'
+    assert split_path.exists()
+
+    split_metadata = pd.read_parquet(split_path)
+    assert set(split_metadata.index) == {item['id'] for item in items}
+    assert {'sample_id', 'tile_id', 'tile_dir', 'organ', 'split'} <= set(split_metadata.columns)
+    assert 'patient' not in split_metadata.columns
+    assert 'cohort' not in split_metadata.columns
+
+    for _, group in split_metadata.groupby('sample_id'):
+        assert group['split'].nunique() == 1
+
+
+def test_create_splits_without_metadata_rejects_missing_target_column(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    output_dir = data_dir / '03_output' / 'hest1k'
+    processed_dir = data_dir / '02_processed' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  include_ids: null\n'
+        '  exclude_ids: null\n'
+    )
+
+    items = [
+        {'id': 'S0_0', 'sample_id': 'S0', 'tile_id': 0, 'tile_dir': '/tmp/S0/0'},
+        {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': '/tmp/S1/0'},
+    ]
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'items').mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([{'sample_id': 'S0', 'patient': 'P0'}, {'sample_id': 'S1', 'patient': 'P1'}]).to_parquet(
+        processed_dir / 'metadata.parquet',
+        index=False,
+    )
+    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_splits.py', 'create_splits_missing_target_script')
+    processing_cfg = load_processing_config(config_path)
+    processing_cfg.split.name = 'default'
+    processing_cfg.split.test_size = 0.5
+    processing_cfg.split.val_size = None
+    processing_cfg.split.target_column_name = 'patient'
+    processing_cfg.split.random_state = 0
+
+    with pytest.raises(AssertionError, match='Missing split columns'):
+        module.main(processing_cfg, overwrite=True, with_metadata=False)

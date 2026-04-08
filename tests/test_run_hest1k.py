@@ -108,7 +108,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         "    organs: null\n"
         "    num_transcripts: 100\n"
         "split:\n"
-        "  split_name: default\n"
+        "  name: default\n"
         "  test_size: 0.25\n"
         "  val_size: 0.25\n"
         "  random_state: 0\n"
@@ -183,7 +183,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         module,
         "create_split_collection",
         lambda cfg, items_path, overwrite=False: calls.append(
-            ("split", cfg.split.split_name, items_path, overwrite)
+            ("split", cfg.split.name, items_path, overwrite)
         ),
     )
 
@@ -304,7 +304,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
         "  filter:\n"
         "    organs: null\n"
         "split:\n"
-        "  split_name: default\n"
+        "  name: default\n"
         "  test_size: 0.25\n"
         "  val_size: 0.25\n"
         "  random_state: 0\n"
@@ -355,7 +355,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
+        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.name, items_path, overwrite)),
     )
 
     cfg = module.load_pipeline_config("hest1k", config_path)

@@ -1,5 +1,3 @@
-
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -10,26 +8,6 @@ from loguru import logger
 from scipy import sparse
 
 from xenium_hne_fusion.metadata import load_items_dataframe
-
-
-@dataclass
-class HvgRecipe:
-    panel_name: str
-    n_top_genes: int
-    items_name: str = 'default'
-    split_path: Path = Path('default/outer=0-seed=0.parquet')
-    flavor: str = 'seurat_v3'
-
-
-def load_hvg_recipe(path: Path) -> HvgRecipe:
-    data = yaml.safe_load(path.read_text()) or {}
-    return HvgRecipe(
-        panel_name=data['panel_name'],
-        n_top_genes=data['n_top_genes'],
-        items_name=data.get('items_name', 'default'),
-        split_path=Path(data.get('split_path', 'default/outer=0-seed=0.parquet')),
-        flavor=data.get('flavor', 'seurat_v3'),
-    )
 
 
 def load_fit_items(items_path: Path, split_metadata_path: Path) -> pd.DataFrame:
@@ -120,7 +98,7 @@ def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], ov
     return output_path
 
 
-def create_hvg_panel(
+def create_panel(
     *,
     items_path: Path,
     split_metadata_path: Path,

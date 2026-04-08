@@ -24,7 +24,7 @@ data:
   expr_pool: token
   items_path: pancreas.json
   metadata_path: pancreas/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-pancreas-default-outer=0-seed=0.yaml
+  panel_path: hvg-pancreas-pancreas-outer=0-seed=0.yaml
 
 lit:
   target_key: target

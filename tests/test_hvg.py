@@ -8,7 +8,7 @@ import pytest
 from xenium_hne_fusion.hvg import (
     build_hvg_anndata,
     build_tile_level_matrix,
-    create_hvg_panel,
+    create_panel,
     get_common_genes,
     load_fit_items,
 )
@@ -88,7 +88,7 @@ def test_get_common_genes_uses_intersection_across_samples(tmp_path: Path):
     assert get_common_genes(fit_items) == ['B', 'C']
 
 
-def test_create_hvg_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S1' / '256_256' / '1'
     _write_transcripts_parquet(tile_a, ['A', 'B', 'C'], ['A', 'C', 'C', 'B'])
@@ -115,7 +115,7 @@ def test_create_hvg_panel_writes_target_hvgs_and_source_remainder(monkeypatch: p
 
     monkeypatch.setattr('scanpy.pp.highly_variable_genes', fake_hvg)
 
-    create_hvg_panel(
+    create_panel(
         items_path=items_path,
         split_metadata_path=split_path,
         output_path=output_path,
@@ -128,18 +128,15 @@ def test_create_hvg_panel_writes_target_hvgs_and_source_remainder(monkeypatch: p
     assert panel['target_panel'] == ['B', 'C']
 
 
-def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     data_dir = tmp_path / 'data'
     raw_dir = tmp_path / 'raw' / 'hest1k'
     output_dir = data_dir / '03_output' / 'hest1k'
     tile_dir = data_dir / '02_processed' / 'hest1k' / 'TENX95' / '256_256' / '0'
     config_path = tmp_path / 'hest1k.yaml'
-    recipe_path = tmp_path / 'configs' / 'panels' / 'hest1k' / 'hvg-default-default-outer=0-seed=0.yaml'
-
     tile_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'splits' / 'default').mkdir(parents=True, exist_ok=True)
-    recipe_path.parent.mkdir(parents=True, exist_ok=True)
 
     _write_transcripts_parquet(tile_dir, ['A', 'B'], ['A', 'B', 'B', 'B'])
     items = json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
@@ -150,13 +147,6 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
         index=pd.Index(['TENX95_0'], name='id'),
     ).to_parquet(output_dir / 'splits' / 'default' / 'outer=0-seed=0.parquet')
 
-    recipe_path.write_text(
-        'panel_name: hvg-default-default-outer=0-seed=0\n'
-        'items_name: default\n'
-        'split_path: default/outer=0-seed=0.parquet\n'
-        'n_top_genes: 1\n'
-        'flavor: seurat_v3\n'
-    )
     config_path.write_text(
         'name: hest1k\n'
         'tile_px: 256\n'
@@ -165,6 +155,15 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
         'filter:\n'
         '  include_ids: null\n'
         '  exclude_ids: null\n'
+        'items:\n'
+        '  name: default\n'
+        'split:\n'
+        '  name: default\n'
+        '  random_state: 0\n'
+        'panel:\n'
+        '  name: hvg-default-default-outer=0-seed=0\n'
+        '  n_top_genes: 1\n'
+        '  flavor: seurat_v3\n'
     )
 
     def fake_hvg(adata, n_top_genes, flavor, inplace):
@@ -173,16 +172,104 @@ def test_create_hvg_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr('scanpy.pp.highly_variable_genes', fake_hvg)
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
-    monkeypatch.setenv('XHF_REPO_ROOT', str(tmp_path))
 
-    module = _load_script('scripts/data/create_hvg_panel.py', 'create_hvg_panel_script')
-    module.main('hest1k', config_path=config_path, overwrite=True)
+    module = _load_script('scripts/data/create_panel.py', 'create_panel_script')
+    module.main(config_path=config_path, overwrite=True)
 
     panel_path = output_dir / 'panels' / 'hvg-default-default-outer=0-seed=0.yaml'
     assert panel_path.exists()
     panel = __import__('yaml').safe_load(panel_path.read_text())
     assert panel['source_panel'] == ['A']
     assert panel['target_panel'] == ['B']
+
+
+def test_create_panel_script_accepts_predefined_panel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    output_dir = data_dir / '03_output' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+
+    (output_dir / 'panels').mkdir(parents=True, exist_ok=True)
+    panel_path = output_dir / 'panels' / 'default.yaml'
+    panel_path.write_text(__import__('yaml').safe_dump({'source_panel': ['A'], 'target_panel': ['B']}, sort_keys=False))
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'items:\n'
+        '  name: default\n'
+        'split:\n'
+        '  name: default\n'
+        'panel:\n'
+        '  name: default\n'
+        '  n_top_genes: null\n'
+        '  flavor: null\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_panel.py', 'create_panel_predefined_script')
+    module.main(config_path=config_path, overwrite=False)
+
+    assert panel_path.exists()
+
+
+def test_create_panel_script_rejects_missing_predefined_panel(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'items:\n'
+        '  name: default\n'
+        'split:\n'
+        '  name: default\n'
+        'panel:\n'
+        '  name: missing\n'
+        '  n_top_genes: null\n'
+        '  flavor: null\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_panel.py', 'create_panel_missing_predefined_script')
+    with pytest.raises(AssertionError, match='Panel not found'):
+        module.main(config_path=config_path, overwrite=False)
+
+
+def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / 'hest1k'
+    config_path = tmp_path / 'hest1k.yaml'
+
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'items:\n'
+        '  name: default\n'
+        'split:\n'
+        '  name: default\n'
+        'panel:\n'
+        '  name: default\n'
+        '  n_top_genes: 128\n'
+        '  flavor: null\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
+
+    module = _load_script('scripts/data/create_panel.py', 'create_panel_mixed_mode_script')
+    with pytest.raises(AssertionError, match='panel config must set both n_top_genes and flavor'):
+        module.main(config_path=config_path, overwrite=False)
 
 
 def test_build_hvg_anndata_uses_one_row_per_tile(tmp_path: Path):

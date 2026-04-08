@@ -46,10 +46,7 @@ xenium-hne-fusion/
 ├── src/xenium_hne_fusion/      # importable package
 ├── scripts/data/               # data pipeline entrypoints
 ├── scripts/train/              # training entrypoints
-├── configs/data/               # dataset processing configs
-├── configs/items/              # reusable item-filter presets
-├── configs/splits/             # reusable split presets
-├── configs/panels/             # HVG panel recipe configs
+├── configs/data/               # fully specified dataset processing configs
 ├── configs/train/              # model/training configs
 ├── panels/                     # checked-in reference panel artifacts
 ├── slurm/                      # Slurm submission wrappers
@@ -133,7 +130,8 @@ Notes:
 - `items/<items_name>.json` is a filtered subset, usually driven by `items.filter.*`.
 - tile-stat diagnostics live under `DATA_DIR/03_output/<name>/figures/tile_stats/<items_name>/`.
 - split parquet files are tile-level tables produced by joining `items/*.json` with sample-level `02_processed/<name>/metadata.parquet`.
-- generated panel YAMLs live under `DATA_DIR/03_output/<name>/panels/`, not under `configs/panels/`.
+- generated panel YAMLs live under `DATA_DIR/03_output/<name>/panels/`.
+- fully specified processing configs under `configs/data/` can generate those runtime panel YAMLs.
 
 ## Processing config schema
 
@@ -142,7 +140,7 @@ The data pipeline now uses one nested config schema for both datasets:
 ```yaml
 name: hest1k
 tiles:
-  tile_px: 256
+  tile_px: 512
   stride_px: 256
   mpp: 0.5
   kernel_size: 16
@@ -162,7 +160,7 @@ items:
     num_cells: null
     num_unique_cells: null
 split:
-  split_name: default
+  name: default
   test_size: 0.25
   val_size: 0.25
   stratify: false
@@ -173,11 +171,21 @@ split:
   include_targets: null
   group_column_name: null
   random_state: 0
+panel:
+  name: default
+  n_top_genes: null
+  flavor: null
 ```
 
 Examples:
 
 - [configs/data/local/hest1k.yaml](configs/data/local/hest1k.yaml)
+- [configs/data/local/hest1k-breast.yaml](configs/data/local/hest1k-breast.yaml)
+- [configs/data/local/hest1k-lung.yaml](configs/data/local/hest1k-lung.yaml)
+- [configs/data/local/hest1k-pancreas.yaml](configs/data/local/hest1k-pancreas.yaml)
+- [configs/data/remote/hest1k-breast.yaml](configs/data/remote/hest1k-breast.yaml)
+- [configs/data/remote/hest1k-lung.yaml](configs/data/remote/hest1k-lung.yaml)
+- [configs/data/remote/hest1k-pancreas.yaml](configs/data/remote/hest1k-pancreas.yaml)
 - [configs/data/remote/hest1k.yaml](configs/data/remote/hest1k.yaml)
 - [configs/data/local/beat.yaml](configs/data/local/beat.yaml)
 
@@ -187,7 +195,7 @@ Examples:
 --filter.include_ids '[TENX116]'
 --items.name breast
 --items.filter.organs '[Breast]'
---split.split_name breast
+--split.name breast
 --split.group_column_name sample_id
 ```
 
@@ -243,27 +251,21 @@ Generate a filtered item set:
 
 ```bash
 uv run scripts/data/filter_items.py \
-  --config configs/data/local/hest1k.yaml \
-  --items.name breast \
-  --items.filter.organs '[Breast]'
+  --config configs/data/local/hest1k-breast.yaml
 ```
 
 Create split parquet files from an item set plus sample metadata:
 
 ```bash
 uv run scripts/data/create_splits.py \
-  --config configs/data/local/hest1k.yaml \
-  --items.name breast \
-  --items.filter.organs '[Breast]' \
-  --split.split_name breast
+  --config configs/data/local/hest1k-breast.yaml
 ```
 
-Create an HVG panel from a recipe config:
+Create a panel from a fully specified organ config:
 
 ```bash
-uv run scripts/data/create_hvg_panel.py hest1k \
-  --config_path configs/data/local/hest1k.yaml \
-  --recipe_path configs/panels/hest1k/hvg-breast-default-outer=0-seed=0.yaml
+uv run scripts/data/create_panel.py \
+  --config_path configs/data/local/hest1k-breast.yaml
 ```
 
 ### End-to-end dataset runners
@@ -277,7 +279,7 @@ The dataset runners execute the full pipeline in order:
 5. build `items/all.json`
 6. compute `statistics/all.parquet`
 7. write the filtered item set named by `items.name`
-8. write the split collection named by `split.split_name`
+8. write the split collection named by `split.name`
 
 HEST1K:
 
@@ -309,10 +311,11 @@ uv run scripts/data/run_hest1k.py \
 
 ## Panel recipes and training path resolution
 
-There are two different panel concepts in the repo:
+There is one panel concept in the repo:
 
-- `configs/panels/<dataset>/*.yaml`: recipe configs for `create_hvg_panel.py`
 - `DATA_DIR/03_output/<name>/panels/*.yaml`: runtime panel files consumed by training
+
+Fully specified processing configs under `configs/data/` also carry the panel settings used to generate those runtime panel files.
 
 Training configs under `configs/train/` resolve relative data paths as follows:
 
@@ -414,9 +417,8 @@ uv run python scripts/data/create_splits.py \
 4. If training needs a panel file, generate it after splits exist:
 
 ```bash
-uv run python scripts/data/create_hvg_panel.py hest1k \
-  --config_path configs/data/remote/hest1k.yaml \
-  --recipe_path configs/panels/hest1k/hvg-default-default-outer=0-seed=0.yaml
+uv run python scripts/data/create_panel.py \
+  --config_path configs/data/local/hest1k-pancreas.yaml
 ```
 
 5. Launch training once the data outputs, splits, and panel are ready:
@@ -512,16 +514,10 @@ For organ-specific or thresholded HEST1K runs, keep using the same `--config` fi
 
 ```bash
 uv run python scripts/data/filter_items.py \
-  --config configs/data/remote/hest1k.yaml \
-  --name hest1k \
-  --items.name breast \
-  --items.filter.organs '[Breast]'
+  --config configs/data/remote/hest1k-breast.yaml
 
 uv run python scripts/data/create_splits.py \
-  --config configs/data/remote/hest1k.yaml \
-  --items.name breast \
-  --items.filter.organs '[Breast]' \
-  --split.split_name breast
+  --config configs/data/remote/hest1k-breast.yaml
 ```
 
 ## Kaiko Ray
@@ -536,9 +532,7 @@ Data preparation:
 
 ```bash
 ./ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml
-./ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k-256.yaml
 ./ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml
-./ray/scripts/run_beat.sh --config configs/data/remote/beat-256.yaml
 ```
 
 Useful helpers:
@@ -549,6 +543,27 @@ bash ray/scripts/disk_space.sh
 bash ray/submit.sh "bash ray/scripts/test_env.sh"
 bash ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml --name hest1k --filter.include_ids '[TENX116]'
 bash ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml --name beat
+```
+
+Local machine commands:
+
+```bash
+# hest1k
+./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
+./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
+./ray/submit.sh 'python scripts/data/compute_tile_stats.py hest1k "$DATA_DIR/03_output/hest1k/items/all.json" --config_path "configs/data/remote/hest1k.yaml"'
+
+./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
+./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-lung.yaml" --overwrite=true'
+
+./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
+
+# beat
+./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/beat.yaml"'
+./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/beat.yaml"'
+./ray/submit.sh 'python scripts/data/compute_tile_stats.py beat "$DATA_DIR/03_output/beat/items/all.json" --config_path "configs/data/remote/beat.yaml"'
+
+
 ```
 
 ## Development

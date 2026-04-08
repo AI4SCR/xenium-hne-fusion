@@ -151,6 +151,30 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
     assert resolve_samples(cfg, metadata_path) == ['TENX95']
 
 
+def test_load_processing_config_loads_split_name_and_panel(tmp_path: Path):
+    config_path = tmp_path / 'hest1k.yaml'
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'split:\n'
+        '  name: default\n'
+        'panel:\n'
+        '  name: default\n'
+        '  n_top_genes: 128\n'
+        '  flavor: seurat_v3\n'
+    )
+
+    cfg = load_dataset_config(config_path)
+
+    assert cfg.split.name == 'default'
+    assert cfg.panel is not None
+    assert cfg.panel.name == 'default'
+    assert cfg.panel.n_top_genes == 128
+    assert cfg.panel.flavor == 'seurat_v3'
+
+
 def test_repo_hest_config_pins_three_include_ids():
     cfg = load_dataset_config(Path('configs/data/local/hest1k.yaml'))
 
@@ -167,6 +191,34 @@ def test_repo_remote_hest_config_processes_all_samples():
     assert cfg.filter.exclude_ids is None
     assert cfg.items.filter.include_ids is None
     assert cfg.items.filter.exclude_ids is None
+
+
+@pytest.mark.parametrize(
+    ('path', 'items_name', 'split_name', 'panel_name'),
+    [
+        ('configs/data/local/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0'),
+        ('configs/data/local/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0'),
+        ('configs/data/local/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0'),
+        ('configs/data/remote/hest1k-breast.yaml', 'breast', 'breast', 'hvg-breast-breast-outer=0-seed=0'),
+        ('configs/data/remote/hest1k-lung.yaml', 'lung', 'lung', 'hvg-lung-lung-outer=0-seed=0'),
+        ('configs/data/remote/hest1k-pancreas.yaml', 'pancreas', 'pancreas', 'hvg-pancreas-pancreas-outer=0-seed=0'),
+    ],
+)
+def test_repo_hest_organ_configs_are_fully_specified(
+    path: str,
+    items_name: str,
+    split_name: str,
+    panel_name: str,
+):
+    cfg = load_dataset_config(Path(path))
+
+    assert cfg.name == 'hest1k'
+    assert cfg.items.name == items_name
+    assert cfg.split.name == split_name
+    assert cfg.panel is not None
+    assert cfg.panel.name == panel_name
+    assert cfg.panel.n_top_genes == 128
+    assert cfg.panel.flavor == 'seurat_v3'
 
 
 def test_items_filter_sample_ids_override_legacy_top_level_filter(tmp_path: Path):

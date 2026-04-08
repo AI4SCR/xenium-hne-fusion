@@ -147,10 +147,37 @@ def join_items_with_metadata(items_path: Path, sample_metadata_path: Path) -> pd
     return joined
 
 
+def build_split_metadata_frame(
+    items_path: Path,
+    split_cfg: SplitConfig,
+    *,
+    with_metadata: bool = False,
+    sample_metadata_path: Path | None = None,
+) -> pd.DataFrame:
+    if with_metadata:
+        assert sample_metadata_path is not None, 'sample_metadata_path is required when with_metadata=true'
+        return join_items_with_metadata(items_path, sample_metadata_path)
+
+    items_df = load_items_dataframe(items_path).set_index('id', drop=True)
+    assert items_df.index.is_unique, 'Tile-level metadata index must be unique item ids'
+
+    required_columns = [
+        split_cfg.group_column_name,
+        split_cfg.target_column_name,
+    ]
+    missing = sorted({col for col in required_columns if col is not None and col not in items_df.columns})
+    assert not missing, f'Missing split columns: {missing}'
+    if split_cfg.include_targets is not None:
+        assert split_cfg.target_column_name is not None, 'include_targets requires target_column_name'
+        assert split_cfg.target_column_name in items_df.columns, f'Missing split columns: {[split_cfg.target_column_name]}'
+
+    return items_df
+
+
 def load_split_config(path: Path) -> SplitConfig:
     data = yaml.safe_load(path.read_text()) or {}
     return SplitConfig(
-        split_name=data['split_name'],
+        name=data['name'],
         test_size=data.get('test_size'),
         val_size=data.get('val_size'),
         stratify=data.get('stratify', False),

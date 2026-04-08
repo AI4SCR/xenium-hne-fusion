@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from xenium_hne_fusion.config import FilterConfig, ItemsConfig, ItemsThresholdConfig, ProcessingConfig, SplitConfig, TilesConfig
+from xenium_hne_fusion.config import FilterConfig, ItemsConfig, ItemsThresholdConfig, PanelConfig, ProcessingConfig, SplitConfig, TilesConfig
 from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
 
 
@@ -122,7 +122,8 @@ def load_processing_config(path: Path) -> ProcessingConfig:
     filter_data = data.get('filter') or {}
     items_data = data.get('items') or {'name': 'default', 'filter': {}}
     items_filter_data = items_data.get('filter') or {}
-    split_data = data.get('split') or {'split_name': 'default', 'test_size': 0.25, 'val_size': 0.25}
+    split_data = data.get('split') or {'name': 'default', 'test_size': 0.25, 'val_size': 0.25}
+    panel_data = data.get('panel') or None
     return ProcessingConfig(
         name=data['name'],
         tiles=TilesConfig(
@@ -152,7 +153,7 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             ),
         ),
         split=SplitConfig(
-            split_name=split_data['split_name'],
+            name=split_data['name'],
             test_size=split_data.get('test_size'),
             val_size=split_data.get('val_size'),
             stratify=split_data.get('stratify', False),
@@ -163,6 +164,11 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             include_targets=split_data.get('include_targets'),
             group_column_name=split_data.get('group_column_name'),
             random_state=split_data.get('random_state'),
+        ),
+        panel=None if panel_data is None else PanelConfig(
+            name=panel_data['name'],
+            n_top_genes=panel_data.get('n_top_genes'),
+            flavor=panel_data.get('flavor'),
         ),
     )
 

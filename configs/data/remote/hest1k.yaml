@@ -22,7 +22,7 @@ items:
     num_cells: null
     num_unique_cells: null
 split:
-  split_name: default
+  name: default
   test_size: 0.25
   val_size: 0.25
   stratify: false
@@ -33,3 +33,7 @@ split:
   include_targets: null
   group_column_name: sample_id
   random_state: 0
+panel:
+  name: default
+  n_top_genes: null
+  flavor: null

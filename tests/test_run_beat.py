@@ -143,7 +143,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "create_split_collection",
-        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.split_name, items_path, overwrite)),
+        lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.name, items_path, overwrite)),
     )
 
     processing_cfg = load_processing_config(config_path)

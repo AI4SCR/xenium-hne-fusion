@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.hvg import load_transcript_gene_categories
-from xenium_hne_fusion.metadata import join_items_with_metadata, load_items_dataframe, save_split_metadata
+from xenium_hne_fusion.metadata import build_split_metadata_frame, load_items_dataframe, save_split_metadata
 from xenium_hne_fusion.config import FilterConfig
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
@@ -359,11 +359,16 @@ def create_split_collection(
     overwrite: bool = False,
 ) -> Path:
     split_cfg = cfg.processing.split
-    split_dir = cfg.paths.output_dir / "splits" / split_cfg.split_name
+    split_dir = cfg.paths.output_dir / "splits" / split_cfg.name
     if split_dir.exists() and not overwrite:
         logger.info(f"Split metadata already exists: {split_dir}")
         return split_dir
 
-    joined = join_items_with_metadata(items_path, cfg.paths.processed_dir / "metadata.parquet")
-    save_split_metadata(joined, split_dir, split_cfg, overwrite=overwrite)
+    split_metadata = build_split_metadata_frame(
+        items_path,
+        split_cfg,
+        with_metadata=False,
+        sample_metadata_path=cfg.paths.processed_dir / "metadata.parquet",
+    )
+    save_split_metadata(split_metadata, split_dir, split_cfg, overwrite=overwrite)
     return split_dir
