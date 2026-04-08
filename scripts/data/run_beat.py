@@ -95,6 +95,8 @@ def process_sample(
     logger.info(f"Processing BEAT sample {sample_id}")
     structured_dir = cfg.paths.structured_dir / sample_id
     tiles_cfg = cfg.processing.tiles
+    assert tiles_cfg.img_size is not None, "tiles.img_size is required"
+    img_size = tiles_cfg.img_size
     wsi_path = structured_dir / "wsi.tiff"
     transcripts_path = structured_dir / "transcripts.parquet"
     cells_path = structured_dir / "cells.parquet"
@@ -112,18 +114,17 @@ def process_sample(
         output_parquet=tiles_path,
     )
     tiles = gpd.read_parquet(tiles_path)
-    extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp)
-    tile_transcripts(tiles, transcripts_path, processed_dir, predicate)
+    extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp, img_size=img_size)
+    tile_transcripts(tiles, transcripts_path, processed_dir, img_size=img_size, predicate=predicate)
     process_tiles(
         tiles,
         processed_dir,
-        transcripts_path,
-        img_size=tiles_cfg.tile_px,
+        img_size=img_size,
         kernel_size=kernel_size,
     )
     if cells_path.exists():
         tile_cells(tiles, cells_path, processed_dir, predicate)
-        process_cells(tiles, processed_dir, img_size=tiles_cfg.tile_px)
+        process_cells(tiles, processed_dir, img_size=img_size)
 
 
 def create_filtered_items(

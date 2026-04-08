@@ -122,6 +122,7 @@ def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
         'tile_px: 512\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'items:\n'
         '  name: subset\n'
         'split:\n'

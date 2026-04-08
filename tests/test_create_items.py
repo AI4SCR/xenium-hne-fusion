@@ -33,6 +33,7 @@ def test_create_items_writes_dataset_scoped_output(monkeypatch: pytest.MonkeyPat
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids:\n'
         '    - TENX95\n'

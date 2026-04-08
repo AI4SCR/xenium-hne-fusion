@@ -117,8 +117,10 @@ def load_processing_config(path: Path) -> ProcessingConfig:
         'stride_px': data.get('stride_px'),
         'mpp': data.get('tile_mpp'),
         'kernel_size': data.get('kernel_size', 16),
+        'img_size': data.get('img_size'),
         'predicate': data.get('predicate', 'within'),
     }
+    assert tiles.get('img_size') is not None, f"Missing tiles.img_size in {path}"
     filter_data = data.get('filter') or {}
     items_data = data.get('items') or {'name': 'default', 'filter': {}}
     items_filter_data = items_data.get('filter') or {}
@@ -131,6 +133,7 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             stride_px=tiles['stride_px'],
             mpp=tiles['mpp'],
             kernel_size=tiles.get('kernel_size', 16),
+            img_size=tiles.get('img_size'),
             predicate=tiles.get('predicate', 'within'),
         ),
         filter=FilterConfig(

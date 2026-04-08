@@ -95,6 +95,7 @@ def test_cache_hescape_split_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_p
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids: null\n'
         '  exclude_ids: null\n'

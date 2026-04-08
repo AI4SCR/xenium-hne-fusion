@@ -79,7 +79,7 @@ done < <(
     exit 1
 }
 
-read -r DATASET_NAME TILE_PX STRIDE_PX TILE_MPP KERNEL_SIZE PREDICATE <<<"$(
+read -r DATASET_NAME TILE_PX STRIDE_PX TILE_MPP IMG_SIZE KERNEL_SIZE PREDICATE <<<"$(
     uv run python -c '
 from pathlib import Path
 import sys
@@ -87,7 +87,7 @@ from xenium_hne_fusion.utils.getters import load_pipeline_config
 
 cfg = load_pipeline_config("beat", Path(sys.argv[1]))
 tiles = cfg.processing.tiles
-print(cfg.name, tiles.tile_px, tiles.stride_px, tiles.mpp, tiles.kernel_size, tiles.predicate)
+print(cfg.name, tiles.tile_px, tiles.stride_px, tiles.mpp, tiles.img_size or tiles.tile_px, tiles.kernel_size, tiles.predicate)
 ' "${CONFIG_PATH}"
 )"
 
@@ -108,9 +108,9 @@ if [[ ! -f \"${transcripts_path}\" ]]; then echo \"Missing transcripts: ${transc
 uv run python scripts/data/detect_tissues.py --wsi_path \"${wsi_path}\" --output_parquet \"${tissues_path}\"; \
 uv run python scripts/data/tile.py --wsi_path \"${wsi_path}\" --tissues_parquet \"${tissues_path}\" --output_parquet \"${tiles_path}\" --tile_px ${TILE_PX} --stride_px ${STRIDE_PX} --mpp ${TILE_MPP}; \
 if [[ -f \"${cells_path}\" ]]; then \
-  uv run python scripts/data/process.py --wsi_path \"${wsi_path}\" --tiles_parquet \"${tiles_path}\" --transcripts_path \"${transcripts_path}\" --output_dir \"${processed_dir}\" --mpp ${TILE_MPP} --predicate \"${PREDICATE}\" --img_size ${TILE_PX} --kernel_size ${KERNEL_SIZE} --cells_path \"${cells_path}\"; \
+  uv run python scripts/data/process.py --wsi_path \"${wsi_path}\" --tiles_parquet \"${tiles_path}\" --transcripts_path \"${transcripts_path}\" --output_dir \"${processed_dir}\" --mpp ${TILE_MPP} --predicate \"${PREDICATE}\" --img_size ${IMG_SIZE} --kernel_size ${KERNEL_SIZE} --cells_path \"${cells_path}\"; \
 else \
-  uv run python scripts/data/process.py --wsi_path \"${wsi_path}\" --tiles_parquet \"${tiles_path}\" --transcripts_path \"${transcripts_path}\" --output_dir \"${processed_dir}\" --mpp ${TILE_MPP} --predicate \"${PREDICATE}\" --img_size ${TILE_PX} --kernel_size ${KERNEL_SIZE}; \
+  uv run python scripts/data/process.py --wsi_path \"${wsi_path}\" --tiles_parquet \"${tiles_path}\" --transcripts_path \"${transcripts_path}\" --output_dir \"${processed_dir}\" --mpp ${TILE_MPP} --predicate \"${PREDICATE}\" --img_size ${IMG_SIZE} --kernel_size ${KERNEL_SIZE}; \
 fi"
     )
 

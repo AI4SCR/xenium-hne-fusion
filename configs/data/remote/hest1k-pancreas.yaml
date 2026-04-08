@@ -4,6 +4,7 @@ tiles:
   stride_px: 256
   mpp: 0.5
   kernel_size: 16
+  img_size: 224
   predicate: within
 filter:
   species: Homo sapiens

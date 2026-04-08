@@ -30,6 +30,8 @@ def main(
     metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
     sample_ids = [sample_id] if sample_id is not None else resolve_samples(cfg, metadata_path)
     tiles_cfg = cfg.processing.tiles
+    assert tiles_cfg.img_size is not None, "tiles.img_size is required"
+    img_size = tiles_cfg.img_size
 
     for sample_id in sample_ids:
         logger.info(f"Processing HEST1k sample {sample_id}")
@@ -57,18 +59,17 @@ def main(
             slide_mpp=slide_mpp,
         )
         tiles = gpd.read_parquet(tiles_path)
-        extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp, native_mpp=slide_mpp)
-        tile_transcripts(tiles, transcripts_path, processed_dir, predicate)
+        extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp, native_mpp=slide_mpp, img_size=img_size)
+        tile_transcripts(tiles, transcripts_path, processed_dir, img_size=img_size, predicate=predicate)
         process_tiles(
             tiles,
             processed_dir,
-            transcripts_path,
-            img_size=tiles_cfg.tile_px,
+            img_size=img_size,
             kernel_size=kernel_size,
         )
         if cells_path.exists():
             tile_cells(tiles, cells_path, processed_dir, predicate)
-            process_cells(tiles, processed_dir, img_size=tiles_cfg.tile_px)
+            process_cells(tiles, processed_dir, img_size=img_size)
 
 
 if __name__ == "__main__":

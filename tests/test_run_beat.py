@@ -97,6 +97,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
         "tile_px: 512\n"
         "stride_px: 256\n"
         "tile_mpp: 0.5\n"
+        "img_size: 224\n"
         "filter:\n"
         "  include_ids:\n"
         "    - S1\n"
@@ -185,7 +186,7 @@ def test_resolve_beat_samples_supports_include_and_exclude(tmp_path: Path):
         ),
         processing=ProcessingConfig(
             name="beat",
-            tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5),
+            tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5, img_size=224),
         ),
     )
 
@@ -209,7 +210,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     data_dir = tmp_path / "data"
     raw_dir = tmp_path / "raw" / "beat"
     config_path = tmp_path / "beat.yaml"
-    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\n")
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
     monkeypatch.setenv("DATA_DIR", str(data_dir))
     monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
 
@@ -265,7 +266,7 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     data_dir = tmp_path / "data"
     raw_dir = tmp_path / "raw" / "beat"
     config_path = tmp_path / "beat.yaml"
-    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\n")
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
     monkeypatch.setenv("DATA_DIR", str(data_dir))
     monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
 
@@ -340,7 +341,7 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     data_dir = tmp_path / "data"
     raw_dir = tmp_path / "raw" / "beat"
     config_path = tmp_path / "beat.yaml"
-    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\n")
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
     monkeypatch.setenv("DATA_DIR", str(data_dir))
     monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
 

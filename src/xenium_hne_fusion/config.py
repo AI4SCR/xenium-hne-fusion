@@ -15,6 +15,7 @@ class TilesConfig:
     tile_px: int
     stride_px: int
     mpp: float
+    img_size: int
     kernel_size: int = 16
     predicate: str = 'within'
 

@@ -35,6 +35,7 @@ def namespace_to_processing_config(ns) -> ProcessingConfig:
     items_filter = _drop_internal_keys(items["filter"])
     split = _drop_internal_keys(data["split"])
     panel = _drop_internal_keys(data["panel"]) if data.get("panel") else None
+    assert data["tiles"].get("img_size") is not None, "tiles.img_size is required"
     return ProcessingConfig(
         name=data["name"],
         tiles=TilesConfig(**data["tiles"]),

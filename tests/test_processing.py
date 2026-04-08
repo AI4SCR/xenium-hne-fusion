@@ -133,6 +133,9 @@ def test_extract_tiles_uses_native_mpp_override(monkeypatch: pytest.MonkeyPatch,
         def get_region(self, x, y, w, h, level=0):
             return np.zeros((h, w, 3), dtype=np.uint8)
 
+        def resize_img(self, img, dsize):
+            return np.zeros((dsize[1], dsize[0], 3), dtype=np.uint8)
+
     class FakeProperties:
         mpp = None
 
@@ -148,10 +151,10 @@ def test_extract_tiles_uses_native_mpp_override(monkeypatch: pytest.MonkeyPatch,
     )
     output_dir = tmp_path / 'processed'
 
-    extract_tiles(tmp_path / 'wsi.tiff', tiles, output_dir, mpp=0.5, native_mpp=0.25)
+    extract_tiles(tmp_path / 'wsi.tiff', tiles, output_dir, mpp=0.5, native_mpp=0.25, img_size=224)
 
     tensor = __import__('torch').load(output_dir / '0' / 'tile.pt', weights_only=True)
-    assert tuple(tensor.shape) == (3, 50, 50)
+    assert tuple(tensor.shape) == (3, 224, 224)
 
 
 def test_tile_subsets_are_written_directly_into_tile_dirs(tmp_path: Path):
@@ -186,7 +189,7 @@ def test_tile_subsets_are_written_directly_into_tile_dirs(tmp_path: Path):
     cells.to_parquet(cells_path)
 
     output_dir = tmp_path / 'processed'
-    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
     tile_cells(tiles, cells_path, output_dir)
 
     assert not (output_dir / 'transcripts').exists()
@@ -221,7 +224,7 @@ def test_tile_transcripts_supports_coordinate_only_hest_parquet(tmp_path: Path):
     transcripts.to_parquet(transcripts_path)
 
     output_dir = tmp_path / 'processed'
-    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
 
     stored = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
     assert stored['transcript_id'].tolist() == [1, 2]
@@ -247,7 +250,7 @@ def test_tile_transcripts_supports_geometry_only_beat_parquet(tmp_path: Path):
     transcripts.to_parquet(transcripts_path)
 
     output_dir = tmp_path / 'processed'
-    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
 
     stored = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
     assert stored['transcript_id'].tolist() == [1, 2]
@@ -288,9 +291,9 @@ def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: 
     tile_dir.mkdir(parents=True, exist_ok=True)
     torch.save(torch.zeros((3, 100, 100), dtype=torch.uint8), tile_dir / 'tile.pt')
 
-    tile_transcripts(tiles, transcripts_path, output_dir)
+    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
     tile_cells(tiles, cells_path, output_dir)
-    process_tiles(tiles, output_dir, transcripts_path, img_size=100, kernel_size=50)
+    process_tiles(tiles, output_dir, img_size=100, kernel_size=50)
     process_cells(tiles, output_dir, img_size=100)
 
     assert (tile_dir / 'transcripts.parquet').exists()

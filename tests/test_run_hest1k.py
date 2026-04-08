@@ -94,6 +94,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         "  tile_px: 256\n"
         "  stride_px: 256\n"
         "  mpp: 0.5\n"
+        "  img_size: 224\n"
         "  kernel_size: 16\n"
         "  predicate: within\n"
         "filter:\n"
@@ -247,7 +248,7 @@ def test_filter_hest_samples_by_tile_mpp_keeps_only_eligible_samples(
             processed_dir=tmp_path / "processed",
             output_dir=tmp_path / "output",
         ),
-        processing=ProcessingConfig(name="hest1k", tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5)),
+        processing=ProcessingConfig(name="hest1k", tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5, img_size=224)),
     )
     metadata_path = tmp_path / "HEST_v1_3_0.csv"
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: sample_id != "C")
@@ -266,7 +267,7 @@ def test_sample_done_markers_define_completion(tmp_path: Path):
             processed_dir=tmp_path / "processed",
             output_dir=tmp_path / "output",
         ),
-        processing=ProcessingConfig(name="hest1k", tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5)),
+        processing=ProcessingConfig(name="hest1k", tiles=TilesConfig(tile_px=256, stride_px=256, mpp=0.5, img_size=224)),
     )
 
     (cfg.structured_dir / "S1").mkdir(parents=True, exist_ok=True)
@@ -295,6 +296,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
         "  tile_px: 256\n"
         "  stride_px: 256\n"
         "  mpp: 0.5\n"
+        "  img_size: 224\n"
         "filter:\n"
         "  species: Homo sapiens\n"
         "  include_ids: null\n"

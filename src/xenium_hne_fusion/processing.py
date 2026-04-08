@@ -28,16 +28,15 @@ def extract_tiles(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
     mpp: float,
+    img_size: int,
     native_mpp: float | None = None,
 ) -> None:
     """
     Crop and save a tile.pt for each tile.
 
-    Reads native-resolution region, resizes to tile_px × tile_px at target mpp,
-    saves as uint8 CHW torch tensor.
+    Reads the native-resolution region, rescales it to the requested image size,
+    and saves it as a uint8 CHW torch tensor.
     """
-    from PIL import Image
-
     wsi = open_wsi(wsi_path)
     native_mpp = native_mpp if native_mpp is not None else wsi.properties.mpp
     assert native_mpp is not None, "WSI has no mpp metadata"
@@ -49,10 +48,8 @@ def extract_tiles(
         tile_dir.mkdir(parents=True, exist_ok=True)
 
         x, y, w, h = tile.x_px, tile.y_px, tile.width_px, tile.height_px
-        tile_px = round(w * native_mpp / mpp)
-
         img = wsi.reader.get_region(x, y, w, h, level=0)  # (H, W, 3) uint8
-        img = Image.fromarray(img).resize((tile_px, tile_px), Image.BILINEAR)
+        img = wsi.reader.resize_img(img, dsize=(img_size, img_size))
         tensor = torch.from_numpy(np.array(img)).permute(2, 0, 1)  # CHW
         torch.save(tensor, tile_dir / "tile.pt")
 
@@ -132,10 +129,24 @@ def _load_transcript_batch(batch) -> gpd.GeoDataFrame:
     return gpd.GeoDataFrame.from_arrow(batch)
 
 
-def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir: Path, predicate: str = "within") -> None:
+def tile_transcripts(
+    tiles: gpd.GeoDataFrame,
+    transcripts_path: Path,
+    output_dir: Path,
+    *,
+    img_size: int,
+    predicate: str = "within",
+) -> None:
     """Write tile-local transcript subsets to <tile_dir>/transcripts.parquet."""
 
     transcripts = pq.ParquetFile(transcripts_path)
+    feature_universe_path = output_dir.parent / "feature_universe.txt"
+    feature_universe = infer_feature_universe(
+        transcripts_path,
+        feature_universe_path=feature_universe_path,
+    )
+    tiles_by_id = tiles.set_index("tile_id", drop=False)
+    assert tiles_by_id.index.is_unique, "Duplicate tile_id values"
 
     logger.info(
         f"Tiling transcripts (num_tiles={len(tiles)}, num_transcripts={transcripts.metadata.num_rows})..."
@@ -184,20 +195,17 @@ def tile_transcripts(tiles: gpd.GeoDataFrame, transcripts_path: Path, output_dir
             if not partition_dir.exists():
                 continue
 
+            tile = tiles_by_id.loc[tile_id]
             tile_dir = output_dir / str(tile_id)
             tile_dir.mkdir(parents=True, exist_ok=True)
             pts = _load_partitioned_points(partition_dir)
             pts = pts.drop(columns=["tile_id"], errors="ignore")
+            pts = transform_points(pts, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
+            pts = pts.drop(columns=["index_right"], errors="ignore")
+            pts["feature_name"] = set_feature_universe(pts["feature_name"], feature_universe)
             pts.to_parquet(tile_dir / "transcripts.parquet")
 
         logger.info("Transcript tiling done")
-
-
-def load_tile_points(tile_path: Path) -> gpd.GeoDataFrame | None:
-    if not tile_path.exists():
-        return None
-
-    return gpd.read_parquet(tile_path)
 
 
 def make_token_tiles(img_size: int, kernel_size: int) -> gpd.GeoDataFrame:
@@ -215,8 +223,7 @@ def make_token_tiles(img_size: int, kernel_size: int) -> gpd.GeoDataFrame:
 def process_tiles(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
-    raw_transcripts_path: Path,
-    img_size: int = 256,
+    img_size: int,
     kernel_size: int = 16,
 ) -> None:
     from skimage.io import imsave
@@ -226,24 +233,20 @@ def process_tiles(
 
     token_tiles = make_token_tiles(img_size, kernel_size)
     feature_universe_path = output_dir.parent / "feature_universe.txt"
-    feature_universe = infer_feature_universe(
-        raw_transcripts_path,
-        feature_universe_path=feature_universe_path,
-    )
+    feature_universe = load_feature_universe(feature_universe_path)
     logger.info(f"Processing {len(tiles)} tiles (img_size={img_size}, kernel_size={kernel_size})")
 
     for _, tile in tiles.iterrows():
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        pts = load_tile_points(tile_dir / "transcripts.parquet")
-        if pts is None:
+        transcripts_path = tile_dir / "transcripts.parquet"
+        if not transcripts_path.exists():
             continue
+        pts = gpd.read_parquet(transcripts_path)
 
-        pts = transform_points(pts, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         pts = pts.drop(columns=["tile_id", "index_right"], errors="ignore")
         pts["feature_name"] = set_feature_universe(pts["feature_name"], feature_universe)
-        pts.to_parquet(tile_dir / "transcripts.parquet")
 
         expr = compute_expr_tokens(
             pts,
@@ -293,7 +296,7 @@ def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, output_dir: Path, pred
 def process_cells(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
-    img_size: int = 256,
+    img_size: int,
 ) -> None:
     """Transform tile-local cell subsets and render cells.png overlays."""
     from skimage.io import imsave
@@ -306,9 +309,10 @@ def process_cells(
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        cells = load_tile_points(tile_dir / "cells.parquet")
-        if cells is None:
+        cells_path = tile_dir / "cells.parquet"
+        if not cells_path.exists():
             continue
+        cells = gpd.read_parquet(cells_path)
 
         cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         cells = cells.drop(columns=["tile_id", "index_right"], errors="ignore")

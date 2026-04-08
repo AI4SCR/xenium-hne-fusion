@@ -24,14 +24,15 @@ def main(
     mpp: float = 0.5,
     native_mpp: Optional[float] = None,
     predicate: str = "within",
-    img_size: int = 256,
+    *,
+    img_size: int,
     kernel_size: int = 16,
     cells_path: Optional[Path] = None,
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
-    extract_tiles(wsi_path, tiles, output_dir, mpp, native_mpp=native_mpp)
-    tile_transcripts(tiles, transcripts_path, output_dir, predicate)
-    process_tiles(tiles, output_dir, transcripts_path, img_size, kernel_size)
+    extract_tiles(wsi_path, tiles, output_dir, mpp, native_mpp=native_mpp, img_size=img_size)
+    tile_transcripts(tiles, transcripts_path, output_dir, img_size=img_size, predicate=predicate)
+    process_tiles(tiles, output_dir, img_size=img_size, kernel_size=kernel_size)
 
     if cells_path is not None and not cells_path.exists():
         logger.warning(f"cells_path not found, skipping cell processing: {cells_path}")

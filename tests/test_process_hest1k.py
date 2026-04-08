@@ -29,6 +29,7 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids:\n'
         '    - NCBI856\n'
@@ -61,22 +62,22 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
     monkeypatch.setattr(
         module,
         'extract_tiles',
-        lambda wsi_path, tiles, output_dir, mpp, native_mpp=None: calls.append(
-            ('extract_tiles', wsi_path, len(tiles), output_dir, mpp, native_mpp)
+        lambda wsi_path, tiles, output_dir, mpp, native_mpp=None, img_size=None: calls.append(
+            ('extract_tiles', wsi_path, len(tiles), output_dir, mpp, native_mpp, img_size)
         ),
     )
     monkeypatch.setattr(
         module,
         'tile_transcripts',
-        lambda tiles, transcripts_path, save_dir, predicate='within': calls.append(
-            ('tile_transcripts', len(tiles), transcripts_path, save_dir, predicate)
+        lambda tiles, transcripts_path, save_dir, img_size, predicate='within': calls.append(
+            ('tile_transcripts', len(tiles), transcripts_path, save_dir, img_size, predicate)
         ),
     )
     monkeypatch.setattr(
         module,
         'process_tiles',
-        lambda tiles, output_dir, raw_transcripts_path, img_size=256, kernel_size=16: calls.append(
-            ('process_tiles', len(tiles), output_dir, raw_transcripts_path, img_size, kernel_size)
+        lambda tiles, output_dir, img_size, kernel_size=16: calls.append(
+            ('process_tiles', len(tiles), output_dir, img_size, kernel_size)
         ),
     )
 
@@ -95,7 +96,7 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
             sample_dir / 'tiles' / '256_256.parquet',
             0.2125,
         ),
-        ('extract_tiles', sample_dir / 'wsi.tiff', 1, processed_dir, 0.5, 0.2125),
-        ('tile_transcripts', 1, sample_dir / 'transcripts.parquet', processed_dir, 'within'),
-        ('process_tiles', 1, processed_dir, sample_dir / 'transcripts.parquet', 256, 16),
+        ('extract_tiles', sample_dir / 'wsi.tiff', 1, processed_dir, 0.5, 0.2125, 224),
+        ('tile_transcripts', 1, sample_dir / 'transcripts.parquet', processed_dir, 224, 'within'),
+        ('process_tiles', 1, processed_dir, 224, 16),
     ]

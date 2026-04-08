@@ -89,6 +89,8 @@ def process_sample(
     tissues_path = structured_dir / "tissues.parquet"
     tiles_path = structured_dir / "tiles" / f"{tiles_cfg.tile_px}_{tiles_cfg.stride_px}.parquet"
     processed_dir = processed_sample_dir(cfg, sample_id)
+    assert tiles_cfg.img_size is not None, "tiles.img_size is required"
+    img_size = tiles_cfg.img_size
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
 
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,18 +104,17 @@ def process_sample(
         slide_mpp=slide_mpp,
     )
     tiles = gpd.read_parquet(tiles_path)
-    extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp, native_mpp=slide_mpp)
-    tile_transcripts(tiles, transcripts_path, processed_dir, predicate)
+    extract_tiles(wsi_path, tiles, processed_dir, tiles_cfg.mpp, img_size=img_size, native_mpp=slide_mpp)
+    tile_transcripts(tiles, transcripts_path, processed_dir, img_size=img_size, predicate=predicate)
     process_tiles(
         tiles,
         processed_dir,
-        transcripts_path,
-        img_size=tiles_cfg.tile_px,
+        img_size=img_size,
         kernel_size=kernel_size,
     )
     if cells_path.exists():
         tile_cells(tiles, cells_path, processed_dir, predicate)
-        process_cells(tiles, processed_dir, img_size=tiles_cfg.tile_px)
+        process_cells(tiles, processed_dir, img_size=img_size)
 
 
 def can_extract_sample_at_tile_mpp(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> bool:

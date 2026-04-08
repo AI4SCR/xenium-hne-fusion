@@ -17,6 +17,7 @@ def test_load_dataset_config_requires_name(tmp_path: Path):
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids:\n'
         '    - TENX95\n'
@@ -35,6 +36,7 @@ def test_load_pipeline_config_resolves_name_scoped_paths(monkeypatch: pytest.Mon
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids:\n'
         '    - TENX95\n'
@@ -59,6 +61,7 @@ def test_load_pipeline_config_requires_env_vars(monkeypatch: pytest.MonkeyPatch,
         'tile_px: 512\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids: null\n'
         '  exclude_ids: null\n'
@@ -92,6 +95,7 @@ def test_build_pipeline_config_uses_exact_dataset_name(
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
     )
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
@@ -115,6 +119,7 @@ def test_build_pipeline_config_rejects_non_canonical_name(
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
     )
 
     monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
@@ -133,6 +138,7 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  species: Homo sapiens\n'
         '  disease_type: Cancer\n'
@@ -158,6 +164,7 @@ def test_load_processing_config_loads_split_name_and_panel(tmp_path: Path):
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'split:\n'
         '  name: default\n'
         'panel:\n'
@@ -229,6 +236,7 @@ def test_items_filter_sample_ids_override_legacy_top_level_filter(tmp_path: Path
         'tile_px: 256\n'
         'stride_px: 256\n'
         'tile_mpp: 0.5\n'
+        'img_size: 224\n'
         'filter:\n'
         '  include_ids:\n'
         '    - LEGACY\n'
