@@ -51,7 +51,7 @@ def test_process_metadata_writes_cleaned_sample_metadata(monkeypatch: pytest.Mon
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/process_metadata.py', 'process_metadata_script')
-    module.main('hest1k', config_path=config_path)
+    module.main(load_processing_config(config_path))
 
     output_path = data_dir / '02_processed' / 'hest1k' / 'metadata.parquet'
     assert output_path.exists()
@@ -91,7 +91,7 @@ def test_process_metadata_writes_beat_metadata_to_processed(monkeypatch: pytest.
     monkeypatch.setenv('BEAT_RAW_DIR', str(raw_dir))
 
     module = _load_script('scripts/data/process_metadata.py', 'process_metadata_beat_script')
-    module.main('beat', config_path=config_path)
+    module.main(load_processing_config(config_path))
 
     output_path = data_dir / '02_processed' / 'beat' / 'metadata.parquet'
     assert output_path.exists()

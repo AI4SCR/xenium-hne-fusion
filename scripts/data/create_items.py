@@ -4,18 +4,21 @@ Output: DATA_DIR/03_output/<name>/items/all.json
 """
 
 import json
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 from loguru import logger
 from tqdm import tqdm
 
-from xenium_hne_fusion.utils.getters import DEFAULT_SOURCE_ITEMS_NAME, iter_tile_dirs, load_pipeline_config, tile_item
+from xenium_hne_fusion.config import ProcessingConfig
+from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.utils.getters import DEFAULT_SOURCE_ITEMS_NAME, build_pipeline_config, iter_tile_dirs, tile_item
 
 
-def main(dataset: str, config_path: Path | None = None, overwrite: bool = False) -> None:
+def main(processing_cfg: ProcessingConfig, overwrite: bool = False) -> None:
     load_dotenv()
-    cfg = load_pipeline_config(dataset, config_path)
+    cfg = build_pipeline_config(processing_cfg)
     processed_dir = cfg.paths.processed_dir
     items_path = cfg.paths.output_dir / 'items' / f'{DEFAULT_SOURCE_ITEMS_NAME}.json'
 
@@ -50,5 +53,5 @@ def _ensure_output_scaffold(output_dir: Path) -> None:
 
 
 if __name__ == '__main__':
-    from jsonargparse import auto_cli
-    auto_cli(main)
+    processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    main(processing_cfg, overwrite=overwrite_arg)

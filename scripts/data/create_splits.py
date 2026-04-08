@@ -26,7 +26,10 @@ def main(
     cfg = load_pipeline_config(dataset, config_path) if processing_cfg is None else build_pipeline_config(processing_cfg)
     split_cfg = cfg.processing.split
 
-    items_path = items_path or (cfg.paths.output_dir / 'items' / 'all.json')
+    if items_path is None:
+        configured_items_path = cfg.paths.output_dir / 'items' / f'{cfg.processing.items.name}.json'
+        source_items_path = cfg.paths.output_dir / 'items' / 'all.json'
+        items_path = configured_items_path if configured_items_path.exists() else source_items_path
     metadata_path = metadata_path or (cfg.paths.processed_dir / 'metadata.parquet')
     split_dir = cfg.paths.output_dir / 'splits' / split_cfg.split_name
 

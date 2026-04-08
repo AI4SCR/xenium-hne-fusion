@@ -226,8 +226,8 @@ uv run scripts/data/process_hest1k.py hest1k \
 Build the base item set:
 
 ```bash
-uv run scripts/data/create_items.py hest1k \
-  --config_path configs/data/local/hest1k.yaml
+uv run python scripts/data/create_items.py \
+  --config configs/data/local/hest1k.yaml
 ```
 
 Compute per-tile filtering statistics:
@@ -243,7 +243,6 @@ Generate a filtered item set:
 ```bash
 uv run scripts/data/filter_items.py \
   --config configs/data/local/hest1k.yaml \
-  --name hest1k \
   --items.name breast \
   --items.filter.organs '[Breast]'
 ```
@@ -253,7 +252,6 @@ Create split parquet files from an item set plus sample metadata:
 ```bash
 uv run scripts/data/create_splits.py \
   --config configs/data/local/hest1k.yaml \
-  --name hest1k \
   --items.name breast \
   --items.filter.organs '[Breast]' \
   --split.split_name breast
@@ -397,20 +395,18 @@ DATASET_NAME=hest1k
 uv run python scripts/data/process_metadata.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/create_items.py "$DATASET_NAME" \
-  --config_path "configs/data/remote/$DATASET_NAME.yaml"
+uv run python scripts/data/create_items.py \
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
   --config_path "configs/data/remote/$DATASET_NAME.yaml" \
   "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
 
 uv run python scripts/data/filter_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml" \
-  --name "$DATASET_NAME"
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/create_splits.py \
-  --config configs/data/remote/hest1k.yaml \
-  --name hest1k
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 ```
 
 4. If training needs a panel file, generate it after splits exist:
@@ -489,20 +485,18 @@ DATASET_NAME=beat
 uv run python scripts/data/process_metadata.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/create_items.py "$DATASET_NAME" \
-  --config_path "configs/data/remote/$DATASET_NAME.yaml"
+uv run python scripts/data/create_items.py \
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
   --config_path "configs/data/remote/$DATASET_NAME.yaml" \
   "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
 
 uv run python scripts/data/filter_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml" \
-  --name "$DATASET_NAME"
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
 uv run python scripts/data/create_splits.py \
-  --config configs/data/remote/beat.yaml \
-  --name beat
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 ```
 
 4. Train once the dataset outputs are ready:
@@ -523,7 +517,6 @@ uv run python scripts/data/filter_items.py \
 
 uv run python scripts/data/create_splits.py \
   --config configs/data/remote/hest1k.yaml \
-  --name hest1k \
   --items.name breast \
   --items.filter.organs '[Breast]' \
   --split.split_name breast

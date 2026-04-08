@@ -42,7 +42,8 @@ def test_create_items_writes_dataset_scoped_output(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_create_items_module()
-    module.main('hest1k', config_path=config_path, overwrite=True)
+    from xenium_hne_fusion.utils.getters import load_processing_config
+    module.main(load_processing_config(config_path), overwrite=True)
 
     items_path = data_dir / '03_output' / 'hest1k' / 'items' / 'all.json'
     assert items_path.exists()
