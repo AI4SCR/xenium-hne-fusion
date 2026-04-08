@@ -43,11 +43,46 @@ export KAIKO_AI4BMR_MODULE_PATH="${AI4BMR_MODULE_PATH}"
 envsubst < "${ENV_TEMPLATE}" > "${ENV_FILE}"
 
 RAY_ADDRESS="https://chuv.nebul.prd.kaiko.ai"
+ENTRYPOINT_NUM_GPUS="${KAIKO_ENTRYPOINT_NUM_GPUS:-0}"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --entrypoint-num-gpus)
+            shift
+            [[ $# -gt 0 ]] || {
+                echo "Missing value for --entrypoint-num-gpus" >&2
+                exit 1
+            }
+            ENTRYPOINT_NUM_GPUS="$1"
+            shift
+            ;;
+        --entrypoint-num-gpus=*)
+            ENTRYPOINT_NUM_GPUS="${1#*=}"
+            shift
+            ;;
+        --help|-h)
+            cat <<'EOF'
+Usage: ray/submit.sh [--entrypoint-num-gpus N] [--] [REMOTE_CMD...]
+
+Defaults to --entrypoint-num-gpus 0 and runs `pwd` when no remote command is given.
+EOF
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 REMOTE_CMD="${*:-pwd}"
 
 kray job submit \
     --address "$RAY_ADDRESS" \
-    --entrypoint-num-gpus 0 \
+    --entrypoint-num-gpus "$ENTRYPOINT_NUM_GPUS" \
     --working-dir "${REPO_ROOT}" \
     --runtime-env "${ENV_FILE}" \
     -- bash -c "$REMOTE_CMD"
