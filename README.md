@@ -392,19 +392,21 @@ uv run python scripts/data/process_hest1k.py \
 3. After all sample jobs finish, finalize the dataset outputs:
 
 ```bash
+DATASET_NAME=hest1k
+
 uv run python scripts/data/process_metadata.py \
-  --config configs/data/remote/hest1k.yaml
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/create_items.py hest1k \
-  --config_path configs/data/remote/hest1k.yaml
+uv run python scripts/data/create_items.py "$DATASET_NAME" \
+  --config_path "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/compute_tile_stats.py hest1k \
-  --config_path configs/data/remote/hest1k.yaml \
-  "$DATA_DIR/03_output/hest1k/items/all.json"
+uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
+  --config_path "configs/data/remote/$DATASET_NAME.yaml" \
+  "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
 
 uv run python scripts/data/filter_items.py \
-  --config configs/data/remote/hest1k.yaml \
-  --name hest1k
+  --config "configs/data/remote/$DATASET_NAME.yaml" \
+  --name "$DATASET_NAME"
 
 uv run python scripts/data/create_splits.py \
   --config configs/data/remote/hest1k.yaml \
@@ -482,19 +484,21 @@ When `cells.parquet` exists, the wrapper adds:
 3. After all sample jobs finish, finalize the dataset outputs:
 
 ```bash
+DATASET_NAME=beat
+
 uv run python scripts/data/process_metadata.py \
-  --config configs/data/remote/beat.yaml
+  --config "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/create_items.py beat \
-  --config_path configs/data/remote/beat.yaml
+uv run python scripts/data/create_items.py "$DATASET_NAME" \
+  --config_path "configs/data/remote/$DATASET_NAME.yaml"
 
-uv run python scripts/data/compute_tile_stats.py beat \
-  --config_path configs/data/remote/beat.yaml \
-  "$DATA_DIR/03_output/beat/items/all.json"
+uv run python scripts/data/compute_tile_stats.py "$DATASET_NAME" \
+  --config_path "configs/data/remote/$DATASET_NAME.yaml" \
+  "$DATA_DIR/03_output/$DATASET_NAME/items/all.json"
 
 uv run python scripts/data/filter_items.py \
-  --config configs/data/remote/beat.yaml \
-  --name beat
+  --config "configs/data/remote/$DATASET_NAME.yaml" \
+  --name "$DATASET_NAME"
 
 uv run python scripts/data/create_splits.py \
   --config configs/data/remote/beat.yaml \
