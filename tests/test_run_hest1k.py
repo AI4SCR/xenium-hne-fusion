@@ -158,9 +158,9 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, metadata_path_arg, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
-            calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
+            calls.append(("process", sample_id, cfg.processing.tiles.kernel_size, cfg.processing.tiles.predicate, overwrite)),
         ),
     )
     monkeypatch.setattr(
@@ -338,9 +338,9 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, metadata_path_arg, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, metadata_path_arg, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
-            calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
+            calls.append(("process", sample_id, cfg.processing.tiles.kernel_size, cfg.processing.tiles.predicate, overwrite)),
         ),
     )
     monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)))
@@ -360,12 +360,12 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
         lambda cfg, items_path, overwrite=False: calls.append(("split", cfg.split.name, items_path, overwrite)),
     )
 
-    cfg = module.load_pipeline_config("hest1k", config_path)
-    (cfg.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
-    (cfg.processed_dir / "DONE" / "256_256").mkdir(parents=True, exist_ok=True)
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    (cfg.paths.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
+    (cfg.paths.processed_dir / "DONE" / "256_256").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "DONE")
     module.mark_sample_processed(cfg, "DONE")
-    (cfg.structured_dir / "P1").mkdir(parents=True, exist_ok=True)
+    (cfg.paths.structured_dir / "P1").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "P1")
 
     processing_cfg = load_processing_config(config_path)
@@ -375,4 +375,4 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     assert ("items", 16, False) in calls
     assert ("stats", "Level3_grouped", False) in calls
     assert ("filtered", "default", False) in calls
-    assert ("split", "default", cfg.output_dir / "items" / "default.json", False) in calls
+    assert ("split", "default", cfg.paths.output_dir / "items" / "default.json", False) in calls

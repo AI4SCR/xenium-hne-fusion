@@ -67,48 +67,21 @@ mkdir -p "${LOG_DIR}"
     exit 1
 }
 
-SAMPLE_IDS=()
-while IFS= read -r sample_id; do
-    SAMPLE_IDS+=("${sample_id}")
-done < <(
-    uv run python -c '
-from pathlib import Path
-import os
-import sys
-from xenium_hne_fusion.utils.getters import load_processing_config, resolve_samples
-
-config_path = Path(sys.argv[1])
-metadata_path = Path(os.environ["HEST1K_RAW_DIR"]) / "HEST_v1_3_0.csv"
-cfg = load_processing_config(config_path)
-for sample_id in resolve_samples(cfg, metadata_path):
-    print(sample_id)
-' "${CONFIG_PATH}"
+cmd=(
+    uv run python
+    scripts/data/process_hest1k.py
+    --config "${CONFIG_PATH}"
 )
 
-[[ ${#SAMPLE_IDS[@]} -gt 0 ]] || {
-    echo "No HEST1K sample IDs resolved from ${CONFIG_PATH}" >&2
-    exit 1
-}
+printf -v wrapped_cmd '%q ' "${cmd[@]}"
+wrapped_cmd="${wrapped_cmd% }"
 
-for sample_id in "${SAMPLE_IDS[@]}"; do
-    cmd=(
-        uv run python
-        scripts/data/process_hest1k.py
-        --dataset hest1k
-        --config_path "${CONFIG_PATH}"
-        --sample_id "${sample_id}"
-    )
-
-    printf -v wrapped_cmd '%q ' "${cmd[@]}"
-    wrapped_cmd="${wrapped_cmd% }"
-
-    echo "Submitting ${sample_id}"
-    sbatch \
-        --job-name "hest1k_${sample_id}" \
-        --cpus-per-task 8 \
-        --mem 64G \
-        --time 08:00:00 \
-        --output "${LOG_DIR}/%j.log" \
-        --error "${LOG_DIR}/%j.err" \
-        --wrap "${wrapped_cmd}"
-done
+echo "Submitting HEST1K processing job"
+sbatch \
+    --job-name "hest1k_process" \
+    --cpus-per-task 8 \
+    --mem 64G \
+    --time 08:00:00 \
+    --output "${LOG_DIR}/%j.log" \
+    --error "${LOG_DIR}/%j.err" \
+    --wrap "${wrapped_cmd}"

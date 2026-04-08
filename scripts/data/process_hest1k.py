@@ -1,37 +1,35 @@
 """Process HEST1k samples using slide MPP from HEST metadata."""
 
 import shutil
-from pathlib import Path
 
 import geopandas as gpd
 from dotenv import load_dotenv
-from jsonargparse import auto_cli
 from loguru import logger
 
 load_dotenv()
 
+from xenium_hne_fusion.config import ProcessingConfig
 from xenium_hne_fusion.download import get_hest_sample_mpp
 from xenium_hne_fusion.metadata import get_structured_metadata_path
 from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
+from xenium_hne_fusion.processing_cli import parse_processing_args
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
-from xenium_hne_fusion.utils.getters import load_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples
 
 
 def main(
-    dataset: str = "hest1k",
-    config_path: Path | None = None,
-    sample_id: str | None = None,
-    kernel_size: int = 16,
-    predicate: str = "within",
+    processing_cfg: ProcessingConfig,
     overwrite: bool = False,
 ) -> None:
-    assert dataset == "hest1k", f"Expected dataset='hest1k', got {dataset!r}"
-    cfg = load_pipeline_config(dataset, config_path)
+    assert processing_cfg.name == "hest1k", f"Expected dataset='hest1k', got {processing_cfg.name!r}"
+    cfg = build_pipeline_config(processing_cfg)
     metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
-    sample_ids = [sample_id] if sample_id is not None else resolve_samples(cfg, metadata_path)
+    sample_ids = resolve_samples(cfg, metadata_path)
     tiles_cfg = cfg.processing.tiles
     assert tiles_cfg.img_size is not None, "tiles.img_size is required"
     img_size = tiles_cfg.img_size
+    kernel_size = tiles_cfg.kernel_size
+    predicate = tiles_cfg.predicate
 
     for sample_id in sample_ids:
         logger.info(f"Processing HEST1k sample {sample_id}")
@@ -69,8 +67,9 @@ def main(
         )
         if cells_path.exists():
             tile_cells(tiles, cells_path, processed_dir, predicate)
-            process_cells(tiles, processed_dir, img_size=img_size)
+        process_cells(tiles, processed_dir, img_size=img_size)
 
 
 if __name__ == "__main__":
-    auto_cli(main)
+    processing_cfg, overwrite, _ = parse_processing_args(include_executor=False)
+    main(processing_cfg, overwrite=overwrite)

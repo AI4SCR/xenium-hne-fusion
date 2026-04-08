@@ -5,6 +5,8 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import box
 
+from xenium_hne_fusion.utils.getters import load_processing_config
+
 
 def _load_script(path: str, module_name: str):
     script_path = Path(path).resolve()
@@ -81,7 +83,8 @@ def test_process_hest1k_uses_metadata_mpp_for_tiling_and_extraction(
         ),
     )
 
-    module.main('hest1k', config_path=config_path, sample_id='NCBI856')
+    processing_cfg = load_processing_config(config_path)
+    module.main(processing_cfg)
 
     processed_dir = data_dir / '02_processed' / 'hest1k' / 'NCBI856' / '256_256'
     assert calls == [

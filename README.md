@@ -221,12 +221,11 @@ uv run python scripts/data/process_metadata.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Per-sample processing:
+HEST1K processing:
 
 ```bash
-uv run scripts/data/process_hest1k.py hest1k \
-  --config_path configs/data/local/hest1k.yaml \
-  --sample_id TENX116
+uv run python scripts/data/process_hest1k.py \
+  --config configs/data/local/hest1k.yaml
 ```
 
 Items:
@@ -390,7 +389,7 @@ sbatch --job-name beat_early_fusion --cpus-per-task 8 --mem 64G --gres=gpu:1 --t
 
 ### Full pipeline on Slurm
 
-The wrappers only submit per-sample processing. Run the rest in order below.
+The wrappers submit the processing job. Run the rest in order below.
 
 HEST1K:
 
@@ -401,19 +400,17 @@ uv run python scripts/data/structure_hest1k.py hest1k \
   --config_path configs/data/remote/hest1k.yaml
 ```
 
-2. Submit one per-sample job per resolved sample:
+2. Submit the HEST processing job:
 
 ```bash
 ./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
 ```
 
-The wrapped per-sample command is:
+The wrapped command is:
 
 ```bash
 uv run python scripts/data/process_hest1k.py \
-  --dataset hest1k \
-  --config_path configs/data/remote/hest1k.yaml \
-  --sample_id SAMPLE_ID
+  --config configs/data/remote/hest1k.yaml
 ```
 
 3. Finalize dataset outputs:

@@ -41,7 +41,6 @@ from xenium_hne_fusion.utils.getters import (
     build_pipeline_config,
     is_sample_processed,
     is_sample_structured,
-    load_pipeline_config,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
@@ -53,11 +52,8 @@ def get_raw_sample_ids(cfg: PipelineConfig) -> list[str]:
     return sorted(path.name for path in cfg.raw_dir.iterdir() if path.is_dir())
 
 
-def resolve_beat_samples(cfg: PipelineConfig, sample_id: str | None = None) -> list[str]:
+def resolve_beat_samples(cfg: PipelineConfig) -> list[str]:
     raw_sample_ids = get_raw_sample_ids(cfg)
-    if sample_id is not None:
-        assert sample_id in raw_sample_ids, f"Unknown sample_id: {sample_id}"
-        return [sample_id]
     return select_sample_ids(raw_sample_ids, cfg.processing.filter)
 
 
@@ -88,8 +84,6 @@ def detect_sample_tissues(cfg: PipelineConfig, sample_id: str) -> None:
 def process_sample(
     cfg: PipelineConfig,
     sample_id: str,
-    kernel_size: int = 16,
-    predicate: str = "within",
     overwrite: bool = False,
 ) -> None:
     logger.info(f"Processing BEAT sample {sample_id}")
@@ -97,6 +91,8 @@ def process_sample(
     tiles_cfg = cfg.processing.tiles
     assert tiles_cfg.img_size is not None, "tiles.img_size is required"
     img_size = tiles_cfg.img_size
+    kernel_size = tiles_cfg.kernel_size
+    predicate = tiles_cfg.predicate
     wsi_path = structured_dir / "wsi.tiff"
     transcripts_path = structured_dir / "transcripts.parquet"
     cells_path = structured_dir / "cells.parquet"
@@ -158,18 +154,16 @@ def _run(
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     cfg, sample_ids = prepare_driver_context(processing_cfg)
-    kernel_size = cfg.processing.tiles.kernel_size
-    predicate = cfg.processing.tiles.predicate
 
     if executor == "serial":
-        retained_sample_ids = run_samples_serial(cfg, sample_ids, kernel_size, predicate, overwrite)
+        retained_sample_ids = run_samples_serial(cfg, sample_ids, overwrite)
     else:
-        retained_sample_ids = run_samples_ray(cfg, sample_ids, kernel_size, predicate, overwrite)
+        retained_sample_ids = run_samples_ray(cfg, sample_ids, overwrite)
 
     finalize_dataset(
         cfg,
         retained_sample_ids,
-        kernel_size,
+        cfg.processing.tiles.kernel_size,
         cell_type_col,
         overwrite,
     )
@@ -189,25 +183,15 @@ def prepare_driver_context(
 def process_sample_stage(
     cfg: PipelineConfig,
     sample_id: str,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> None:
-    process_sample(
-        cfg,
-        sample_id,
-        kernel_size=kernel_size,
-        predicate=predicate,
-        overwrite=overwrite,
-    )
+    process_sample(cfg, sample_id, overwrite=overwrite)
     mark_sample_processed(cfg, sample_id)
 
 
 def run_sample_serial(
     cfg: PipelineConfig,
     sample_id: str,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> str:
     maybe_reset_sample(cfg, sample_id, overwrite)
@@ -220,7 +204,7 @@ def run_sample_serial(
         return sample_id
 
     detect_sample_tissues(cfg, sample_id)
-    process_sample_stage(cfg, sample_id, kernel_size, predicate, overwrite)
+    process_sample_stage(cfg, sample_id, overwrite)
     return sample_id
 
 
@@ -241,12 +225,10 @@ def build_remote_sample_functions(ray):
         ref: object,
         cfg: PipelineConfig,
         sample_id: str,
-        kernel_size: int,
-        predicate: str,
         overwrite: bool,
     ) -> str:
         del ref
-        process_sample_stage(cfg, sample_id, kernel_size, predicate, overwrite)
+        process_sample_stage(cfg, sample_id, overwrite)
         return sample_id
 
     return structure_sample_remote, detect_tissues_remote, process_sample_remote
@@ -255,21 +237,17 @@ def build_remote_sample_functions(ray):
 def run_samples_serial(
     cfg: PipelineConfig,
     sample_ids: list[str],
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> list[str]:
     retained_sample_ids = []
     for current_sample_id in sample_ids:
-        retained_sample_ids.append(run_sample_serial(cfg, current_sample_id, kernel_size, predicate, overwrite))
+        retained_sample_ids.append(run_sample_serial(cfg, current_sample_id, overwrite))
     return retained_sample_ids
 
 
 def run_samples_ray(
     cfg: PipelineConfig,
     sample_ids: list[str],
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> list[str]:
     ray = load_ray_module()
@@ -293,14 +271,7 @@ def run_samples_ray(
             structure_ref = structure_sample_remote.remote(cfg, current_sample_id)
 
         detect_ref = detect_tissues_remote.remote(structure_ref, cfg, current_sample_id)
-        process_ref = process_sample_remote.remote(
-            detect_ref,
-            cfg,
-            current_sample_id,
-            kernel_size,
-            predicate,
-            overwrite,
-        )
+        process_ref = process_sample_remote.remote(detect_ref, cfg, current_sample_id, overwrite)
         futures.append((current_sample_id, process_ref))
         retained_sample_ids.append(current_sample_id)
 

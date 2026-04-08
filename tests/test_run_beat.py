@@ -111,15 +111,15 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     calls = []
 
     monkeypatch.setattr(module, "structure_beat_metadata", lambda cfg: calls.append(("structure_metadata", cfg.raw_dir)))
-    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg, sample_id=None: ["S1", "S2"])
+    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg: ["S1", "S2"])
     monkeypatch.setattr(module, "structure_sample_stage", lambda cfg, sample_id: calls.append(("structure", sample_id)))
     monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: calls.append(("detect", sample_id)))
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
-            calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
+            calls.append(("process", sample_id, cfg.processing.tiles.kernel_size, cfg.processing.tiles.predicate, overwrite)),
         ),
     )
     monkeypatch.setattr(
@@ -218,13 +218,13 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     calls = []
 
     monkeypatch.setattr(module, "structure_beat_metadata", lambda cfg: None)
-    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg, sample_id=None: ["DONE", "S2"])
+    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg: ["DONE", "S2"])
     monkeypatch.setattr(module, "structure_sample_stage", lambda cfg, sample_id: calls.append(("structure", sample_id)))
     monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: calls.append(("detect", sample_id)))
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
             calls.append(("process", sample_id)),
         ),
@@ -242,9 +242,9 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
         lambda cfg, overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
     )
 
-    cfg = module.load_pipeline_config("beat", config_path)
-    (cfg.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
-    (cfg.processed_dir / "DONE" / "512_256").mkdir(parents=True, exist_ok=True)
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    (cfg.paths.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
+    (cfg.paths.processed_dir / "DONE" / "512_256").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "DONE")
     module.mark_sample_processed(cfg, "DONE")
 
@@ -276,15 +276,15 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
 
     monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
     monkeypatch.setattr(module, "structure_beat_metadata", lambda cfg: None)
-    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg, sample_id=None: ["DONE", "S1", "S2"])
+    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg: ["DONE", "S1", "S2"])
     monkeypatch.setattr(module, "structure_sample_stage", lambda cfg, sample_id: calls.append(("structure", sample_id)))
     monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: calls.append(("detect", sample_id)))
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True),
-            calls.append(("process", sample_id, kernel_size, predicate, overwrite)),
+            calls.append(("process", sample_id, cfg.processing.tiles.kernel_size, cfg.processing.tiles.predicate, overwrite)),
         ),
     )
     monkeypatch.setattr(
@@ -307,12 +307,12 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
         )[1],
     )
 
-    cfg = module.load_pipeline_config("beat", config_path)
-    (cfg.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
-    (cfg.processed_dir / "DONE" / "512_256").mkdir(parents=True, exist_ok=True)
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    (cfg.paths.structured_dir / "DONE").mkdir(parents=True, exist_ok=True)
+    (cfg.paths.processed_dir / "DONE" / "512_256").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "DONE")
     module.mark_sample_processed(cfg, "DONE")
-    (cfg.structured_dir / "S2").mkdir(parents=True, exist_ok=True)
+    (cfg.paths.structured_dir / "S2").mkdir(parents=True, exist_ok=True)
     module.mark_sample_structured(cfg, "S2")
 
     processing_cfg = load_processing_config(config_path)
@@ -351,13 +351,13 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
 
     monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
     monkeypatch.setattr(module, "structure_beat_metadata", lambda cfg: None)
-    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg, sample_id=None: ["S1", "S2"])
+    monkeypatch.setattr(module, "resolve_beat_samples", lambda cfg: ["S1", "S2"])
     monkeypatch.setattr(module, "structure_sample_stage", lambda cfg, sample_id: None)
     monkeypatch.setattr(module, "detect_sample_tissues", lambda cfg, sample_id: None)
     monkeypatch.setattr(
         module,
         "process_sample",
-        lambda cfg, sample_id, kernel_size, predicate, overwrite: (
+        lambda cfg, sample_id, overwrite: (
             (cfg.processed_dir / sample_id / f"{cfg.tile_px}_{cfg.stride_px}").mkdir(parents=True, exist_ok=True)
         ),
     )

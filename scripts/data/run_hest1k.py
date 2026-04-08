@@ -49,7 +49,6 @@ from xenium_hne_fusion.utils.getters import (
     build_pipeline_config,
     is_sample_processed,
     is_sample_structured,
-    load_pipeline_config,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
@@ -76,8 +75,6 @@ def process_sample(
     cfg: PipelineConfig,
     sample_id: str,
     metadata_path: Path,
-    kernel_size: int = 16,
-    predicate: str = "within",
     overwrite: bool = False,
 ) -> None:
     logger.info(f"Processing HEST1K sample {sample_id}")
@@ -91,6 +88,8 @@ def process_sample(
     processed_dir = processed_sample_dir(cfg, sample_id)
     assert tiles_cfg.img_size is not None, "tiles.img_size is required"
     img_size = tiles_cfg.img_size
+    kernel_size = tiles_cfg.kernel_size
+    predicate = tiles_cfg.predicate
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
 
     tiles_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,16 +168,12 @@ def _run(
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     cfg, metadata_path, eligible_sample_ids = prepare_driver_context(processing_cfg)
-    kernel_size = cfg.processing.tiles.kernel_size
-    predicate = cfg.processing.tiles.predicate
 
     if executor == "serial":
         retained_sample_ids = run_samples_serial(
             cfg,
             eligible_sample_ids,
             metadata_path,
-            kernel_size,
-            predicate,
             overwrite,
         )
     else:
@@ -186,8 +181,6 @@ def _run(
             cfg,
             eligible_sample_ids,
             metadata_path,
-            kernel_size,
-            predicate,
             overwrite,
         )
 
@@ -195,7 +188,7 @@ def _run(
         cfg,
         metadata_path,
         retained_sample_ids,
-        kernel_size,
+        cfg.processing.tiles.kernel_size,
         cell_type_col,
         overwrite,
     )
@@ -235,18 +228,9 @@ def process_sample_stage(
     cfg: PipelineConfig,
     sample_id: str,
     metadata_path: Path,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> None:
-    process_sample(
-        cfg,
-        sample_id,
-        metadata_path,
-        kernel_size=kernel_size,
-        predicate=predicate,
-        overwrite=overwrite,
-    )
+    process_sample(cfg, sample_id, metadata_path, overwrite=overwrite)
     mark_sample_processed(cfg, sample_id)
 
 
@@ -254,8 +238,6 @@ def run_sample_serial(
     cfg: PipelineConfig,
     sample_id: str,
     metadata_path: Path,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> str:
     maybe_reset_sample(cfg, sample_id, overwrite)
@@ -268,7 +250,7 @@ def run_sample_serial(
         return sample_id
 
     detect_sample_tissues(cfg, sample_id)
-    process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
+    process_sample_stage(cfg, sample_id, metadata_path, overwrite)
     return sample_id
 
 
@@ -290,12 +272,10 @@ def build_remote_sample_functions(ray):
         cfg: PipelineConfig,
         sample_id: str,
         metadata_path: Path,
-        kernel_size: int,
-        predicate: str,
         overwrite: bool,
     ) -> str:
         del ref
-        process_sample_stage(cfg, sample_id, metadata_path, kernel_size, predicate, overwrite)
+        process_sample_stage(cfg, sample_id, metadata_path, overwrite)
         return sample_id
 
     return structure_sample_remote, detect_tissues_remote, process_sample_remote
@@ -305,15 +285,11 @@ def run_samples_serial(
     cfg: PipelineConfig,
     sample_ids: list[str],
     metadata_path: Path,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> list[str]:
     retained_sample_ids = []
     for current_sample_id in sample_ids:
-        retained_sample_ids.append(
-            run_sample_serial(cfg, current_sample_id, metadata_path, kernel_size, predicate, overwrite)
-        )
+        retained_sample_ids.append(run_sample_serial(cfg, current_sample_id, metadata_path, overwrite))
     return retained_sample_ids
 
 
@@ -321,8 +297,6 @@ def run_samples_ray(
     cfg: PipelineConfig,
     sample_ids: list[str],
     metadata_path: Path,
-    kernel_size: int,
-    predicate: str,
     overwrite: bool,
 ) -> list[str]:
     ray = load_ray_module()
@@ -351,8 +325,6 @@ def run_samples_ray(
             cfg,
             current_sample_id,
             metadata_path,
-            kernel_size,
-            predicate,
             overwrite,
         )
         futures.append((current_sample_id, process_ref))
