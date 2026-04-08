@@ -392,6 +392,7 @@ uv run python scripts/data/process_hest1k.py \
 
 ```bash
 DATASET_NAME=hest1k
+DATASET_NAME=beat
 
 uv run python scripts/data/process_metadata.py \
   --config "configs/data/remote/$DATASET_NAME.yaml"

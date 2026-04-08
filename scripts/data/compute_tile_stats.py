@@ -14,7 +14,7 @@ def main(
     output_dir: Path | None = None,
     config_path: Path | None = None,
     overwrite: bool = False,
-    batch_size: int = 32,
+    batch_size: int = 256,
     num_workers: int = 10,
 ) -> None:
     load_dotenv()
