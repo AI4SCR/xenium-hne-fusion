@@ -1,10 +1,12 @@
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
+from xenium_hne_fusion.pipeline import filter_items_from_items_path
 from xenium_hne_fusion.utils.getters import load_processing_config
 
 
@@ -139,3 +141,48 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
 
     filtered = json.loads((output_dir / 'items' / 'lung.json').read_text())
     assert [item['id'] for item in filtered] == ['L1_0']
+
+
+def test_filter_items_from_items_path_derives_stats_from_items_stem(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'beat'
+    items_path = output_dir / 'items' / 'subset.json'
+    output_path = output_dir / 'items' / 'default.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
+
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': '/tmp/S1/0'},
+                {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': '/tmp/S1/1'},
+            ]
+        )
+    )
+    pd.DataFrame(
+        {
+            'num_transcripts': [199, 200],
+            'num_unique_transcripts': [None, None],
+            'num_cells': [None, None],
+            'num_unique_cells': [None, None],
+        },
+        index=pd.Index(['S1_0', 'S1_1'], name='id'),
+    ).to_parquet(output_dir / 'statistics' / 'subset.parquet')
+
+    output_path, n_kept = filter_items_from_items_path(
+        items_path=items_path,
+        output_path=output_path,
+        items_filter_cfg=SimpleNamespace(
+            name='default',
+            organs=None,
+            num_transcripts=200,
+            num_unique_transcripts=None,
+            num_cells=None,
+            num_unique_cells=None,
+        ),
+        overwrite=True,
+    )
+
+    assert output_path == output_dir / 'items' / 'default.json'
+    assert n_kept == 1
+    filtered = json.loads(output_path.read_text())
+    assert [item['id'] for item in filtered] == ['S1_1']

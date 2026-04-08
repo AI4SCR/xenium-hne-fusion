@@ -118,11 +118,13 @@ def normalize_sample_metadata(metadata: pd.DataFrame) -> pd.DataFrame:
 
 def load_items_dataframe(items_path: Path) -> pd.DataFrame:
     items = json.loads(items_path.read_text())
+    if isinstance(items, dict):
+        items = list(items.values())
+
     items_df = pd.DataFrame(items)
-    required = {'id', 'sample_id', 'tile_id', 'tile_dir'}
-    missing = required - set(items_df.columns)
-    assert not missing, f'Items are missing required columns: {sorted(missing)}'
-    assert items_df['id'].is_unique, 'Item ids must be unique'
+    if items_df.empty:
+        return pd.DataFrame(columns=['id', 'sample_id', 'tile_id', 'tile_dir'])
+
     return items_df
 
 

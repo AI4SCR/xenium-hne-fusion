@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
-import pandas as pd
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -23,11 +22,11 @@ from xenium_hne_fusion.download import (
     validate_hest_sample_mpp,
 )
 from xenium_hne_fusion.metadata import (
-    load_items_dataframe,
     process_dataset_metadata,
 )
 from xenium_hne_fusion.pipeline import (
     compute_all_tile_stats,
+    filter_items_from_items_path,
     create_all_items,
     create_split_collection,
     load_ray_module,
@@ -45,10 +44,8 @@ from xenium_hne_fusion.processing import (
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
-    DEFAULT_SOURCE_ITEMS_NAME,
     ItemsFilterConfig,
     PipelineConfig,
-    apply_filter,
     build_pipeline_config,
     is_sample_processed,
     is_sample_structured,
@@ -139,7 +136,6 @@ def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], 
 
 def create_filtered_items(
     cfg: PipelineConfig,
-    source_items_name: str = DEFAULT_SOURCE_ITEMS_NAME,
     overwrite: bool = False,
 ) -> tuple[Path, int]:
     filter_cfg = ItemsFilterConfig(
@@ -151,29 +147,15 @@ def create_filtered_items(
         num_unique_cells=cfg.processing.items.filter.num_unique_cells,
     )
     output_path = cfg.paths.output_dir / "items" / f"{filter_cfg.name}.json"
-    if output_path.exists() and not overwrite:
-        logger.info(f"Filtered items already exist: {output_path}")
-        return output_path, len(load_items_dataframe(output_path))
-
-    items_path = cfg.paths.output_dir / "items" / f"{source_items_name}.json"
-    stats_path = cfg.paths.output_dir / "statistics" / f"{source_items_name}.parquet"
-    assert items_path.exists(), f"Source items not found: {items_path}"
-    assert stats_path.exists(), f"Statistics not found: {stats_path}"
-
-    items_df = load_items_dataframe(items_path)
-    if filter_cfg.organs is not None:
-        metadata = pd.read_parquet(cfg.paths.processed_dir / "metadata.parquet")
-        allowed_samples = set(metadata.loc[metadata["organ"].isin(filter_cfg.organs), "sample_id"])
-        items_df = items_df[items_df["sample_id"].isin(allowed_samples)]
-
-    stats = pd.read_parquet(stats_path)
-    filtered = items_df[items_df["id"].isin(set(stats.index[apply_filter(stats, filter_cfg)]))]
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(filtered.to_dict("records"), indent=2))
-    logger.info(f"Filter {filter_cfg.name}: {len(items_df)} -> {len(filtered)} tiles")
-    logger.info(f"Saved filtered items -> {output_path}")
-    return output_path, len(filtered)
+    items_path = cfg.paths.output_dir / "items" / "all.json"
+    metadata_path = cfg.paths.processed_dir / "metadata.parquet" if filter_cfg.organs is not None else None
+    return filter_items_from_items_path(
+        items_path=items_path,
+        output_path=output_path,
+        items_filter_cfg=filter_cfg,
+        metadata_path=metadata_path,
+        overwrite=overwrite,
+    )
 
 
 
@@ -395,7 +377,6 @@ def finalize_dataset(
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
     filtered_items_path, num_items = create_filtered_items(
         cfg,
-        source_items_name=DEFAULT_SOURCE_ITEMS_NAME,
         overwrite=overwrite,
     )
     if num_items == 0:

@@ -173,8 +173,8 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: (
-            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
+        lambda cfg, overwrite=False: (
+            calls.append(("filtered", cfg.items.name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 5),
         )[1],
     )
@@ -211,7 +211,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
         ("metadata", "hest1k", metadata_path, processed_metadata_path, ["B1", "L1"]),
         ("items", 32, True),
         ("stats", "ct", True),
-        ("filtered", "default", "all", True),
+        ("filtered", "default", True),
         ("split", "default", output_dir / "items" / "default.json", True),
     ]
 
@@ -339,8 +339,8 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: (
-            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
+        lambda cfg, overwrite=False: (
+            calls.append(("filtered", cfg.items.name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 1),
         )[1],
     )
@@ -364,5 +364,5 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     assert ("metadata", ["DONE", "L1", "P1"]) in calls
     assert ("items", 16, False) in calls
     assert ("stats", "Level3_grouped", False) in calls
-    assert ("filtered", "default", "all", False) in calls
+    assert ("filtered", "default", False) in calls
     assert ("split", "default", cfg.output_dir / "items" / "default.json", False) in calls

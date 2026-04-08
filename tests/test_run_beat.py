@@ -133,8 +133,8 @@ def test_run_beat_runs_full_pipeline_in_training_order(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: (
-            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
+        lambda cfg, overwrite=False: (
+            calls.append(("filtered", cfg.items.name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 5),
         )[1],
     )
@@ -161,7 +161,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
         ("metadata", ["S1", "S2"]),
         ("items", 32, True),
         ("stats", "ct", True),
-        ("filtered", "default", "all", True),
+        ("filtered", "default", True),
         ("split", "default", output_dir / "items" / "default.json", True),
     ]
 
@@ -202,7 +202,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
+        lambda cfg, overwrite=False: (cfg.output_dir / "items" / "default.json", 0),
     )
 
     cfg = module.load_pipeline_config("beat", config_path)
@@ -264,8 +264,8 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: (
-            calls.append(("filtered", cfg.items.name, source_items_name, overwrite)),
+        lambda cfg, overwrite=False: (
+            calls.append(("filtered", cfg.items.name, overwrite)),
             (cfg.output_dir / "items" / "default.json", 0),
         )[1],
     )
@@ -334,7 +334,7 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     monkeypatch.setattr(
         module,
         "create_filtered_items",
-        lambda cfg, source_items_name="all", overwrite=False: calls.append(("filtered",)),
+        lambda cfg, overwrite=False: calls.append(("filtered",)),
     )
 
     with pytest.raises(RuntimeError, match=r"Failed samples: \['S1'\]"):
