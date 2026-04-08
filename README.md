@@ -351,12 +351,41 @@ slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
 slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
 ```
 
+Submit a Slurm pipeline with `./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml` or `./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml`.
+
 They submit one sample per job with:
 
 - `8` CPUs
 - `64G` RAM
 - `08:00:00` wall time
 - logs in `$HOME/logs`
+
+Quick Slurm runs:
+
+```bash
+export CONFIG=configs/data/remote/hest1k-breast.yaml
+
+./slurm/run_hest1k_slurm.sh --config "$CONFIG"
+uv run python scripts/data/process_metadata.py --config "$CONFIG"
+uv run python scripts/data/create_items.py --config "$CONFIG"
+uv run python scripts/data/filter_items.py --config "$CONFIG"
+uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
+uv run python scripts/data/create_splits.py --config "$CONFIG"
+uv run python scripts/data/create_panel.py --config "$CONFIG"
+sbatch --job-name hest1k_breast_early_fusion --cpus-per-task 8 --mem 64G --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
+```
+
+```bash
+export CONFIG=configs/data/remote/beat.yaml
+
+./slurm/run_beat_slurm.sh --config "$CONFIG"
+uv run python scripts/data/process_metadata.py --config "$CONFIG"
+uv run python scripts/data/create_items.py --config "$CONFIG"
+uv run python scripts/data/filter_items.py --config "$CONFIG"
+uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
+uv run python scripts/data/create_splits.py --config "$CONFIG"
+sbatch --job-name beat_early_fusion --cpus-per-task 8 --mem 64G --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
+```
 
 ### Full pipeline on Slurm
 
@@ -419,12 +448,6 @@ uv run python scripts/data/create_panel.py \
 ```bash
 uv run scripts/train/supervised.py \
   --config configs/train/hest1k/expression/pancreas/early-fusion.yaml
-```
-
-Or use the existing HEST1K early-fusion wrapper:
-
-```bash
-./slurm/train_hest1k_early_fusion_organ.sh pancreas
 ```
 
 BEAT:
