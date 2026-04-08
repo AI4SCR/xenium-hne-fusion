@@ -92,11 +92,11 @@ for sample_id in resolve_samples(cfg, metadata_path):
 
 for sample_id in "${SAMPLE_IDS[@]}"; do
     cmd=(
-        uv run
-        scripts/data/run_hest1k.py
-        --config "${CONFIG_PATH}"
-        --executor serial
-        --filter.sample_ids "[${sample_id}]"
+        uv run python
+        scripts/data/process_hest1k.py
+        --dataset hest1k
+        --config_path "${CONFIG_PATH}"
+        --sample_id "${sample_id}"
     )
 
     printf -v wrapped_cmd '%q ' "${cmd[@]}"
