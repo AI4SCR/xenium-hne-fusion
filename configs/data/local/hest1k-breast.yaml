@@ -1,0 +1,43 @@
+name: hest1k
+tiles:
+  tile_px: 512
+  stride_px: 256
+  mpp: 0.5
+  kernel_size: 16
+  predicate: within
+filter:
+  species: Homo sapiens
+  organ: null
+  disease_type: null
+  include_ids:
+    - NCBI783
+    - NCBI856
+    - TENX116
+  exclude_ids: null
+items:
+  name: breast
+  filter:
+    organs:
+      - Breast
+    include_ids: null
+    exclude_ids: null
+    num_transcripts: 100
+    num_unique_transcripts: null
+    num_cells: null
+    num_unique_cells: null
+split:
+  name: breast
+  test_size: 0.25
+  val_size: 0.25
+  stratify: false
+  target_column_name: null
+  encode_targets: false
+  nan_value: -1
+  use_filtered_targets_for_train: false
+  include_targets: null
+  group_column_name: null
+  random_state: 0
+panel:
+  name: hvg-breast-breast-outer=0-seed=0
+  n_top_genes: 128
+  flavor: seurat_v3
