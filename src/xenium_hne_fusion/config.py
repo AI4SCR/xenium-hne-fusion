@@ -22,6 +22,8 @@ class TilesConfig:
 @dataclass
 class ItemsThresholdConfig:
     organs: list[str] | None = None
+    include_ids: list[str] | None = None
+    exclude_ids: list[str] | None = None
     num_transcripts: int | None = None
     num_unique_transcripts: int | None = None
     num_cells: int | None = None

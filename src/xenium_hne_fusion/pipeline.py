@@ -16,6 +16,7 @@ from tqdm import tqdm
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.hvg import load_transcript_gene_categories
 from xenium_hne_fusion.metadata import join_items_with_metadata, load_items_dataframe, save_split_metadata
+from xenium_hne_fusion.config import FilterConfig
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
     DEFAULT_SOURCE_ITEMS_NAME,
@@ -26,6 +27,7 @@ from xenium_hne_fusion.utils.getters import (
     clear_sample_markers,
     iter_tile_dirs,
     processed_sample_dir,
+    select_sample_ids,
     tile_item,
 )
 
@@ -321,6 +323,15 @@ def filter_items_from_items_path(
         meta = pd.read_parquet(metadata_path)
         allowed_samples = set(meta.loc[meta.organ.isin(items_filter_cfg.organs), "sample_id"])
         items_df = items_df[items_df["sample_id"].isin(allowed_samples)]
+    if items_filter_cfg.include_ids is not None or items_filter_cfg.exclude_ids is not None:
+        selected_sample_ids = select_sample_ids(
+            sorted(items_df["sample_id"].unique().tolist()),
+            FilterConfig(
+                include_ids=items_filter_cfg.include_ids,
+                exclude_ids=items_filter_cfg.exclude_ids,
+            ),
+        )
+        items_df = items_df[items_df["sample_id"].isin(selected_sample_ids)]
 
     stats = pd.read_parquet(stats_path)
     kept_ids = set(stats.index[apply_filter(stats, items_filter_cfg)])

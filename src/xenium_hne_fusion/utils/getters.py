@@ -87,6 +87,8 @@ class PipelineConfig:
 class ItemsFilterConfig:
     name: str
     organs: list[str] | None = None
+    include_ids: list[str] | None = None
+    exclude_ids: list[str] | None = None
     num_transcripts: int | None = None
     num_unique_transcripts: int | None = None
     num_cells: int | None = None
@@ -99,6 +101,8 @@ def load_items_filter_config(path: Path) -> ItemsFilterConfig:
     return ItemsFilterConfig(
         name=data['name'],
         organs=filter_data.get('organs'),
+        include_ids=filter_data.get('include_ids'),
+        exclude_ids=filter_data.get('exclude_ids'),
         num_transcripts=filter_data.get('num_transcripts'),
         num_unique_transcripts=filter_data.get('num_unique_transcripts'),
         num_cells=filter_data.get('num_cells'),
@@ -139,6 +143,8 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             name=items_data['name'],
             filter=ItemsThresholdConfig(
                 organs=items_filter_data.get('organs'),
+                include_ids=items_filter_data.get('include_ids'),
+                exclude_ids=items_filter_data.get('exclude_ids'),
                 num_transcripts=items_filter_data.get('num_transcripts'),
                 num_unique_transcripts=items_filter_data.get('num_unique_transcripts'),
                 num_cells=items_filter_data.get('num_cells'),

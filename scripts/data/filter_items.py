@@ -20,6 +20,8 @@ def main(
     filter_cfg = ItemsFilterConfig(
         name=cfg.processing.items.name,
         organs=cfg.processing.items.filter.organs,
+        include_ids=cfg.processing.items.filter.include_ids,
+        exclude_ids=cfg.processing.items.filter.exclude_ids,
         num_transcripts=cfg.processing.items.filter.num_transcripts,
         num_unique_transcripts=cfg.processing.items.filter.num_unique_transcripts,
         num_cells=cfg.processing.items.filter.num_cells,

@@ -156,6 +156,8 @@ def test_repo_hest_config_pins_three_include_ids():
 
     assert cfg.filter.include_ids == ['NCBI783', 'NCBI856', 'TENX116']
     assert cfg.filter.exclude_ids is None
+    assert cfg.items.filter.include_ids is None
+    assert cfg.items.filter.exclude_ids is None
 
 
 def test_repo_remote_hest_config_processes_all_samples():
@@ -163,6 +165,35 @@ def test_repo_remote_hest_config_processes_all_samples():
 
     assert cfg.filter.include_ids is None
     assert cfg.filter.exclude_ids is None
+    assert cfg.items.filter.include_ids is None
+    assert cfg.items.filter.exclude_ids is None
+
+
+def test_items_filter_sample_ids_override_legacy_top_level_filter(tmp_path: Path):
+    config_path = tmp_path / 'hest1k.yaml'
+    config_path.write_text(
+        'name: hest1k\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+        'filter:\n'
+        '  include_ids:\n'
+        '    - LEGACY\n'
+        '  exclude_ids: null\n'
+        'items:\n'
+        '  name: default\n'
+        '  filter:\n'
+        '    include_ids: null\n'
+        '    exclude_ids:\n'
+        '      - CANONICAL\n'
+    )
+
+    cfg = load_dataset_config(config_path)
+
+    assert cfg.filter.include_ids == ['LEGACY']
+    assert cfg.filter.exclude_ids is None
+    assert cfg.items.filter.include_ids is None
+    assert cfg.items.filter.exclude_ids == ['CANONICAL']
 
 
 def test_select_sample_ids_supports_include_and_exclude():

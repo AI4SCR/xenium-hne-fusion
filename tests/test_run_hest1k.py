@@ -225,8 +225,12 @@ def test_run_hest1k_local_and_remote_configs_define_sample_scope():
 
     assert local_cfg.filter.include_ids == ["NCBI783", "NCBI856", "TENX116"]
     assert local_cfg.filter.exclude_ids is None
+    assert local_cfg.items.filter.include_ids is None
+    assert local_cfg.items.filter.exclude_ids is None
     assert remote_cfg.filter.include_ids is None
     assert remote_cfg.filter.exclude_ids is None
+    assert remote_cfg.items.filter.include_ids is None
+    assert remote_cfg.items.filter.exclude_ids is None
 
 
 def test_filter_hest_samples_by_tile_mpp_keeps_only_eligible_samples(

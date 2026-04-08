@@ -10,15 +10,17 @@ filter:
   organ: null
   disease_type: null
   include_ids: null
-  exclude_ids:
-    - XE_1JAT.01_HNE_1JAT
-    - XE_1IVR.01_HNE_1IVR_01-1
-    - XE_1FYV.01_HNE_1FYV-01
-    - XE_1GX4.01_HNE_1GX4-01
+  exclude_ids: null
 items:
   name: default
   filter:
     organs: null
+    include_ids: null
+    exclude_ids:
+      - XE_1JAT.01_HNE_1JAT
+      - XE_1IVR.01_HNE_1IVR_01-1
+      - XE_1FYV.01_HNE_1FYV-01
+      - XE_1GX4.01_HNE_1GX4-01
     num_transcripts: 200
     num_unique_transcripts: null
     num_cells: null

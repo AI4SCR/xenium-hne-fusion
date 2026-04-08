@@ -18,6 +18,8 @@ items:
   name: default
   filter:
     organs: null
+    include_ids: null
+    exclude_ids: null
     num_transcripts: 100
     num_unique_transcripts: null
     num_cells: null
