@@ -57,6 +57,7 @@ sbatch \
     --job-name "hest1k_early_fusion_${ORGAN}" \
     --cpus-per-task 8 \
     --mem 64G \
+    --gres gpu:1 \
     --time 08:00:00 \
     --output "${LOG_DIR}/%j.log" \
     --error "${LOG_DIR}/%j.err" \

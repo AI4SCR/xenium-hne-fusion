@@ -373,7 +373,7 @@ uv run python scripts/data/filter_items.py --config "$CONFIG"
 uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
 uv run python scripts/data/create_splits.py --config "$CONFIG"
 uv run python scripts/data/create_panel.py --config "$CONFIG"
-sbatch --job-name hest1k_breast_early_fusion --cpus-per-task 8 --mem 64G --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
+sbatch --job-name hest1k_breast_early_fusion --cpus-per-task 8 --mem 64G --gres=gpu:1 --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
 
 ```bash
@@ -385,7 +385,7 @@ uv run python scripts/data/create_items.py --config "$CONFIG"
 uv run python scripts/data/filter_items.py --config "$CONFIG"
 uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
 uv run python scripts/data/create_splits.py --config "$CONFIG"
-sbatch --job-name beat_early_fusion --cpus-per-task 8 --mem 64G --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
+sbatch --job-name beat_early_fusion --cpus-per-task 8 --mem 64G --gres=gpu:1 --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
 ```
 
 ### Full pipeline on Slurm
