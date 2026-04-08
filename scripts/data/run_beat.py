@@ -42,9 +42,9 @@ from xenium_hne_fusion.utils.getters import (
     PipelineConfig,
     apply_filter,
     build_pipeline_config,
-    infer_dataset,
     is_sample_processed,
     is_sample_structured,
+    load_pipeline_config,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
@@ -194,8 +194,7 @@ def _run(
 def prepare_driver_context(
     config: ProcessingConfig,
 ) -> tuple[PipelineConfig, list[str]]:
-    dataset = infer_dataset(config.name)
-    assert dataset == "beat", f"Expected dataset='beat', got {dataset!r}"
+    assert config.name == "beat", f"Expected dataset='beat', got {config.name!r}"
     cfg = build_pipeline_config(config)
     structure_beat_metadata(cfg)
     sample_ids = resolve_beat_samples(cfg)

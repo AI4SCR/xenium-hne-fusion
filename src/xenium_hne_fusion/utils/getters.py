@@ -187,14 +187,9 @@ def get_panels_dir(name: str) -> Path:
     return get_managed_paths(name).output_dir / 'panels'
 
 
-def infer_dataset(name: str) -> str:
-    dataset = name.split('-', 1)[0]
-    assert dataset in {'beat', 'hest1k'}, f'Unknown dataset for config name: {name!r}'
-    return dataset
-
-
 def build_pipeline_config(cfg: ProcessingConfig) -> PipelineConfig:
-    dataset = infer_dataset(cfg.name)
+    dataset = cfg.name
+    assert dataset in {'beat', 'hest1k'}, f'Unknown dataset for config name: {cfg.name!r}'
     managed = get_managed_paths(cfg.name)
     raw_dir = _require_env_path(f'{dataset.upper()}_RAW_DIR')
     return PipelineConfig(
@@ -215,7 +210,8 @@ def load_pipeline_config(
         config_path = get_processing_config_path(dataset, config_root=config_root)
     cfg = load_processing_config(config_path)
     if dataset is not None:
-        assert dataset == infer_dataset(cfg.name), f"Config name {cfg.name!r} does not match dataset {dataset!r}"
+        assert cfg.name in {'beat', 'hest1k'}, f'Unknown dataset for config name: {cfg.name!r}'
+        assert dataset == cfg.name, f"Config name {cfg.name!r} does not match dataset {dataset!r}"
     return build_pipeline_config(cfg)
 
 

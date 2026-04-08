@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from xenium_hne_fusion.utils.getters import load_dataset_config, load_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import build_pipeline_config, load_dataset_config, load_pipeline_config, resolve_samples
 
 
 def test_load_dataset_config_requires_name(tmp_path: Path):
@@ -65,6 +65,57 @@ def test_load_pipeline_config_requires_env_vars(monkeypatch: pytest.MonkeyPatch,
     monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
     with pytest.raises(AssertionError, match='BEAT_RAW_DIR'):
         load_pipeline_config('beat', config_path)
+
+
+@pytest.mark.parametrize(
+    ('dataset', 'env_var'),
+    [('beat', 'BEAT_RAW_DIR'), ('hest1k', 'HEST1K_RAW_DIR')],
+)
+def test_build_pipeline_config_uses_exact_dataset_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    dataset: str,
+    env_var: str,
+):
+    data_dir = tmp_path / 'data'
+    raw_dir = tmp_path / 'raw' / dataset
+    config_path = tmp_path / f'{dataset}.yaml'
+    config_path.write_text(
+        f'name: {dataset}\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+    monkeypatch.setenv(env_var, str(raw_dir))
+
+    cfg = build_pipeline_config(load_dataset_config(config_path))
+
+    assert cfg.dataset == dataset
+    assert cfg.raw_dir == raw_dir.resolve()
+
+
+@pytest.mark.parametrize('dataset', ['foo', 'beat-256', 'hest1k-anything'])
+def test_build_pipeline_config_rejects_non_canonical_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    dataset: str,
+):
+    config_path = tmp_path / 'config.yaml'
+    config_path.write_text(
+        f'name: {dataset}\n'
+        'tile_px: 256\n'
+        'stride_px: 256\n'
+        'tile_mpp: 0.5\n'
+    )
+
+    monkeypatch.setenv('DATA_DIR', str(tmp_path / 'data'))
+    monkeypatch.setenv('BEAT_RAW_DIR', str(tmp_path / 'raw' / 'beat'))
+    monkeypatch.setenv('HEST1K_RAW_DIR', str(tmp_path / 'raw' / 'hest1k'))
+
+    with pytest.raises(AssertionError, match='Unknown dataset'):
+        build_pipeline_config(load_dataset_config(config_path))
 
 
 def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):

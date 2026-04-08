@@ -50,9 +50,9 @@ from xenium_hne_fusion.utils.getters import (
     PipelineConfig,
     apply_filter,
     build_pipeline_config,
-    infer_dataset,
     is_sample_processed,
     is_sample_structured,
+    load_pipeline_config,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
@@ -219,8 +219,7 @@ def _run(
 def prepare_driver_context(
     config: ProcessingConfig,
 ) -> tuple[PipelineConfig, Path, list[str]]:
-    dataset = infer_dataset(config.name)
-    assert dataset == "hest1k", f"Expected dataset='hest1k', got {dataset!r}"
+    assert config.name == "hest1k", f"Expected dataset='hest1k', got {config.name!r}"
     cfg = build_pipeline_config(config)
 
     metadata_path = get_hest_metadata_path(cfg.raw_dir)

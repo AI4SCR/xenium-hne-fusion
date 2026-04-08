@@ -12,7 +12,7 @@ from xenium_hne_fusion.metadata import (
     save_split_metadata,
 )
 from xenium_hne_fusion.processing_cli import parse_processing_args
-from xenium_hne_fusion.utils.getters import build_pipeline_config, infer_dataset, load_pipeline_config
+from xenium_hne_fusion.utils.getters import build_pipeline_config, load_pipeline_config
 
 
 def main(
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
     main(
-        dataset=infer_dataset(processing_cfg.name),
+        dataset=processing_cfg.name,
         overwrite=overwrite_arg,
         processing_cfg=processing_cfg,
     )
