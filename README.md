@@ -528,11 +528,15 @@ Ray submission helpers live under `ray/`. The main entrypoint is:
 bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
 ```
 
-Data preparation:
+For `hest1k-breast`, submit each data-preparation step individually:
 
 ```bash
-./ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml
-./ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml
+./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/data/compute_tile_stats.py hest1k "$DATA_DIR/03_output/hest1k/items/all.json" --config_path "configs/data/remote/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
+./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
+./ray/submit.sh 'python scripts/data/create_panel.py --config_path configs/data/remote/hest1k-breast.yaml'
 ```
 
 Useful helpers:
@@ -541,29 +545,17 @@ Useful helpers:
 bash ray/submit.sh
 bash ray/scripts/disk_space.sh
 bash ray/submit.sh "bash ray/scripts/test_env.sh"
-bash ray/scripts/run_hest1k.sh --config configs/data/remote/hest1k.yaml --name hest1k --filter.include_ids '[TENX116]'
-bash ray/scripts/run_beat.sh --config configs/data/remote/beat.yaml --name beat
 ```
 
-Local machine commands:
+To test the other canonical configs, use the same sequence with the matching config path:
 
 ```bash
-# hest1k
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/compute_tile_stats.py hest1k "$DATA_DIR/03_output/hest1k/items/all.json" --config_path "configs/data/remote/hest1k.yaml"'
-
-./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
-./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-lung.yaml" --overwrite=true'
-
-./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml" --overwrite=true'
-
-# beat
-./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/beat.yaml"'
-./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/beat.yaml"'
-./ray/submit.sh 'python scripts/data/compute_tile_stats.py beat "$DATA_DIR/03_output/beat/items/all.json" --config_path "configs/data/remote/beat.yaml"'
-
-
+./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k.yaml" --overwrite=true'
+./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k.yaml" --overwrite=true'
+./ray/submit.sh 'python scripts/data/create_panel.py --config_path configs/data/remote/hest1k.yaml'
 ```
 
 ## Development
