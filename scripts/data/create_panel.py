@@ -17,6 +17,8 @@ from xenium_hne_fusion.utils.getters import build_pipeline_config, get_panels_di
 def main(
     processing_cfg: ProcessingConfig,
     overwrite: bool = False,
+    batch_size: int = 256,
+    num_workers: int = 10,
 ) -> None:
     cfg = build_pipeline_config(processing_cfg)
     panel_cfg = cfg.processing.panel
@@ -39,9 +41,12 @@ def main(
     create_panel(
         items_path=items_path,
         split_metadata_path=split_metadata_path,
+        processed_dir=cfg.processed_dir,
         output_path=output_path,
         n_top_genes=panel_cfg.n_top_genes,
         flavor=panel_cfg.flavor,
+        batch_size=batch_size,
+        num_workers=num_workers,
         overwrite=overwrite,
     )
 

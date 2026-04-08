@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import torch
 
 from xenium_hne_fusion.hvg import (
-    build_hvg_anndata,
-    build_tile_level_matrix,
+    build_hvg_anndata_from_split,
     create_panel,
     get_common_genes,
-    load_fit_items,
 )
+from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.utils.getters import load_processing_config
 
 
@@ -24,34 +24,52 @@ def _load_script(path: str, module_name: str):
     return module
 
 
-def _write_transcripts_parquet(tile_dir: Path, genes: list[str], observed_genes: list[str]) -> None:
+def _write_expr_parquet(tile_dir: Path, genes: list[str], rows: list[list[int]]) -> None:
     tile_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        {
-            'feature_name': pd.Categorical(
-                observed_genes,
-                categories=genes,
-                ordered=False,
-            )
-        }
-    ).to_parquet(tile_dir / 'transcripts.parquet')
+    pd.DataFrame(rows, columns=genes).to_parquet(tile_dir / 'expr-kernel_size=16.parquet', index=False)
 
 
-def test_build_tile_level_matrix_counts_tile_transcripts_and_preserves_gene_order(tmp_path: Path):
-    tile_dir = tmp_path / 'S1' / '256_256' / '0'
-    _write_transcripts_parquet(tile_dir, ['A', 'B', 'C'], ['A', 'C', 'C', 'A', 'A', 'B'])
+def _write_feature_universe(tile_dir: Path, genes: list[str]) -> None:
+    sample_dir = tile_dir.parent.parent
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    (sample_dir / 'feature_universe.txt').write_text('\n'.join(genes) + '\n')
 
-    fit_items = pd.DataFrame(
-        [{'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_dir)}]
+
+def test_build_hvg_anndata_from_split_counts_tile_expression_and_preserves_gene_order(tmp_path: Path):
+    tile_a = tmp_path / 'S1' / '256_256' / '0'
+    tile_b = tmp_path / 'S1' / '256_256' / '1'
+    _write_expr_parquet(tile_a, ['A', 'B', 'C'], [[1, 0, 2], [2, 1, 0]])
+    _write_expr_parquet(tile_b, ['A', 'B', 'C'], [[0, 1, 1], [1, 0, 1]])
+    _write_feature_universe(tile_a, ['A', 'B', 'C'])
+
+    items_path = tmp_path / 'items.json'
+    split_path = tmp_path / 'default.parquet'
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_a)},
+                {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': str(tile_b)},
+            ]
+        )
     )
-    matrix, obs = build_tile_level_matrix(fit_items, ['A', 'B', 'C'])
+    pd.DataFrame(
+        {'split': ['fit', 'fit'], 'sample_id': ['S1', 'S1']},
+        index=pd.Index(['S1_0', 'S1_1'], name='id'),
+    ).to_parquet(split_path)
 
-    assert obs.index.tolist() == ['S1_0']
-    assert matrix.shape == (1, 3)
-    assert matrix.toarray().tolist() == [[3.0, 1.0, 2.0]]
+    adata = build_hvg_anndata_from_split(
+        items_path=items_path,
+        split_metadata_path=split_path,
+        genes=['A', 'B', 'C'],
+    )
+
+    assert adata.obs.index.tolist() == ['S1_0', 'S1_1']
+    assert adata.X.shape == (2, 3)
+    assert adata.var_names.tolist() == ['A', 'B', 'C']
+    assert adata.X.toarray().tolist() == [[3.0, 1.0, 2.0], [1.0, 1.0, 2.0]]
 
 
-def test_load_fit_items_filters_to_fit_split(tmp_path: Path):
+def test_tile_dataset_filters_to_fit_split(tmp_path: Path):
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
     items_path.write_text(
@@ -68,32 +86,46 @@ def test_load_fit_items_filters_to_fit_split(tmp_path: Path):
         index=pd.Index(['S1_0', 'S1_1', 'S1_2'], name='id'),
     ).to_parquet(split_path)
 
-    fit_items = load_fit_items(items_path, split_path)
+    ds = TileDataset(
+        target='expression',
+        source_panel=[],
+        target_panel=[],
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        metadata_path=split_path,
+        split='fit',
+        id_key='id',
+    )
+    ds.setup()
 
-    assert fit_items['id'].tolist() == ['S1_0']
+    assert [item['id'] for item in ds.items] == ['S1_0']
 
 
 def test_get_common_genes_uses_intersection_across_samples(tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S2' / '256_256' / '0'
-    _write_transcripts_parquet(tile_a, ['A', 'B', 'C'], ['A'])
-    _write_transcripts_parquet(tile_b, ['B', 'C', 'D'], ['B'])
+    _write_expr_parquet(tile_a, ['A', 'B', 'C'], [[1, 0, 0]])
+    _write_expr_parquet(tile_b, ['B', 'C', 'D'], [[1, 0, 0]])
+    _write_feature_universe(tile_a, ['A', 'B', 'C'])
+    _write_feature_universe(tile_b, ['B', 'C', 'D'])
 
     fit_items = pd.DataFrame(
         [
-            {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_a)},
-            {'id': 'S2_0', 'sample_id': 'S2', 'tile_id': 0, 'tile_dir': str(tile_b)},
+            {'id': 'S1_0', 'sample_id': 'S1', 'split': 'fit'},
+            {'id': 'S2_0', 'sample_id': 'S2', 'split': 'fit'},
         ]
     )
 
-    assert get_common_genes(fit_items) == ['B', 'C']
+    assert get_common_genes(fit_items, processed_dir=tmp_path) == ['B', 'C']
 
 
 def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     tile_a = tmp_path / 'S1' / '256_256' / '0'
     tile_b = tmp_path / 'S1' / '256_256' / '1'
-    _write_transcripts_parquet(tile_a, ['A', 'B', 'C'], ['A', 'C', 'C', 'B'])
-    _write_transcripts_parquet(tile_b, ['A', 'B', 'C'], ['B', 'B', 'B', 'A'])
+    _write_expr_parquet(tile_a, ['A', 'B', 'C'], [[1, 0, 2], [0, 1, 1]])
+    _write_expr_parquet(tile_b, ['A', 'B', 'C'], [[2, 1, 0], [1, 2, 0]])
+    _write_feature_universe(tile_a, ['A', 'B', 'C'])
 
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
@@ -107,7 +139,7 @@ def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytes
         )
     )
     pd.DataFrame(
-        {'split': ['fit', 'fit']},
+        {'split': ['fit', 'fit'], 'sample_id': ['S1', 'S1']},
         index=pd.Index(['S1_0', 'S1_1'], name='id'),
     ).to_parquet(split_path)
 
@@ -119,6 +151,7 @@ def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytes
     create_panel(
         items_path=items_path,
         split_metadata_path=split_path,
+        processed_dir=tmp_path,
         output_path=output_path,
         n_top_genes=2,
         overwrite=True,
@@ -127,6 +160,94 @@ def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytes
     panel = __import__('yaml').safe_load(output_path.read_text())
     assert panel['source_panel'] == ['A']
     assert panel['target_panel'] == ['B', 'C']
+
+
+def test_create_panel_uses_batched_tile_dataset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    tile_a = tmp_path / 'S1' / '256_256' / '0'
+    tile_b = tmp_path / 'S2' / '256_256' / '0'
+    _write_expr_parquet(tile_a, ['A', 'B'], [[1, 0], [0, 1]])
+    _write_expr_parquet(tile_b, ['A', 'B'], [[0, 1], [1, 0]])
+    _write_feature_universe(tile_a, ['A', 'B'])
+    _write_feature_universe(tile_b, ['A', 'B'])
+
+    items_path = tmp_path / 'items.json'
+    split_path = tmp_path / 'default.parquet'
+    output_path = tmp_path / 'panels' / 'hvg-default.yaml'
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_a)},
+                {'id': 'S2_0', 'sample_id': 'S2', 'tile_id': 0, 'tile_dir': str(tile_b)},
+            ]
+        )
+    )
+    pd.DataFrame(
+        {
+            'split': ['fit', 'fit'],
+            'sample_id': ['S1', 'S2'],
+        },
+        index=pd.Index(['S1_0', 'S2_0'], name='id'),
+    ).to_parquet(split_path)
+
+    real_loader = torch.utils.data.DataLoader
+    calls = {}
+
+    def fake_loader(dataset, *, batch_size, num_workers, shuffle):
+        calls['batch_size'] = batch_size
+        calls['num_workers'] = num_workers
+        calls['shuffle'] = shuffle
+        return real_loader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle)
+
+    def fake_hvg(adata, n_top_genes, flavor, inplace):
+        adata.var['highly_variable'] = [False, True]
+
+    monkeypatch.setattr('xenium_hne_fusion.hvg.DataLoader', fake_loader)
+    monkeypatch.setattr('scanpy.pp.highly_variable_genes', fake_hvg)
+
+    create_panel(
+        items_path=items_path,
+        split_metadata_path=split_path,
+        processed_dir=tmp_path,
+        output_path=output_path,
+        n_top_genes=1,
+        overwrite=True,
+    )
+
+    assert calls == {'batch_size': 256, 'num_workers': 10, 'shuffle': False}
+
+
+def test_create_panel_rejects_when_common_genes_are_fewer_than_requested(tmp_path: Path):
+    tile_dir = tmp_path / 'S1' / '256_256' / '0'
+    _write_expr_parquet(tile_dir, ['A'], [[1], [0]])
+    _write_feature_universe(tile_dir, ['A'])
+
+    items_path = tmp_path / 'items.json'
+    split_path = tmp_path / 'default.parquet'
+    output_path = tmp_path / 'panels' / 'hvg-default.yaml'
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_dir)},
+            ]
+        )
+    )
+    pd.DataFrame(
+        {
+            'split': ['fit'],
+            'sample_id': ['S1'],
+        },
+        index=pd.Index(['S1_0'], name='id'),
+    ).to_parquet(split_path)
+
+    with pytest.raises(AssertionError, match='exceeds common genes'):
+        create_panel(
+            items_path=items_path,
+            split_metadata_path=split_path,
+            processed_dir=tmp_path,
+            output_path=output_path,
+            n_top_genes=2,
+            overwrite=True,
+        )
 
 
 def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -139,12 +260,16 @@ def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'splits' / 'default').mkdir(parents=True, exist_ok=True)
 
-    _write_transcripts_parquet(tile_dir, ['A', 'B'], ['A', 'B', 'B', 'B'])
+    _write_expr_parquet(tile_dir, ['A', 'B'], [[1, 0], [0, 1], [0, 1], [0, 1]])
+    _write_feature_universe(tile_dir, ['A', 'B'])
     items = json.dumps([{'id': 'TENX95_0', 'sample_id': 'TENX95', 'tile_id': 0, 'tile_dir': str(tile_dir)}])
     (output_dir / 'items' / 'all.json').write_text(items)
     (output_dir / 'items' / 'default.json').write_text(items)
     pd.DataFrame(
-        {'split': ['fit']},
+        {
+            'split': ['fit'],
+            'sample_id': ['TENX95'],
+        },
         index=pd.Index(['TENX95_0'], name='id'),
     ).to_parquet(output_dir / 'splits' / 'default' / 'outer=0-seed=0.parquet')
 
@@ -275,23 +400,3 @@ def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.Monkey
     processing_cfg = load_processing_config(config_path)
     with pytest.raises(AssertionError, match='panel config must set both n_top_genes and flavor'):
         module.main(processing_cfg=processing_cfg, overwrite=False)
-
-
-def test_build_hvg_anndata_uses_one_row_per_tile(tmp_path: Path):
-    tile_a = tmp_path / 'S1' / '256_256' / '0'
-    tile_b = tmp_path / 'S1' / '256_256' / '1'
-    _write_transcripts_parquet(tile_a, ['A', 'B'], ['A', 'A', 'B'])
-    _write_transcripts_parquet(tile_b, ['A', 'B'], ['B', 'B', 'B', 'B', 'A'])
-
-    fit_items = pd.DataFrame(
-        [
-            {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(tile_a)},
-            {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': str(tile_b)},
-        ]
-    )
-
-    adata = build_hvg_anndata(fit_items)
-
-    assert adata.n_obs == 2
-    assert adata.obs_names.tolist() == ['S1_0', 'S1_1']
-    assert adata.var_names.tolist() == ['A', 'B']

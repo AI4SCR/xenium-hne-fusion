@@ -64,6 +64,27 @@ def test_tile_dataset_include_flags_control_modalities(tmp_path: Path):
     assert item["target"].tolist() == [15.0]
 
 
+def test_tile_dataset_rejects_overlapping_source_and_target_panels(tmp_path: Path):
+    items_path = tmp_path / "items.json"
+    items_path.write_text(
+        pd.DataFrame(
+            [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tmp_path / "S1" / "0")}]
+        ).to_json(orient="records")
+    )
+
+    with pytest.raises(AssertionError, match="must be disjoint"):
+        TileDataset(
+            target="expression",
+            source_panel=["A", "B"],
+            target_panel=["B", "C"],
+            include_image=False,
+            include_expr=False,
+            items_path=items_path,
+            split="fit",
+            id_key="id",
+        )
+
+
 def test_tile_dataset_transforms_are_applied(tmp_path: Path):
     tile_dir = tmp_path / "S1" / "0"
     _write_tile_dir(tile_dir, feature_names=["A"], cell_types=["tumor"])
