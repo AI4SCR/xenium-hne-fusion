@@ -3,6 +3,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import lazyslide as zs
+import pandas as pd
 import numpy as np
 from loguru import logger
 from spatialdata.models import ShapesModel
@@ -74,6 +75,24 @@ def save_wsi_thumbnail(wsi_path: Path, output_path: Path, max_size: int = 2048) 
     logger.info(f"Thumbnail saved to {output_path}")
 
 
+def _get_transcript_coordinate_columns(schema_names: list[str]) -> list[str]:
+    if {"he_x", "he_y"} <= set(schema_names):
+        return ["he_x", "he_y"]
+    assert "geometry" in schema_names, f"Missing transcript coordinates: {schema_names}"
+    return ["geometry"]
+
+
+def _load_transcript_batch(batch) -> gpd.GeoDataFrame:
+    schema_names = set(batch.schema.names)
+    if {"he_x", "he_y"} <= schema_names:
+        chunk = batch.to_pandas()
+        chunk["geometry"] = gpd.points_from_xy(chunk["he_x"], chunk["he_y"])
+        return gpd.GeoDataFrame(chunk, geometry="geometry")
+
+    assert "geometry" in schema_names, f"Missing transcript coordinates: {batch.schema.names}"
+    return gpd.GeoDataFrame.from_arrow(batch)
+
+
 def save_transcript_overview(
     wsi_path: Path,
     transcripts_path: Path,
@@ -83,69 +102,53 @@ def save_transcript_overview(
     seed: int = 0,
 ) -> None:
     """Plot n random transcripts on the WSI thumbnail. Stream-sample from parquet to control memory."""
-    import matplotlib.pyplot as plt
+    import openslide
     import pyarrow.parquet as pq
+
+    from ai4bmr_learn.plotting.xenium import visualize_points
     from PIL import Image
 
     rng = np.random.default_rng(seed)
 
-    # --- build thumbnail ---
-    wsi = open_wsi(wsi_path)
-    arr = wsi.reader.get_thumbnail(max_size)  # (H, W, 3) uint8
-    thumb_h, thumb_w = arr.shape[:2]
-    props = wsi.reader.properties
-    wsi_h, wsi_w = props.level_shape[0]  # full-res (height, width)
-    scale_x = thumb_w / wsi_w
-    scale_y = thumb_h / wsi_h
-
-    logger.info(f"Thumbnail size: {thumb_w}×{thumb_h}")
-    thumb = Image.fromarray(arr)
-
     # --- stream-sample transcripts ---
     pf = pq.ParquetFile(transcripts_path)
-    row_groups = pf.metadata.num_row_groups
     total_rows = pf.metadata.num_rows
-    logger.info(f"Sampling {n} transcripts from {total_rows} total rows across {row_groups} row groups")
+    batch_size = 65_536
+    num_batches = max(1, (total_rows + batch_size - 1) // batch_size)
+    logger.info(f"Sampling {n} transcripts from {total_rows} total rows across {num_batches} batches")
 
     n = min(n, total_rows)
-    collected: list = []
-    n_collected = 0
+    columns = _get_transcript_coordinate_columns(pf.schema_arrow.names)
+    collected: list[gpd.GeoDataFrame] = []
+    taken_total = 0
 
-    schema_cols = pf.schema_arrow.names
-    x_col = next(c for c in ["he_x", "x"] if c in schema_cols)
-    y_col = next(c for c in ["he_y", "y"] if c in schema_cols)
-
-    order = rng.permutation(row_groups)
-    for rg_idx in order:
-        if n_collected >= n:
-            break
-        needed = n - n_collected
-        table = pf.read_row_group(rg_idx, columns=[x_col, y_col])
-        size = len(table)
-        if size <= needed:
-            collected.append(table.to_pydict())
-            n_collected += size
+    for batch_idx, batch in enumerate(pf.iter_batches(batch_size=batch_size, columns=columns), start=1):
+        batches_left = num_batches - batch_idx + 1
+        needed = n - taken_total
+        if needed <= 0:
+            continue
+        num_take = max(1, int(np.ceil(needed / batches_left)))
+        size = len(batch)
+        if size <= num_take:
+            collected.append(_load_transcript_batch(batch))
+            taken_total += size
         else:
-            idx = rng.choice(size, size=needed, replace=False)
-            collected.append(table.take(idx).to_pydict())
-            n_collected += needed
+            idx = rng.choice(size, size=num_take, replace=False)
+            collected.append(_load_transcript_batch(batch.take(idx)))
+            taken_total += num_take
 
-    xs = np.concatenate([np.asarray(d[x_col]) for d in collected])
-    ys = np.concatenate([np.asarray(d[y_col]) for d in collected])
-    xs = xs * scale_x
-    ys = ys * scale_y
-    logger.info(f"Collected {len(xs)} transcripts for overlay")
+    points = pd.concat(collected, ignore_index=True)
+    points = gpd.GeoDataFrame(points, geometry="geometry")
+    logger.info(f"Collected {len(points)} transcripts for overlay")
 
-    # --- plot ---
-    dpi = 150
-    fig, ax = plt.subplots(figsize=(thumb_w / dpi, thumb_h / dpi), dpi=dpi)
-    ax.imshow(thumb)
-    ax.scatter(xs, ys, s=0.5, c="red", linewidths=0, alpha=0.4, rasterized=True)
-    ax.axis("off")
-    fig.tight_layout(pad=0)
+    slide = openslide.OpenSlide(str(wsi_path))
+    try:
+        viz = visualize_points(points, slide=slide, num_points=None, max_size=max_size, radius=1)
+    finally:
+        slide.close()
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, bbox_inches="tight", pad_inches=0, dpi=dpi)
-    plt.close(fig)
+    Image.fromarray(viz).save(output_path)
     logger.info(f"Transcript overview saved to {output_path}")
 
 

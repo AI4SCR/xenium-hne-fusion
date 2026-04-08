@@ -92,5 +92,6 @@ def test_main_accepts_explicit_items_path(tmp_path: Path, monkeypatch):
     module.main(dataset='hest1k', items_name=None, items_path=items_path)
 
     assert (output_dir / 'statistics' / 'subset.parquet').exists()
-    assert (Path('figures') / 'hest1k' / 'tile_stats' / 'subset' / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
-    assert (Path('figures') / 'hest1k' / 'tile_stats' / 'subset' / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
+    figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'
+    assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
+    assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
