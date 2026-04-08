@@ -7,7 +7,7 @@ head:
 backbone:
   morph_encoder_name: vit_small_patch16_224
   morph_encoder_kws:
-    img_size: 256
+    img_size: 224
   expr_encoder_name: null
   expr_encoder_kws: null
   fusion_strategy: null

@@ -68,6 +68,7 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 
             [
                 v2.ToImage(),
                 v2.ToDtype(torch.float32, scale=True),
+                v2.Resize((224, 224)),
                 normalize,
             ]
         )
