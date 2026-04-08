@@ -9,9 +9,8 @@ xenium-hne-fusion/
 ├── src/xenium_hne_fusion/   # Importable package (core logic, reusable modules)
 ├── scripts/                 # One-off analysis and experiment scripts
 ├── tests/                   # pytest tests
-├── data/                    # Raw and processed inputs (not tracked, .gitkeep only)
+├── data/                    # Managed raw/structured/processed/output data (incl. generated figures)
 ├── results/                 # Outputs and model artifacts (not tracked)
-├── figures/                 # Generated figures (not tracked)
 ├── pyproject.toml           # uv-managed project config
 ├── uv.lock                  # Locked dependency graph (committed)
 └── .env                     # Machine-specific config (not tracked)

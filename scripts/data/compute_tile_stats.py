@@ -2,7 +2,7 @@
 
 Output:
   DATA_DIR/03_output/<name>/statistics/<items_name>.parquet
-  figures/<name>/tile_stats/<items_name>/*.png
+  DATA_DIR/03_output/<name>/figures/tile_stats/<items_name>/*.png
 """
 
 from pathlib import Path
@@ -139,7 +139,7 @@ def main(
     stats.to_parquet(stats_path)
     logger.info(f'Saved statistics → {stats_path}')
 
-    figures_dir = Path('figures') / cfg.processing.name / 'tile_stats' / resolved_items_name
+    figures_dir = cfg.paths.output_dir / 'figures' / 'tile_stats' / resolved_items_name
     plot_tile_stats(stats, figures_dir)
 
 

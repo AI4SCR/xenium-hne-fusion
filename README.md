@@ -56,8 +56,7 @@ xenium-hne-fusion/
 ├── ray/                        # Kaiko Ray submission helpers
 ├── tests/
 ├── data/                       # managed raw/structured/processed/output data
-├── results/                    # local experiment outputs
-└── figures/                    # generated diagnostics
+└── results/                    # local experiment outputs
 ```
 
 ## Managed data layout
@@ -115,6 +114,10 @@ data/
     │   └── <items_name>.json
     ├── statistics/
     │   └── all.parquet
+    ├── figures/
+    │   └── tile_stats/
+    │       └── <items_name>/
+    │           └── *.png
     ├── splits/
     │   └── <split_name>/
     │       └── outer=0[-inner=0]-seed=<seed>.parquet
@@ -128,6 +131,7 @@ Notes:
 
 - `items/all.json` is the complete tile set built from processed tiles.
 - `items/<items_name>.json` is a filtered subset, usually driven by `items.filter.*`.
+- tile-stat diagnostics live under `DATA_DIR/03_output/<name>/figures/tile_stats/<items_name>/`.
 - split parquet files are tile-level tables produced by joining `items/*.json` with sample-level `02_processed/<name>/metadata.parquet`.
 - generated panel YAMLs live under `DATA_DIR/03_output/<name>/panels/`, not under `configs/panels/`.
 
