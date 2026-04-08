@@ -3,14 +3,17 @@
 import importlib
 import json
 import shutil
+from collections import OrderedDict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from loguru import logger
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.hvg import load_transcript_gene_categories
 from xenium_hne_fusion.metadata import join_items_with_metadata, load_items_dataframe, save_split_metadata
 from xenium_hne_fusion.utils.getters import (
@@ -21,7 +24,6 @@ from xenium_hne_fusion.utils.getters import (
     PipelineConfig,
     apply_filter,
     clear_sample_markers,
-    compute_item_stats,
     iter_tile_dirs,
     processed_sample_dir,
     tile_item,
@@ -194,11 +196,18 @@ def _write_tile_stats_summary(items_df: pd.DataFrame, stats: pd.DataFrame, outpu
     logger.info(f"Saved statistics summary -> {output_path}")
 
 
+def _resolve_feature_universe_path(tile_dir: Path) -> Path:
+    feature_universe_path = tile_dir.parent.parent / "feature_universe.txt"
+    assert feature_universe_path.exists(), f"Missing feature_universe.txt: {feature_universe_path}"
+    return feature_universe_path
+
+
 def compute_tile_stats_from_items(
     items_path: Path,
     output_dir: Path,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
+    batch_size: int = 32,
+    num_workers: int = 10,
 ) -> Path:
     items_path = Path(items_path)
     output_dir = Path(output_dir)
@@ -208,10 +217,72 @@ def compute_tile_stats_from_items(
         logger.info(f"Statistics already exist: {stats_path}")
         return stats_path
 
-    items_df = load_items_dataframe(items_path)
+    bootstrap_ds = TileDataset(
+        target="expression",
+        source_panel=None,
+        target_panel=[],
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        metadata_path=None,
+        id_key="id",
+    )
+    bootstrap_ds.setup()
+    items_df = pd.DataFrame(bootstrap_ds.items)
     assert not items_df.empty, f"No items found in {items_path}"
-    items = items_df.to_dict("records")
-    rows = [compute_item_stats(item, cell_type_col) for item in tqdm(items, desc="Tiles")]
+
+    sample_to_items: OrderedDict[str, list[dict]] = OrderedDict()
+    for item in bootstrap_ds.items:
+        sample_to_items.setdefault(item["sample_id"], []).append(item)
+
+    rows = []
+    for sample_id, sample_items in sample_to_items.items():
+        feature_universe_path = _resolve_feature_universe_path(Path(sample_items[0]["tile_dir"]))
+        feature_universe = feature_universe_path.read_text().splitlines()
+        assert feature_universe, f"Empty feature universe: {feature_universe_path}"
+
+        ds = TileDataset(
+            target="expression",
+            source_panel=None,
+            target_panel=feature_universe,
+            include_image=False,
+            include_expr=False,
+            items_path=items_path,
+            metadata_path=None,
+            id_key="id",
+        )
+        ds.setup()
+        ds.items = [item for item in ds.items if item["sample_id"] == sample_id]
+        ds.item_ids = [item["id"] for item in ds.items]
+
+        dl = DataLoader(ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+
+        ids = []
+        num_transcripts = []
+        num_unique_transcripts = []
+        for batch in tqdm(dl, desc=f"Tiles[{sample_id}]"):
+            batch_target = batch["target"]
+
+            ids.append(list(batch["id"]))
+            num_transcripts.append(batch_target.sum(dim=1).tolist())
+            num_unique_transcripts.append((batch_target > 0).sum(dim=1).tolist())
+
+        ids = [item_id for batch_ids in ids for item_id in batch_ids]
+        num_transcripts = [total for batch_totals in num_transcripts for total in batch_totals]
+        num_unique_transcripts = [unique for batch_uniques in num_unique_transcripts for unique in batch_uniques]
+        assert len(ids) == len(num_transcripts) == len(num_unique_transcripts), "Mismatched batch stats"
+
+        for item_id, total, unique in zip(ids, num_transcripts, num_unique_transcripts, strict=True):
+            rows.append(
+                {
+                    "id": item_id,
+                    "num_transcripts": int(total),
+                    "num_unique_transcripts": int(unique),
+                    "num_cells": float("nan"),
+                    "num_unique_cells": float("nan"),
+                }
+            )
+
     stats = pd.DataFrame(rows).set_index("id")
     assert list(stats.columns) == STAT_COLS, f"Unexpected stats columns: {stats.columns.tolist()}"
 
@@ -268,7 +339,7 @@ def compute_all_tile_stats(
     overwrite: bool = False,
 ) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    return compute_tile_stats_from_items(items_path, cfg.paths.output_dir, cell_type_col=cell_type_col, overwrite=overwrite)
+    return compute_tile_stats_from_items(items_path, cfg.paths.output_dir, overwrite=overwrite)
 
 
 def create_split_collection(
