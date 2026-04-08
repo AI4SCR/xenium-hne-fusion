@@ -43,7 +43,7 @@ def main(
 if __name__ == '__main__':
     import sys
 
-    processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    processing_cfg, overwrite_arg, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
     main(
         dataset=processing_cfg.name.split('-', 1)[0],
         config_path=None,

@@ -348,179 +348,52 @@ Slurm wrappers live in `slurm/`:
 ```bash
 slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
 slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
+slurm/train_hest1k_early_fusion_organ.sh breast
 ```
 
-Submit a Slurm pipeline with `./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml` or `./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml`.
+The dataset wrappers submit:
 
-They submit one sample per job with:
+- one `samples` job per selected sample
+- one `finalize` job that depends on all sample jobs
+
+The wrapped jobs call the existing dataset pipelines in `scripts/data/run_hest1k.py` and `scripts/data/run_beat.py`, so the Slurm layer does not reimplement structuring, tissue detection, tiling, processing, metadata, items, stats, or splits.
+
+Default resources:
 
 - `8` CPUs
 - `64G` RAM
 - `08:00:00` wall time
 - logs in `$HOME/logs`
 
-Quick Slurm runs:
+Pass `--overwrite` to reprocess samples and overwrite finalized outputs.
+
+Examples:
 
 ```bash
-export CONFIG=configs/data/remote/hest1k-breast.yaml
-export CONFIG=configs/data/remote/beat.yaml
-
-./slurm/run_hest1k_slurm.sh --config "$CONFIG"
-uv run python scripts/data/process_metadata.py --config "$CONFIG"
-uv run python scripts/data/create_items.py --config "$CONFIG"
-uv run python scripts/data/filter_items.py --config "$CONFIG"
-uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
-uv run python scripts/data/create_splits.py --config "$CONFIG"
-uv run python scripts/data/create_panel.py --config "$CONFIG"
-sbatch --job-name hest1k_breast_early_fusion --cpus-per-task 8 --mem 64G --gres=gpu:1 --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
-```
-
-```bash
-export CONFIG=configs/data/remote/beat.yaml
-
-./slurm/run_beat_slurm.sh --config "$CONFIG"
-uv run python scripts/data/process_metadata.py --config "$CONFIG"
-uv run python scripts/data/create_items.py --config "$CONFIG"
-uv run python scripts/data/filter_items.py --config "$CONFIG"
-uv run python scripts/data/compute_tile_stats.py --config "$CONFIG"
-uv run python scripts/data/create_splits.py --config "$CONFIG"
-sbatch --job-name beat_early_fusion --cpus-per-task 8 --mem 64G --gres=gpu:1 --time 08:00:00 --output "$HOME/logs/%j.log" --error "$HOME/logs/%j.err" --wrap "uv run scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
-```
-
-### Full pipeline on Slurm
-
-The wrappers submit the processing job. Run the rest in order below.
-
-HEST1K:
-
-1. Structure and download the selected samples:
-
-```bash
-uv run python scripts/data/structure_hest1k.py hest1k \
-  --config_path configs/data/remote/hest1k.yaml
-```
-
-2. Submit the HEST processing job:
-
-```bash
-./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml
-```
-
-The wrapped command is:
-
-```bash
-uv run python scripts/data/process_hest1k.py \
-  --config configs/data/remote/hest1k.yaml
-```
-
-3. Finalize dataset outputs:
-
-```bash
-DATASET_NAME=hest1k
-
-uv run python scripts/data/process_metadata.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/create_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/compute_tile_stats.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/filter_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/create_splits.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-```
-
-4. If training needs a panel, generate it after splits exist:
-
-```bash
-uv run python scripts/data/create_panel.py \
-  --config configs/data/local/hest1k-pancreas.yaml
-```
-
-5. Launch training once data outputs, splits, and panel are ready:
-
-```bash
-uv run scripts/train/supervised.py \
-  --config configs/train/hest1k/expression/pancreas/early-fusion.yaml
-```
-
-BEAT:
-
-1. Structure the raw dataset:
-
-```bash
-uv run python scripts/data/structure_beat.py beat \
-  --config_path configs/data/remote/beat.yaml
-```
-
-2. Submit one per-sample job per raw sample directory:
-
-```bash
+./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k-breast.yaml
+./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k-breast.yaml --overwrite
 ./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
+./slurm/train_hest1k_early_fusion_organ.sh breast
 ```
 
-The wrapper expands each sample job into:
+The per-sample jobs run:
 
 ```bash
-uv run python scripts/data/detect_tissues.py \
-  --wsi_path WSI_PATH \
-  --output_parquet TISSUES_PATH
-
-uv run python scripts/data/tile.py \
-  --wsi_path WSI_PATH \
-  --tissues_parquet TISSUES_PATH \
-  --output_parquet TILES_PATH \
-  --tile_px TILE_PX \
-  --stride_px STRIDE_PX \
-  --mpp TILE_MPP
-
-uv run python scripts/data/process.py \
-  --wsi_path WSI_PATH \
-  --tiles_parquet TILES_PATH \
-  --transcripts_path TRANSCRIPTS_PATH \
-  --output_dir PROCESSED_DIR \
-  --mpp TILE_MPP \
-  --predicate PREDICATE \
-  --img_size TILE_PX \
-  --kernel_size KERNEL_SIZE
+uv run python scripts/data/run_<dataset>.py \
+  --config CONFIG_PATH \
+  --executor serial \
+  --stage samples \
+  --filter.include_ids "[SAMPLE_ID]" \
+  --filter.exclude_ids null
 ```
 
-When `cells.parquet` exists, the wrapper adds:
+The finalization job runs once:
 
 ```bash
---cells_path CELLS_PATH
-```
-
-3. Finalize dataset outputs:
-
-```bash
-DATASET_NAME=beat
-
-uv run python scripts/data/process_metadata.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/create_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/compute_tile_stats.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/filter_items.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-
-uv run python scripts/data/create_splits.py \
-  --config "configs/data/remote/$DATASET_NAME.yaml"
-```
-
-4. Train once the dataset outputs are ready:
-
-```bash
-uv run scripts/train/supervised.py \
-  --config configs/train/beat/expression/early-fusion.yaml
+uv run python scripts/data/run_<dataset>.py \
+  --config CONFIG_PATH \
+  --executor serial \
+  --stage finalize
 ```
 
 For organ-specific or thresholded HEST1K runs, reuse the same config and override only what changes:
