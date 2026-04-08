@@ -11,6 +11,7 @@ import pandas as pd
 from loguru import logger
 from tqdm import tqdm
 
+from xenium_hne_fusion.hvg import load_transcript_gene_categories
 from xenium_hne_fusion.metadata import join_items_with_metadata, load_items_dataframe, save_split_metadata
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
@@ -157,6 +158,42 @@ def plot_tile_stats(stats: pd.DataFrame, output_dir: Path) -> None:
     _plot_transcript_scatter(stats, output_dir, log_axes=True)
 
 
+def _write_tile_stats_summary(items_df: pd.DataFrame, stats: pd.DataFrame, output_path: Path) -> None:
+    sample_panels = []
+    for sample_id, sample_items in items_df.groupby("sample_id", sort=False):
+        del sample_id
+        transcripts_path = Path(sample_items.iloc[0]["tile_dir"]) / "transcripts.parquet"
+        try:
+            panel = set(load_transcript_gene_categories(transcripts_path))
+        except AssertionError:
+            transcripts = pd.read_parquet(transcripts_path, columns=["feature_name"])
+            panel = set(transcripts["feature_name"].dropna().astype(str))
+        sample_panels.append(panel)
+
+    panel_sizes = [len(panel) for panel in sample_panels]
+    panel_intersection = len(set.intersection(*sample_panels))
+    panel_union = len(set.union(*sample_panels))
+
+    num_unique_transcripts = stats["num_unique_transcripts"].dropna()
+    summary = {
+        "num_tiles": len(items_df),
+        "num_samples": items_df["sample_id"].nunique(),
+        "num_transcripts": int(stats["num_transcripts"].sum()),
+        "num_unique_transcripts_min": int(num_unique_transcripts.min()),
+        "num_unique_transcripts_median": float(num_unique_transcripts.median()),
+        "num_unique_transcripts_max": int(num_unique_transcripts.max()),
+        "gene_panel_min": min(panel_sizes),
+        "gene_panel_max": max(panel_sizes),
+        "gene_panel_intersection": panel_intersection,
+        "gene_panel_union": panel_union,
+    }
+
+    lines = [f"# {output_path.stem}", ""]
+    lines.extend([f"- `{key}`: {value}" for key, value in summary.items()])
+    output_path.write_text("\n".join(lines) + "\n")
+    logger.info(f"Saved statistics summary -> {output_path}")
+
+
 def compute_tile_stats_from_items(
     items_path: Path,
     output_dir: Path,
@@ -181,6 +218,7 @@ def compute_tile_stats_from_items(
     stats_path.parent.mkdir(parents=True, exist_ok=True)
     stats.to_parquet(stats_path)
     logger.info(f"Saved statistics -> {stats_path}")
+    _write_tile_stats_summary(items_df, stats, stats_path.with_suffix(".md"))
 
     figures_dir = output_dir / "figures" / "tile_stats" / items_path.stem
     plot_tile_stats(stats, figures_dir)

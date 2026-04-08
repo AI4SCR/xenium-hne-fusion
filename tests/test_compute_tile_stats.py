@@ -124,3 +124,71 @@ def test_compute_tile_stats_from_items_accepts_dict_shaped_json(tmp_path: Path):
     figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
+
+
+def test_compute_tile_stats_from_items_writes_markdown_summary(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'hest1k'
+    s1_tile_dir = tmp_path / 'tiles' / 'S1' / '0'
+    s2_tile_dir = tmp_path / 'tiles' / 'S2' / '0'
+    s1_tile_dir.mkdir(parents=True)
+    s2_tile_dir.mkdir(parents=True)
+
+    s1_transcripts = gpd.GeoDataFrame(
+        {
+            'feature_name': pd.Categorical(
+                ['A', 'A', 'B'],
+                categories=['A', 'B', 'C'],
+                ordered=False,
+            )
+        },
+        geometry=[Point(0, 0), Point(1, 1), Point(2, 2)],
+    )
+    s2_transcripts = gpd.GeoDataFrame(
+        {
+            'feature_name': pd.Categorical(
+                ['B', 'C', 'C'],
+                categories=['B', 'C', 'D'],
+                ordered=False,
+            )
+        },
+        geometry=[Point(0, 0), Point(1, 1), Point(2, 2)],
+    )
+    cells = gpd.GeoDataFrame(
+        {'Level3_grouped': ['tumor', 'stroma', 'tumor']},
+        geometry=[Point(0, 0), Point(1, 1), Point(2, 2)],
+    )
+    s1_transcripts.to_parquet(s1_tile_dir / 'transcripts.parquet')
+    s2_transcripts.to_parquet(s2_tile_dir / 'transcripts.parquet')
+    cells.to_parquet(s1_tile_dir / 'cells.parquet')
+    cells.to_parquet(s2_tile_dir / 'cells.parquet')
+
+    items_path = output_dir / 'items' / 'subset.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    items_path.write_text(json.dumps([
+        {
+            'id': 'S1_0',
+            'sample_id': 'S1',
+            'tile_id': 0,
+            'tile_dir': str(s1_tile_dir),
+        },
+        {
+            'id': 'S2_0',
+            'sample_id': 'S2',
+            'tile_id': 0,
+            'tile_dir': str(s2_tile_dir),
+        },
+    ]))
+
+    compute_tile_stats_from_items(items_path, output_dir)
+
+    summary_path = output_dir / 'statistics' / 'subset.md'
+    assert summary_path.exists()
+    summary = summary_path.read_text()
+    assert 'num_samples' in summary
+    assert 'num_transcripts' in summary
+    assert 'gene_panel_min' in summary
+    assert 'gene_panel_max' in summary
+    assert 'gene_panel_intersection' in summary
+    assert 'gene_panel_union' in summary
+    assert '- `gene_panel_intersection`: 2' in summary
+    assert '- `gene_panel_union`: 4' in summary
