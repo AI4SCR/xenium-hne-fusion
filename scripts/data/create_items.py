@@ -53,5 +53,5 @@ def _ensure_output_scaffold(output_dir: Path) -> None:
 
 
 if __name__ == '__main__':
-    processing_cfg, overwrite_arg, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    processing_cfg, overwrite_arg, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
     main(processing_cfg, overwrite=overwrite_arg)

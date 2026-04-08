@@ -166,32 +166,36 @@ def _run(
     overwrite: bool,
     executor: Literal["serial", "ray"],
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+    stage: Literal["all", "samples", "finalize"] = "all",
 ) -> None:
     cfg, metadata_path, eligible_sample_ids = prepare_driver_context(processing_cfg)
 
-    if executor == "serial":
-        retained_sample_ids = run_samples_serial(
-            cfg,
-            eligible_sample_ids,
-            metadata_path,
-            overwrite,
-        )
-    else:
-        retained_sample_ids = run_samples_ray(
-            cfg,
-            eligible_sample_ids,
-            metadata_path,
-            overwrite,
-        )
+    retained_sample_ids = eligible_sample_ids
+    if stage in {"all", "samples"}:
+        if executor == "serial":
+            retained_sample_ids = run_samples_serial(
+                cfg,
+                eligible_sample_ids,
+                metadata_path,
+                overwrite,
+            )
+        else:
+            retained_sample_ids = run_samples_ray(
+                cfg,
+                eligible_sample_ids,
+                metadata_path,
+                overwrite,
+            )
 
-    finalize_dataset(
-        cfg,
-        metadata_path,
-        retained_sample_ids,
-        cfg.processing.tiles.kernel_size,
-        cell_type_col,
-        overwrite,
-    )
+    if stage in {"all", "finalize"}:
+        finalize_dataset(
+            cfg,
+            metadata_path,
+            retained_sample_ids,
+            cfg.processing.tiles.kernel_size,
+            cell_type_col,
+            overwrite,
+        )
 
 
 def prepare_driver_context(
@@ -369,15 +373,16 @@ def main(
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
     executor: Literal["serial", "ray"] = "serial",
+    stage: Literal["all", "samples", "finalize"] = "all",
 ) -> None:
     assert processing_cfg is not None, "processing_cfg is required"
-    _run(processing_cfg, overwrite=overwrite, executor=executor, cell_type_col=cell_type_col)
+    _run(processing_cfg, overwrite=overwrite, executor=executor, cell_type_col=cell_type_col, stage=stage)
 
 
 def cli(argv: list[str] | None = None) -> None:
-    processing_cfg, overwrite, executor = parse_processing_args(argv)
+    processing_cfg, overwrite, executor, stage = parse_processing_args(argv)
     assert executor is not None
-    _run(processing_cfg, overwrite=overwrite, executor=executor)
+    _run(processing_cfg, overwrite=overwrite, executor=executor, stage=stage)
 
 
 if __name__ == "__main__":

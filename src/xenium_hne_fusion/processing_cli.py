@@ -24,6 +24,7 @@ def build_processing_parser(*, include_executor: bool = True) -> ArgumentParser:
     parser.add_class_arguments(SplitConfig, nested_key="split")
     parser.add_class_arguments(PanelConfig, nested_key="panel")
     parser.add_argument("--overwrite", type=bool, default=False)
+    parser.add_argument("--stage", type=Literal["all", "samples", "finalize"], default="all")
     if include_executor:
         parser.add_argument("--executor", type=Literal["serial", "ray"], default="serial")
     return parser
@@ -57,8 +58,8 @@ def parse_processing_args(
     argv: list[str] | None = None,
     *,
     include_executor: bool = True,
-) -> tuple[ProcessingConfig, bool, str | None]:
+) -> tuple[ProcessingConfig, bool, str | None, str]:
     parser = build_processing_parser(include_executor=include_executor)
     ns = parser.parse_args(argv)
     executor = ns.executor if include_executor else None
-    return namespace_to_processing_config(ns), ns.overwrite, executor
+    return namespace_to_processing_config(ns), ns.overwrite, executor, ns.stage

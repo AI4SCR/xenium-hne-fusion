@@ -39,5 +39,5 @@ def main(processing_cfg: ProcessingConfig) -> None:
 
 
 if __name__ == '__main__':
-    processing_cfg, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    processing_cfg, _, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
     main(processing_cfg)
