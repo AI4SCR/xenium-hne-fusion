@@ -42,9 +42,23 @@ envsubst < "${ENV_TEMPLATE}" > "${ENV_FILE}"
 
 RAY_ADDRESS="https://chuv.nebul.prd.kaiko.ai"
 ENTRYPOINT_NUM_GPUS="${KAIKO_ENTRYPOINT_NUM_GPUS:-0}"
+ENTRYPOINT_NUM_CPUS="${KAIKO_ENTRYPOINT_NUM_CPUS:-0}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --entrypoint-num-cpus)
+            shift
+            [[ $# -gt 0 ]] || {
+                echo "Missing value for --entrypoint-num-cpus" >&2
+                exit 1
+            }
+            ENTRYPOINT_NUM_CPUS="$1"
+            shift
+            ;;
+        --entrypoint-num-cpus=*)
+            ENTRYPOINT_NUM_CPUS="${1#*=}"
+            shift
+            ;;
         --entrypoint-num-gpus)
             shift
             [[ $# -gt 0 ]] || {
@@ -60,11 +74,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             cat <<'EOF'
-Usage: ray/submit.sh [--entrypoint-num-gpus N] [--] [REMOTE_CMD...]
+Usage: ray/submit.sh [--entrypoint-num-cpus N] [--entrypoint-num-gpus N] [--] [REMOTE_CMD...]
 
 Pass multiple arguments to submit an exact command argv.
 Pass a single argument to run a shell snippet via `bash -lc`.
-Defaults to --entrypoint-num-gpus 0 and runs `pwd` when no remote command is given.
+Defaults to --entrypoint-num-cpus 0, --entrypoint-num-gpus 0, and runs `pwd` when no remote command is given.
 EOF
             exit 0
             ;;
@@ -88,6 +102,7 @@ fi
 
 kray job submit \
     --address "$RAY_ADDRESS" \
+    --entrypoint-num-cpus "$ENTRYPOINT_NUM_CPUS" \
     --entrypoint-num-gpus "$ENTRYPOINT_NUM_GPUS" \
     --working-dir . \
     --runtime-env "${ENV_FILE}" \
