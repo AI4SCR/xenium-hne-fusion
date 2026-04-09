@@ -521,3 +521,42 @@ uv run pytest
 uv add <pkg>
 uv add --dev <pkg>
 ```
+## HEST1k Commands
+
+```bash
+
+for ORGAN in breast lung pancreas; do
+    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml
+    
+    for OUTER in 0 1 2 3; do
+        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+        echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+
+        uv run python scripts/artifacts/create_panel.py \
+            --config "configs/artifacts/hest1k-${ORGAN}.yaml" \
+            --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
+            --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
+    done
+done
+
+
+for ORGAN in breast lung pancreas; do
+  
+    ./ray/submit.sh "scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml"
+    
+    for OUTER in 0 1 2 3; do
+        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+        echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+
+        cmd="python scripts/artifacts/create_panel.py \
+            --config configs/artifacts/hest1k-${ORGAN}.yaml \
+            --panel.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet \
+            --panel.name hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
+
+        echo "Running: ${cmd}"
+        ./ray/submit.sh "${cmd}"
+    done
+done
+
+
+```
