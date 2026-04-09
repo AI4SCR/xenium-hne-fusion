@@ -12,7 +12,7 @@ OVERWRITE=false
 usage() {
     cat <<'EOF'
 Usage:
-  ./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml [--overwrite]
+  ./slurm/run_beat.sh --config configs/data/remote/beat.yaml [--overwrite]
 EOF
 }
 

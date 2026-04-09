@@ -12,7 +12,7 @@ OVERWRITE=false
 usage() {
     cat <<'EOF'
 Usage:
-  ./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k.yaml [--overwrite]
+  ./slurm/run_hest1k.sh --config configs/data/remote/hest1k.yaml [--overwrite]
 EOF
 }
 
