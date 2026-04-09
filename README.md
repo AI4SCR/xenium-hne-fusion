@@ -589,3 +589,10 @@ done
 
 
 ```
+
+## Data Processing Commands
+
+```bash
+./ray/submit.sh "python scripts/data/run_beat.py --config configs/data/remote/beat.yaml --executor ray --stage all --overwrite true"
+./ray/submit.sh "python scripts/data/run_hest1k.py --config configs/data/remote/hest1k.yaml --executor ray --stage all --overwrite true"
+```
