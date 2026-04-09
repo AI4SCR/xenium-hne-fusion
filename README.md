@@ -558,5 +558,23 @@ for ORGAN in breast lung pancreas; do
     done
 done
 
+# copy default panel
+./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
+
+
+./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --items.name=all"  # note: feels a bit hacky
+./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat.yaml"
+for model in early-fusion late-fusion vision expr-tile expr-token; do
+  cp cp panels/beat/default.yaml ${DATA_DIR}/03_output/beat/panels/
+  ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 python scripts/train/supervised.py --config "configs/train/beat/expression/${model}.yaml"
+done
+
+ORGAN=breast
+for model in late-fusion vision expr-tile expr-token; do
+  ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 python scripts/train/supervised.py --config "configs/train/hest1k/expression/${ORGAN}/${model}.yaml"
+done
 
 ```
