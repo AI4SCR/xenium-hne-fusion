@@ -107,3 +107,4 @@ kray job submit \
     --working-dir . \
     --runtime-env "${ENV_FILE}" \
     -- "${REMOTE_CMD[@]}"
+#    --no-wait \
