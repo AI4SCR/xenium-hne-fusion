@@ -12,7 +12,7 @@ from xenium_hne_fusion.pipeline import filter_items
 
 
 def _load_filter_items_module():
-    path = Path('scripts/data/filter_items.py').resolve()
+    path = Path('scripts/artifacts/filter_items.py').resolve()
     spec = importlib.util.spec_from_file_location('filter_items_script', path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

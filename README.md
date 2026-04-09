@@ -124,7 +124,7 @@ data/
 
 Key outputs:
 
-- `items/all.json`: complete tile set
+- `items/all.json`: complete tile set used for source-item stats
 - `items/<items_name>.json`: filtered subset
 - `figures/tile_stats/<items_name>/`: tile-stat plots
 - `splits/<split_name>/`: split parquet files
@@ -172,17 +172,13 @@ split:
 
 Examples:
 
-- [configs/data/local/hest1k.yaml](configs/data/local/hest1k.yaml)
-- [configs/data/local/hest1k-breast.yaml](configs/data/local/hest1k-breast.yaml)
-- [configs/data/local/hest1k-lung.yaml](configs/data/local/hest1k-lung.yaml)
-- [configs/data/local/hest1k-pancreas.yaml](configs/data/local/hest1k-pancreas.yaml)
-- [configs/data/remote/hest1k-breast.yaml](configs/data/remote/hest1k-breast.yaml)
-- [configs/data/remote/hest1k-lung.yaml](configs/data/remote/hest1k-lung.yaml)
-- [configs/data/remote/hest1k-pancreas.yaml](configs/data/remote/hest1k-pancreas.yaml)
-- [configs/data/remote/hest1k.yaml](configs/data/remote/hest1k.yaml)
-- [configs/data/local/beat.yaml](configs/data/local/beat.yaml)
+- [configs/artifacts/hest1k.yaml](configs/artifacts/hest1k.yaml)
+- [configs/artifacts/hest1k-breast.yaml](configs/artifacts/hest1k-breast.yaml)
+- [configs/artifacts/hest1k-lung.yaml](configs/artifacts/hest1k-lung.yaml)
+- [configs/artifacts/hest1k-pancreas.yaml](configs/artifacts/hest1k-pancreas.yaml)
+- [configs/artifacts/beat.yaml](configs/artifacts/beat.yaml)
 
-`scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/data/filter_items.py`, and `scripts/data/create_splits.py` all use this schema. `filter.include_ids` and `filter.exclude_ids` are mutually exclusive:
+`scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/artifacts/filter_items.py`, and `scripts/artifacts/create_splits.py` all use this schema. `filter.include_ids` and `filter.exclude_ids` are mutually exclusive:
 
 ```bash
 --filter.include_ids '[TENX116]'
@@ -231,32 +227,35 @@ uv run python scripts/data/create_items.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-#### Tile stats
+#### Source item stats
+
+Intended to compute summary stats for `items/<items.name>.json` using the artifacts config.
+`scripts/artifacts/compute_items_stats.py` parses `ArtifactsConfig`, so it expects an artifacts config.
 
 ```bash
-uv run scripts/data/compute_items_stats.py \
-  --config configs/data/local/hest1k.yaml
+uv run scripts/artifacts/compute_items_stats.py \
+  --config configs/artifacts/hest1k.yaml
 ```
 
 #### Filtered items
 
 ```bash
-uv run scripts/data/filter_items.py \
-  --config configs/data/local/hest1k-breast.yaml
+uv run scripts/artifacts/filter_items.py \
+  --config configs/artifacts/hest1k-breast.yaml
 ```
 
 #### Splits
 
 ```bash
-uv run scripts/data/create_splits.py \
-  --config configs/data/local/hest1k-breast.yaml
+uv run scripts/artifacts/create_splits.py \
+  --config configs/artifacts/hest1k-breast.yaml
 ```
 
 #### Panel
 
 ```bash
-uv run scripts/data/create_panel.py \
-  --config configs/train/hest1k/expression/breast/early-fusion.yaml
+uv run scripts/artifacts/create_panel.py \
+  --config configs/artifacts/hest1k-breast.yaml
 ```
 
 ### End-to-end runners
@@ -305,7 +304,7 @@ uv run scripts/data/run_hest1k.py \
 Panels are runtime YAML files consumed by training:
 - `DATA_DIR/03_output/<name>/panels/*.yaml`
 
-Panel creation is defined in the training config, not the data config. Keep the output filename in `data.panel_path`, and keep the recipe in a dedicated top-level `panel:` section:
+Panel creation is defined in the artifacts config. Keep the output filename in `data.panel_path`, and keep the recipe in a dedicated top-level `panel:` section:
 
 ```yaml
 data:
@@ -320,7 +319,7 @@ panel:
   flavor: seurat_v3
 ```
 
-`scripts/data/create_panel.py` accepts a training config only. It resolves the current training config, uses the fit split referenced by `data.metadata_path`, and writes the panel YAML to `data.panel_path`.
+`scripts/artifacts/create_panel.py` accepts an artifacts config. It resolves the current artifacts layout, uses the fit split referenced by `split.name` and `panel.metadata_path`, and writes the panel YAML under `data.panel_path`.
 
 Training configs under `configs/train/` resolve relative data paths as follows:
 
@@ -339,11 +338,11 @@ Examples:
 Create panels:
 
 ```bash
-uv run python scripts/data/create_panel.py \
+uv run python scripts/artifacts/create_panel.py \
   --config configs/train/hest1k/expression/breast/early-fusion.yaml \
   --overwrite true
 
-uv run python scripts/data/create_panel.py \
+uv run python scripts/artifacts/create_panel.py \
   --config configs/train/beat/expression/early-fusion.yaml \
   --overwrite true
 ```
@@ -403,11 +402,11 @@ Pass `--overwrite` to reprocess samples and overwrite finalized outputs.
 For organ-specific or thresholded HEST1K runs, reuse the same config and override only what changes:
 
 ```bash
-uv run python scripts/data/filter_items.py \
-  --config configs/data/remote/hest1k-breast.yaml
+uv run python scripts/artifacts/filter_items.py \
+  --config configs/artifacts/hest1k-breast.yaml
 
-uv run python scripts/data/create_splits.py \
-  --config configs/data/remote/hest1k-breast.yaml
+uv run python scripts/artifacts/create_splits.py \
+  --config configs/artifacts/hest1k-breast.yaml
 ```
 
 ### BEAT
@@ -471,26 +470,26 @@ For `hest1k-breast`, submit each step individually:
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/data/compute_items_stats.py --config "configs/data/remote/hest1k.yaml"'
+./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k.yaml"'
 
-./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/data/compute_items_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
+./ray/submit.sh 'python scripts/artifacts/filter_items.py --config "configs/artifacts/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/artifacts/create_splits.py --config "configs/artifacts/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k-breast.yaml'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
 To run the same sequence for other canonical configs:
 
 ```bash
-export CONFIG=configs/data/remote/hest1k-breast.yaml
+export CONFIG=configs/artifacts/hest1k-breast.yaml
 
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/filter_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/compute_items_stats.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
+./ray/submit.sh "python scripts/artifacts/filter_items.py --config $CONFIG"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config $CONFIG"
+./ray/submit.sh "python scripts/artifacts/create_splits.py --config $CONFIG"
+./ray/submit.sh "python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k-breast.yaml"
 ./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
 

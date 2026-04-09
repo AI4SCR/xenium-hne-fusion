@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, SplitConfig
 from xenium_hne_fusion.metadata import link_structured_metadata
 from xenium_hne_fusion.utils.getters import load_processing_config
 
@@ -142,20 +143,25 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
     processed_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     pd.DataFrame(sample_rows).to_parquet(processed_dir / 'metadata.parquet', index=False)
-    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
+    (output_dir / 'items' / 'default.json').write_text(json.dumps(items))
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_splits.py', 'create_splits_script')
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.split.name = 'default'
-    processing_cfg.split.test_size = 0.2
-    processing_cfg.split.val_size = None
-    processing_cfg.split.stratify = False
-    processing_cfg.split.group_column_name = 'sample_id'
-    processing_cfg.split.random_state = 0
-    module.main(processing_cfg, overwrite=True, with_metadata=True)
+    module = _load_script('scripts/artifacts/create_splits.py', 'create_splits_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(
+            name='default',
+            test_size=0.2,
+            val_size=None,
+            stratify=False,
+            group_column_name='sample_id',
+            random_state=0,
+        ),
+    )
+    module.main(artifacts_cfg, overwrite=True, with_metadata=True)
 
     split_dir = output_dir / 'splits' / 'default'
     assert split_dir.exists()
@@ -169,8 +175,11 @@ def test_create_splits_writes_tile_level_metadata_with_sample_columns(
 
 
 def test_beat_default_split_groups_by_sample_id():
-    cfg = load_processing_config(Path('configs/data/local/beat.yaml'))
-    assert cfg.split.group_column_name == 'sample_id'
+    artifacts_cfg = ArtifactsConfig(
+        name='beat',
+        split=SplitConfig(name='default', group_column_name='sample_id'),
+    )
+    assert artifacts_cfg.split.group_column_name == 'sample_id'
 
 
 def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
@@ -216,16 +225,20 @@ def test_create_hest1k_organ_splits_can_mix_tiles_within_sample(
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_splits.py', 'create_splits_lung_script')
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.items.name = 'lung'
-    processing_cfg.split.name = 'lung'
-    processing_cfg.split.test_size = 0.2
-    processing_cfg.split.val_size = None
-    processing_cfg.split.stratify = False
-    processing_cfg.split.group_column_name = None
-    processing_cfg.split.random_state = 0
-    module.main(processing_cfg, overwrite=True)
+    module = _load_script('scripts/artifacts/create_splits.py', 'create_splits_lung_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='lung'),
+        split=SplitConfig(
+            name='lung',
+            test_size=0.2,
+            val_size=None,
+            stratify=False,
+            group_column_name=None,
+            random_state=0,
+        ),
+    )
+    module.main(artifacts_cfg, overwrite=True)
 
     split_path = output_dir / 'splits' / 'lung' / 'outer=0-seed=0.parquet'
     assert split_path.exists()
@@ -274,20 +287,25 @@ def test_create_splits_without_metadata_keeps_item_columns_only(
     processed_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     pd.DataFrame(sample_rows).to_parquet(processed_dir / 'metadata.parquet', index=False)
-    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
+    (output_dir / 'items' / 'default.json').write_text(json.dumps(items))
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_splits.py', 'create_splits_no_metadata_script')
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.split.name = 'default'
-    processing_cfg.split.test_size = 0.2
-    processing_cfg.split.val_size = None
-    processing_cfg.split.stratify = False
-    processing_cfg.split.group_column_name = 'sample_id'
-    processing_cfg.split.random_state = 0
-    module.main(processing_cfg, overwrite=True, with_metadata=False)
+    module = _load_script('scripts/artifacts/create_splits.py', 'create_splits_no_metadata_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(
+            name='default',
+            test_size=0.2,
+            val_size=None,
+            stratify=False,
+            group_column_name='sample_id',
+            random_state=0,
+        ),
+    )
+    module.main(artifacts_cfg, overwrite=True, with_metadata=False)
 
     split_path = output_dir / 'splits' / 'default' / 'outer=0-seed=0.parquet'
     assert split_path.exists()
@@ -334,18 +352,23 @@ def test_create_splits_without_metadata_rejects_missing_target_column(
         processed_dir / 'metadata.parquet',
         index=False,
     )
-    (output_dir / 'items' / 'all.json').write_text(json.dumps(items))
+    (output_dir / 'items' / 'default.json').write_text(json.dumps(items))
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_splits.py', 'create_splits_missing_target_script')
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.split.name = 'default'
-    processing_cfg.split.test_size = 0.5
-    processing_cfg.split.val_size = None
-    processing_cfg.split.target_column_name = 'patient'
-    processing_cfg.split.random_state = 0
+    module = _load_script('scripts/artifacts/create_splits.py', 'create_splits_missing_target_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(
+            name='default',
+            test_size=0.5,
+            val_size=None,
+            target_column_name='patient',
+            random_state=0,
+        ),
+    )
 
     with pytest.raises(AssertionError, match='Missing split columns'):
-        module.main(processing_cfg, overwrite=True, with_metadata=False)
+        module.main(artifacts_cfg, overwrite=True, with_metadata=False)

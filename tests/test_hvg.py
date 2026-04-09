@@ -6,13 +6,13 @@ import pandas as pd
 import pytest
 import torch
 
+from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, PanelConfig, SplitConfig
 from xenium_hne_fusion.hvg import (
     build_hvg_anndata_from_split,
     create_panel,
     get_common_genes,
 )
 from xenium_hne_fusion.datasets.tiles import TileDataset
-from xenium_hne_fusion.utils.getters import load_processing_config
 
 
 def _load_script(path: str, module_name: str):
@@ -300,9 +300,19 @@ def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_panel.py', 'create_panel_script')
-    processing_cfg = load_processing_config(config_path)
-    module.main(processing_cfg=processing_cfg, overwrite=True)
+    module = _load_script('scripts/artifacts/create_panel.py', 'create_panel_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(name='default', random_state=0),
+        panel=PanelConfig(
+            name='hvg-default-default-outer=0-seed=0',
+            metadata_path=Path('default/outer=0-seed=0.parquet'),
+            n_top_genes=1,
+            flavor='seurat_v3',
+        ),
+    )
+    module.main(artifacts_cfg=artifacts_cfg, overwrite=True)
 
     panel_path = output_dir / 'panels' / 'hvg-default-default-outer=0-seed=0.yaml'
     assert panel_path.exists()
@@ -339,9 +349,14 @@ def test_create_panel_script_accepts_predefined_panel(monkeypatch: pytest.Monkey
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_panel.py', 'create_panel_predefined_script')
-    processing_cfg = load_processing_config(config_path)
-    module.main(processing_cfg=processing_cfg, overwrite=False)
+    module = _load_script('scripts/artifacts/create_panel.py', 'create_panel_predefined_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(name='default'),
+        panel=PanelConfig(name='default'),
+    )
+    module.main(artifacts_cfg=artifacts_cfg, overwrite=False)
 
     assert panel_path.exists()
 
@@ -370,10 +385,15 @@ def test_create_panel_script_rejects_missing_predefined_panel(monkeypatch: pytes
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_panel.py', 'create_panel_missing_predefined_script')
-    processing_cfg = load_processing_config(config_path)
+    module = _load_script('scripts/artifacts/create_panel.py', 'create_panel_missing_predefined_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(name='default'),
+        panel=PanelConfig(name='missing'),
+    )
     with pytest.raises(AssertionError, match='Panel not found'):
-        module.main(processing_cfg=processing_cfg, overwrite=False)
+        module.main(artifacts_cfg=artifacts_cfg, overwrite=False)
 
 
 def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -400,7 +420,12 @@ def test_create_panel_script_rejects_mixed_panel_mode(monkeypatch: pytest.Monkey
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
-    module = _load_script('scripts/data/create_panel.py', 'create_panel_mixed_mode_script')
-    processing_cfg = load_processing_config(config_path)
-    with pytest.raises(AssertionError, match='panel config must set both n_top_genes and flavor'):
-        module.main(processing_cfg=processing_cfg, overwrite=False)
+    module = _load_script('scripts/artifacts/create_panel.py', 'create_panel_mixed_mode_script')
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='default'),
+        split=SplitConfig(name='default'),
+        panel=PanelConfig(name='default', n_top_genes=128),
+    )
+    with pytest.raises(AssertionError, match='panel.flavor is required'):
+        module.main(artifacts_cfg=artifacts_cfg, overwrite=False)
