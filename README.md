@@ -563,14 +563,14 @@ done
 
 ./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --items.name=all"  # note: feels a bit hacky
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat.yaml"
-./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat.yaml"
-./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat.yaml --overwrite true"
+./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat.yaml --overwrite true"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --overwrite true"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     for model in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
     done
 done
 
@@ -579,8 +579,8 @@ for ORGAN in breast lung pancreas; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
     for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
     done
   done
 done
