@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from xenium_hne_fusion.config import ProcessingConfig
+from xenium_hne_fusion.config import DataConfig
 from xenium_hne_fusion.download import (
     create_structured_metadata_symlink,
     create_structured_symlinks,
@@ -15,7 +15,7 @@ from xenium_hne_fusion.download import (
     download_sample,
     validate_hest_sample_mpp,
 )
-from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples
 
 
@@ -34,9 +34,9 @@ def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
     download_sample(sample_id, raw_dir)
 
 
-def main(processing_cfg: ProcessingConfig) -> None:
-    assert processing_cfg.name == "hest1k", f"Expected dataset='hest1k', got {processing_cfg.name!r}"
-    cfg = build_pipeline_config(processing_cfg)
+def main(data_cfg: DataConfig) -> None:
+    assert data_cfg.name == "hest1k", f"Expected dataset='hest1k', got {data_cfg.name!r}"
+    cfg = build_pipeline_config(data_cfg)
     metadata_csv = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_csv, cfg.paths.structured_dir)
     samples = resolve_samples(cfg, metadata_csv)
@@ -47,5 +47,5 @@ def main(processing_cfg: ProcessingConfig) -> None:
 
 
 if __name__ == "__main__":
-    processing_cfg, _, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
-    main(processing_cfg)
+    data_cfg, _, _, _ = parse_data_args(sys.argv[1:], include_executor=False)
+    main(data_cfg)

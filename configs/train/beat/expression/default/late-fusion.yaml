@@ -29,9 +29,6 @@ data:
   metadata_path: default/outer=0-inner=0-seed=0.parquet
   panel_path: default.yaml
 
-panel:
-  name: default
-
 lit:
   target_key: target
   lr_head: 1.0e-4

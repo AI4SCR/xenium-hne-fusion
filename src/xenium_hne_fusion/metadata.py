@@ -278,14 +278,3 @@ def save_split_metadata(
     )
     logger.info(f'Saved split collection → {split_dir}')
     return split_dir
-
-
-def get_default_split_path(split_dir: Path, split_cfg: SplitConfig) -> Path:
-    seed = split_cfg.random_state
-    if split_cfg.val_size is None:
-        filename = f'outer=0-seed={seed}.parquet'
-    else:
-        filename = f'outer=0-inner=0-seed={seed}.parquet'
-    path = split_dir / filename
-    assert path.exists(), f'Expected canonical split file at {path}'
-    return path

@@ -26,11 +26,6 @@ data:
   metadata_path: default/outer=0-inner=0-seed=0.parquet
   panel_path: hvg.yaml
 
-panel:
-  name: hvg
-  n_top_genes: 128
-  flavor: seurat_v3
-
 lit:
   target_key: target
   lr_head: 1.0e-4

@@ -144,6 +144,7 @@ You are an expert coding assistant for research code in computer vision, followi
 - **Lean code**: concise, readable, easy to debug. No boilerplate.
 - **Python 3.12 typing**: prefer modern built-in typing syntax when possible, including `X | Y` over `Union[X, Y]`.
 - **Use libraries**: if a library simplifies the overall codebase, use it.
+- **No script-to-script imports**: scripts under `scripts/` are entrypoints, not reusable modules. Import only from installed packages or `src/xenium_hne_fusion/`. If multiple scripts need the same logic, move that logic into `src/` and keep the scripts as thin wrappers.
 - **No over-engineering**: this is iterative research code. No extensive error handling, no speculative abstractions, no backwards-compat shims.
 - **No trailing summaries**: do not summarize what was just done at the end of a response.
 

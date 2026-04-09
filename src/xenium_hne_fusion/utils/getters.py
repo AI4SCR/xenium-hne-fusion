@@ -5,7 +5,16 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from xenium_hne_fusion.config import FilterConfig, ItemsConfig, ItemsThresholdConfig, ProcessingConfig, SplitConfig, TilesConfig
+from xenium_hne_fusion.config import (
+    ArtifactsConfig,
+    DataConfig,
+    FilterConfig,
+    ItemsConfig,
+    ItemsThresholdConfig,
+    PanelConfig,
+    SplitConfig,
+    TilesConfig,
+)
 from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
 
 
@@ -32,11 +41,11 @@ class PipelineConfig:
     dataset: str
     raw_dir: Path
     paths: ManagedPaths
-    processing: ProcessingConfig
+    data: DataConfig
 
     @property
     def name(self) -> str:
-        return self.processing.name
+        return self.data.name
 
     @property
     def structured_dir(self) -> Path:
@@ -52,35 +61,27 @@ class PipelineConfig:
 
     @property
     def tile_px(self) -> int:
-        return self.processing.tiles.tile_px
+        return self.data.tiles.tile_px
 
     @property
     def stride_px(self) -> int:
-        return self.processing.tiles.stride_px
+        return self.data.tiles.stride_px
 
     @property
     def tile_mpp(self) -> float:
-        return self.processing.tiles.mpp
+        return self.data.tiles.mpp
 
     @property
     def kernel_size(self) -> int:
-        return self.processing.tiles.kernel_size
+        return self.data.tiles.kernel_size
 
     @property
     def predicate(self) -> str:
-        return self.processing.tiles.predicate
+        return self.data.tiles.predicate
 
     @property
     def filter(self) -> FilterConfig:
-        return self.processing.filter
-
-    @property
-    def items(self) -> ItemsConfig:
-        return self.processing.items
-
-    @property
-    def split(self) -> SplitConfig:
-        return self.processing.split
+        return self.data.filter
 
 
 @dataclass
@@ -110,7 +111,7 @@ def load_items_filter_config(path: Path) -> ItemsFilterConfig:
     )
 
 
-def load_processing_config(path: Path) -> ProcessingConfig:
+def load_data_config(path: Path) -> DataConfig:
     data = yaml.safe_load(path.read_text()) or {}
     tiles = data.get('tiles') or {
         'tile_px': data.get('tile_px'),
@@ -122,10 +123,7 @@ def load_processing_config(path: Path) -> ProcessingConfig:
     }
     assert tiles.get('img_size') is not None, f"Missing tiles.img_size in {path}"
     filter_data = data.get('filter') or {}
-    items_data = data.get('items') or {'name': 'default', 'filter': {}}
-    items_filter_data = items_data.get('filter') or {}
-    split_data = data.get('split') or {'name': 'default', 'test_size': 0.25, 'val_size': 0.25}
-    return ProcessingConfig(
+    return DataConfig(
         name=data['name'],
         tiles=TilesConfig(
             tile_px=tiles['tile_px'],
@@ -142,6 +140,17 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             include_ids=filter_data.get('include_ids'),
             exclude_ids=filter_data.get('exclude_ids'),
         ),
+    )
+
+
+def load_artifacts_config(path: Path) -> ArtifactsConfig:
+    data = yaml.safe_load(path.read_text()) or {}
+    items_data = data.get('items') or {'name': 'default', 'filter': {}}
+    items_filter_data = items_data.get('filter') or {}
+    split_data = data.get('split') or {'name': 'default', 'test_size': 0.25, 'val_size': 0.25}
+    panel_data = data.get('panel')
+    return ArtifactsConfig(
+        name=data['name'],
         items=ItemsConfig(
             name=items_data['name'],
             filter=ItemsThresholdConfig(
@@ -167,16 +176,30 @@ def load_processing_config(path: Path) -> ProcessingConfig:
             group_column_name=split_data.get('group_column_name'),
             random_state=split_data.get('random_state'),
         ),
+        panel=None if panel_data is None else PanelConfig(
+            name=panel_data.get('name'),
+            n_top_genes=panel_data.get('n_top_genes'),
+            flavor=panel_data.get('flavor'),
+        ),
     )
 
 
-def load_dataset_config(path: Path) -> ProcessingConfig:
-    return load_processing_config(path)
+def load_dataset_config(path: Path) -> DataConfig:
+    return load_data_config(path)
 
 
-def get_processing_config_path(dataset: str, config_root: Path | None = None) -> Path:
+def get_data_config_path(dataset: str, config_root: Path | None = None) -> Path:
     root = config_root or Path('configs/data/local')
     return root / f'{dataset}.yaml'
+
+
+def get_artifacts_config_path(dataset: str, config_root: Path | None = None) -> Path:
+    root = config_root or Path('configs/artifacts/local')
+    return root / f'{dataset}.yaml'
+
+
+load_processing_config = load_data_config
+get_processing_config_path = get_data_config_path
 
 
 def get_data_dir() -> Path:
@@ -224,7 +247,7 @@ def select_sample_ids(
     return selected
 
 
-def build_pipeline_config(cfg: ProcessingConfig) -> PipelineConfig:
+def build_pipeline_config(cfg: DataConfig) -> PipelineConfig:
     dataset = cfg.name
     assert dataset in {'beat', 'hest1k'}, f'Unknown dataset for config name: {cfg.name!r}'
     managed = get_managed_paths(cfg.name)
@@ -233,7 +256,7 @@ def build_pipeline_config(cfg: ProcessingConfig) -> PipelineConfig:
         dataset=dataset,
         raw_dir=raw_dir,
         paths=managed,
-        processing=cfg,
+        data=cfg,
     )
 
 
@@ -244,8 +267,8 @@ def load_pipeline_config(
 ) -> PipelineConfig:
     assert dataset is not None or config_path is not None, 'dataset or config_path is required'
     if config_path is None:
-        config_path = get_processing_config_path(dataset, config_root=config_root)
-    cfg = load_processing_config(config_path)
+        config_path = get_data_config_path(dataset, config_root=config_root)
+    cfg = load_data_config(config_path)
     if dataset is not None:
         assert cfg.name in {'beat', 'hest1k'}, f'Unknown dataset for config name: {cfg.name!r}'
         assert dataset == cfg.name, f"Config name {cfg.name!r} does not match dataset {dataset!r}"
@@ -279,12 +302,12 @@ def structured_done_path(cfg: 'PipelineConfig', sample_id: str) -> Path:
 
 
 def processed_done_path(cfg: 'PipelineConfig', sample_id: str) -> Path:
-    tiles = cfg.processing.tiles
+    tiles = cfg.data.tiles
     return cfg.paths.processed_dir / sample_id / f'{tiles.tile_px}_{tiles.stride_px}' / '.processed.done'
 
 
 def processed_sample_dir(cfg: 'PipelineConfig', sample_id: str) -> Path:
-    tiles = cfg.processing.tiles
+    tiles = cfg.data.tiles
     return cfg.paths.processed_dir / sample_id / f'{tiles.tile_px}_{tiles.stride_px}'
 
 
@@ -372,8 +395,8 @@ def apply_filter(stats: pd.DataFrame, cfg: 'ItemsFilterConfig') -> pd.Series:
     return mask
 
 
-def resolve_samples(cfg: ProcessingConfig | PipelineConfig, metadata_path: Path) -> list[str]:
-    filter_cfg = cfg.processing.filter if isinstance(cfg, PipelineConfig) else cfg.filter
+def resolve_samples(cfg: DataConfig | PipelineConfig, metadata_path: Path) -> list[str]:
+    filter_cfg = cfg.data.filter if isinstance(cfg, PipelineConfig) else cfg.filter
     validate_filter_ids(filter_cfg)
 
     meta = normalize_sample_metadata(read_metadata_table(metadata_path))

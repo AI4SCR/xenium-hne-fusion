@@ -8,24 +8,24 @@ from loguru import logger
 
 load_dotenv()
 
-from xenium_hne_fusion.config import ProcessingConfig
+from xenium_hne_fusion.config import DataConfig
 from xenium_hne_fusion.download import get_hest_sample_mpp
 from xenium_hne_fusion.metadata import get_structured_metadata_path
 from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
-from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples
 
 
 def main(
-    processing_cfg: ProcessingConfig,
+    data_cfg: DataConfig,
     overwrite: bool = False,
 ) -> None:
-    assert processing_cfg.name == "hest1k", f"Expected dataset='hest1k', got {processing_cfg.name!r}"
-    cfg = build_pipeline_config(processing_cfg)
+    assert data_cfg.name == "hest1k", f"Expected dataset='hest1k', got {data_cfg.name!r}"
+    cfg = build_pipeline_config(data_cfg)
     metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
     sample_ids = resolve_samples(cfg, metadata_path)
-    tiles_cfg = cfg.processing.tiles
+    tiles_cfg = cfg.data.tiles
     assert tiles_cfg.img_size is not None, "tiles.img_size is required"
     img_size = tiles_cfg.img_size
     kernel_size = tiles_cfg.kernel_size
@@ -71,5 +71,5 @@ def main(
 
 
 if __name__ == "__main__":
-    processing_cfg, overwrite, _, _ = parse_processing_args(include_executor=False)
-    main(processing_cfg, overwrite=overwrite)
+    data_cfg, overwrite, _, _ = parse_data_args(include_executor=False)
+    main(data_cfg, overwrite=overwrite)

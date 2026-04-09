@@ -10,31 +10,29 @@ from xenium_hne_fusion.metadata import (
     build_split_metadata_frame,
     save_split_metadata,
 )
-from xenium_hne_fusion.processing_cli import build_processing_parser, namespace_to_processing_config
-from xenium_hne_fusion.config import ProcessingConfig
-from xenium_hne_fusion.utils.getters import build_pipeline_config
+from xenium_hne_fusion.config import ArtifactsConfig
+from xenium_hne_fusion.processing_cli import build_artifacts_parser, namespace_to_artifacts_config
+from xenium_hne_fusion.utils.getters import get_managed_paths
 
 
 def build_parser() -> ArgumentParser:
-    parser = build_processing_parser(include_executor=False)
+    parser = build_artifacts_parser()
     parser.add_argument('--with-metadata', type=bool, default=False)
     return parser
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[ProcessingConfig, bool, bool]:
+def parse_args(argv: list[str] | None = None) -> tuple[ArtifactsConfig, bool, bool]:
     ns = build_parser().parse_args(argv)
-    return namespace_to_processing_config(ns), ns.overwrite, ns.with_metadata
+    return namespace_to_artifacts_config(ns), ns.overwrite, ns.with_metadata
 
 
-def main(processing_cfg: ProcessingConfig, overwrite: bool = False, with_metadata: bool = False) -> None:
-    cfg = build_pipeline_config(processing_cfg)
-    split_cfg = cfg.processing.split
-
-    configured_items_path = cfg.paths.output_dir / 'items' / f'{cfg.processing.items.name}.json'
-    source_items_path = cfg.paths.output_dir / 'items' / 'all.json'
-    items_path = configured_items_path if configured_items_path.exists() else source_items_path
-    metadata_path = cfg.paths.processed_dir / 'metadata.parquet'
-    split_dir = cfg.paths.output_dir / 'splits' / split_cfg.name
+def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False, with_metadata: bool = False) -> None:
+    managed_paths = get_managed_paths(artifacts_cfg.name)
+    split_cfg = artifacts_cfg.split
+    items_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
+    assert items_path.exists(), f'Items not found: {items_path}'
+    metadata_path = managed_paths.processed_dir / 'metadata.parquet'
+    split_dir = managed_paths.output_dir / 'splits' / split_cfg.name
 
     if split_dir.exists() and not overwrite:
         logger.info(f'Split metadata already exists: {split_dir}')
@@ -52,5 +50,5 @@ def main(processing_cfg: ProcessingConfig, overwrite: bool = False, with_metadat
 if __name__ == '__main__':
     import sys
 
-    processing_cfg, overwrite_arg, with_metadata_arg = parse_args(sys.argv[1:])
-    main(processing_cfg, overwrite=overwrite_arg, with_metadata=with_metadata_arg)
+    artifacts_cfg, overwrite_arg, with_metadata_arg = parse_args(sys.argv[1:])
+    main(artifacts_cfg, overwrite=overwrite_arg, with_metadata=with_metadata_arg)

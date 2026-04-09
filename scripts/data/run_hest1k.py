@@ -12,7 +12,7 @@ from loguru import logger
 
 load_dotenv()
 
-from xenium_hne_fusion.config import ProcessingConfig
+from xenium_hne_fusion.config import DataConfig
 from xenium_hne_fusion.download import (
     create_structured_metadata_symlink,
     create_structured_symlinks,
@@ -26,14 +26,12 @@ from xenium_hne_fusion.metadata import (
 )
 from xenium_hne_fusion.pipeline import (
     compute_all_tile_stats,
-    filter_items_from_items_path,
     create_all_items,
-    create_split_collection,
     load_ray_module,
     maybe_reset_sample,
     wait_for_ray_samples,
 )
-from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.processing import (
     extract_tiles,
     process_cells,
@@ -44,7 +42,6 @@ from xenium_hne_fusion.processing import (
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
-    ItemsFilterConfig,
     PipelineConfig,
     build_pipeline_config,
     is_sample_processed,
@@ -79,7 +76,7 @@ def process_sample(
 ) -> None:
     logger.info(f"Processing HEST1K sample {sample_id}")
     structured_dir = cfg.paths.structured_dir / sample_id
-    tiles_cfg = cfg.processing.tiles
+    tiles_cfg = cfg.data.tiles
     wsi_path = structured_dir / "wsi.tiff"
     transcripts_path = structured_dir / "transcripts.parquet"
     cells_path = structured_dir / "cells.parquet"
@@ -118,10 +115,8 @@ def process_sample(
 
 def can_extract_sample_at_tile_mpp(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> bool:
     slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
-    if slide_mpp > cfg.processing.tiles.mpp:
-        logger.warning(
-            f"Skipping {sample_id}: slide_mpp={slide_mpp:.4f} is coarser than tile_mpp={cfg.processing.tiles.mpp:.4f}"
-        )
+    if slide_mpp > cfg.data.tiles.mpp:
+        logger.warning(f"Skipping {sample_id}: slide_mpp={slide_mpp:.4f} is coarser than tile_mpp={cfg.data.tiles.mpp:.4f}")
         return False
     return True
 
@@ -134,41 +129,14 @@ def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], 
     return eligible_sample_ids
 
 
-def create_filtered_items(
-    cfg: PipelineConfig,
-    overwrite: bool = False,
-) -> tuple[Path, int]:
-    filter_cfg = ItemsFilterConfig(
-        name=cfg.processing.items.name,
-        organs=cfg.processing.items.filter.organs,
-        include_ids=cfg.processing.items.filter.include_ids,
-        exclude_ids=cfg.processing.items.filter.exclude_ids,
-        num_transcripts=cfg.processing.items.filter.num_transcripts,
-        num_unique_transcripts=cfg.processing.items.filter.num_unique_transcripts,
-        num_cells=cfg.processing.items.filter.num_cells,
-        num_unique_cells=cfg.processing.items.filter.num_unique_cells,
-    )
-    output_path = cfg.paths.output_dir / "items" / f"{filter_cfg.name}.json"
-    items_path = cfg.paths.output_dir / "items" / "all.json"
-    metadata_path = cfg.paths.processed_dir / "metadata.parquet" if filter_cfg.organs is not None else None
-    return filter_items_from_items_path(
-        items_path=items_path,
-        output_path=output_path,
-        items_filter_cfg=filter_cfg,
-        metadata_path=metadata_path,
-        overwrite=overwrite,
-    )
-
-
-
 def _run(
-    processing_cfg: ProcessingConfig,
+    data_cfg: DataConfig,
     overwrite: bool,
     executor: Literal["serial", "ray"],
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     stage: Literal["all", "samples", "finalize"] = "all",
 ) -> None:
-    cfg, metadata_path, eligible_sample_ids = prepare_driver_context(processing_cfg)
+    cfg, metadata_path, eligible_sample_ids = prepare_driver_context(data_cfg)
 
     retained_sample_ids = eligible_sample_ids
     if stage in {"all", "samples"}:
@@ -192,15 +160,13 @@ def _run(
             cfg,
             metadata_path,
             retained_sample_ids,
-            cfg.processing.tiles.kernel_size,
+            cfg.data.tiles.kernel_size,
             cell_type_col,
             overwrite,
         )
 
 
-def prepare_driver_context(
-    config: ProcessingConfig,
-) -> tuple[PipelineConfig, Path, list[str]]:
+def prepare_driver_context(config: DataConfig) -> tuple[PipelineConfig, Path, list[str]]:
     assert config.name == "hest1k", f"Expected dataset='hest1k', got {config.name!r}"
     cfg = build_pipeline_config(config)
 
@@ -354,35 +320,23 @@ def finalize_dataset(
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
-    filtered_items_path, num_items = create_filtered_items(
-        cfg,
-        overwrite=overwrite,
-    )
-    if num_items == 0:
-        logger.warning(f"No items kept for {cfg.processing.items.name}, skipping split creation")
-        return
-    create_split_collection(
-        cfg,
-        filtered_items_path,
-        overwrite=overwrite,
-    )
 
 
 def main(
-    processing_cfg: ProcessingConfig | None = None,
+    data_cfg: DataConfig | None = None,
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
     executor: Literal["serial", "ray"] = "serial",
     stage: Literal["all", "samples", "finalize"] = "all",
 ) -> None:
-    assert processing_cfg is not None, "processing_cfg is required"
-    _run(processing_cfg, overwrite=overwrite, executor=executor, cell_type_col=cell_type_col, stage=stage)
+    assert data_cfg is not None, "data_cfg is required"
+    _run(data_cfg, overwrite=overwrite, executor=executor, cell_type_col=cell_type_col, stage=stage)
 
 
 def cli(argv: list[str] | None = None) -> None:
-    processing_cfg, overwrite, executor, stage = parse_processing_args(argv)
+    data_cfg, overwrite, executor, stage = parse_data_args(argv)
     assert executor is not None
-    _run(processing_cfg, overwrite=overwrite, executor=executor, stage=stage)
+    _run(data_cfg, overwrite=overwrite, executor=executor, stage=stage)
 
 
 if __name__ == "__main__":

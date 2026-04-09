@@ -1,9 +1,10 @@
-"""Backward-compatible wrapper for item statistics computation."""
+"""Compute statistics for the items artifact defined by an artifacts config."""
 
 from dotenv import load_dotenv
 
 from xenium_hne_fusion.config import ArtifactsConfig
-from xenium_hne_fusion.pipeline import compute_stats_from_items, plot_tile_stats
+from xenium_hne_fusion.pipeline import compute_stats_from_items
+from xenium_hne_fusion.processing_cli import parse_artifacts_args
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
 
@@ -27,7 +28,5 @@ def main(
 
 
 if __name__ == '__main__':
-    from xenium_hne_fusion.processing_cli import parse_artifacts_args
-
     artifacts_cfg, overwrite_arg = parse_artifacts_args()
     main(artifacts_cfg, overwrite=overwrite_arg)

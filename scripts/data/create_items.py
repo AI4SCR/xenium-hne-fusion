@@ -11,14 +11,14 @@ from dotenv import load_dotenv
 from loguru import logger
 from tqdm import tqdm
 
-from xenium_hne_fusion.config import ProcessingConfig
-from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.config import DataConfig
+from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.utils.getters import DEFAULT_SOURCE_ITEMS_NAME, build_pipeline_config, iter_tile_dirs, tile_item
 
 
-def main(processing_cfg: ProcessingConfig, overwrite: bool = False) -> None:
+def main(data_cfg: DataConfig, overwrite: bool = False) -> None:
     load_dotenv()
-    cfg = build_pipeline_config(processing_cfg)
+    cfg = build_pipeline_config(data_cfg)
     processed_dir = cfg.paths.processed_dir
     items_path = cfg.paths.output_dir / 'items' / f'{DEFAULT_SOURCE_ITEMS_NAME}.json'
 
@@ -53,5 +53,5 @@ def _ensure_output_scaffold(output_dir: Path) -> None:
 
 
 if __name__ == '__main__':
-    processing_cfg, overwrite_arg, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
-    main(processing_cfg, overwrite=overwrite_arg)
+    data_cfg, overwrite_arg, _, _ = parse_data_args(sys.argv[1:], include_executor=False)
+    main(data_cfg, overwrite=overwrite_arg)

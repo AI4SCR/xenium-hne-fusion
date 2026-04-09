@@ -26,11 +26,6 @@ data:
   metadata_path: lung/outer=0-inner=0-seed=0.parquet
   panel_path: hvg-lung-lung-outer=0-seed=0.yaml
 
-panel:
-  name: hvg-lung-lung-outer=0-seed=0
-  n_top_genes: 8
-  flavor: seurat_v3
-
 lit:
   target_key: target
   lr_head: 1.0e-4

@@ -40,7 +40,7 @@ class BackboneConfig:
 
 
 @dataclass
-class DataConfig:
+class DataLoaderConfig:
     name: str | None = None
     num_workers: int = 10
     batch_size: int = 256
@@ -55,13 +55,6 @@ class DataConfig:
     items_path: Path | None = None
     metadata_path: Path | None = None
     cache_dir: Path | None = None
-
-
-@dataclass
-class PanelConfig:
-    name: str | None = None
-    n_top_genes: int | None = None
-    flavor: str | None = None
 
 
 @dataclass
@@ -101,8 +94,7 @@ class Config:
     debug: bool = False
     head: HeadConfig = field(default_factory=HeadConfig)
     backbone: BackboneConfig = field(default_factory=BackboneConfig)
-    data: DataConfig = field(default_factory=DataConfig)
-    panel: PanelConfig = field(default_factory=PanelConfig)
+    data: DataLoaderConfig = field(default_factory=DataLoaderConfig)
     lit: LitConfig = field(default_factory=LitConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     wandb: WandbConfig = field(default_factory=WandbConfig)

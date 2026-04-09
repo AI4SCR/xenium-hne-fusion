@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -53,9 +54,26 @@ class SplitConfig:
 
 
 @dataclass
-class ProcessingConfig:
+class PanelConfig:
+    name: str | None = None
+    metadata_path: Path | None = None
+    n_top_genes: int | None = None
+    flavor: str | None = None
+
+
+@dataclass
+class DataConfig:
     name: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
+
+
+@dataclass
+class ArtifactsConfig:
+    name: str
     items: ItemsConfig = field(default_factory=lambda: ItemsConfig(name='default'))
     split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
+    panel: PanelConfig | None = None
+
+
+ProcessingConfig = DataConfig

@@ -5,16 +5,16 @@ import sys
 from dotenv import load_dotenv
 from loguru import logger
 
-from xenium_hne_fusion.config import ProcessingConfig
-from xenium_hne_fusion.processing_cli import parse_processing_args
+from xenium_hne_fusion.config import DataConfig
+from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.structure import structure_metadata, structure_sample
 from xenium_hne_fusion.utils.getters import build_pipeline_config
 
 
-def main(processing_cfg: ProcessingConfig) -> None:
+def main(data_cfg: DataConfig) -> None:
     load_dotenv()
-    assert processing_cfg.name == "beat", f"Expected dataset='beat', got {processing_cfg.name!r}"
-    cfg = build_pipeline_config(processing_cfg)
+    assert data_cfg.name == "beat", f"Expected dataset='beat', got {data_cfg.name!r}"
+    cfg = build_pipeline_config(data_cfg)
 
     metadata_path = cfg.raw_dir / "metadata.parquet"
     if metadata_path.exists():
@@ -30,5 +30,5 @@ def main(processing_cfg: ProcessingConfig) -> None:
 
 
 if __name__ == "__main__":
-    processing_cfg, _, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
-    main(processing_cfg)
+    data_cfg, _, _, _ = parse_data_args(sys.argv[1:], include_executor=False)
+    main(data_cfg)

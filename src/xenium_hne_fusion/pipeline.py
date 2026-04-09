@@ -204,7 +204,7 @@ def _resolve_feature_universe_path(tile_dir: Path) -> Path:
     return feature_universe_path
 
 
-def compute_tile_stats_from_items(
+def compute_stats_from_items(
     items_path: Path,
     output_dir: Path,
     overwrite: bool = False,
@@ -368,16 +368,18 @@ def compute_all_tile_stats(
     overwrite: bool = False,
 ) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    return compute_tile_stats_from_items(items_path, cfg.paths.output_dir, overwrite=overwrite)
+    return compute_stats_from_items(items_path, cfg.paths.output_dir, overwrite=overwrite)
 
 
 def create_split_collection(
-    cfg: PipelineConfig,
+    split_cfg,
+    *,
+    output_dir: Path,
+    processed_dir: Path,
     items_path: Path,
     overwrite: bool = False,
 ) -> Path:
-    split_cfg = cfg.processing.split
-    split_dir = cfg.paths.output_dir / "splits" / split_cfg.name
+    split_dir = output_dir / "splits" / split_cfg.name
     if split_dir.exists() and not overwrite:
         logger.info(f"Split metadata already exists: {split_dir}")
         return split_dir
@@ -386,7 +388,10 @@ def create_split_collection(
         items_path,
         split_cfg,
         with_metadata=False,
-        sample_metadata_path=cfg.paths.processed_dir / "metadata.parquet",
+        sample_metadata_path=processed_dir / "metadata.parquet",
     )
     save_split_metadata(split_metadata, split_dir, split_cfg, overwrite=overwrite)
     return split_dir
+
+
+compute_tile_stats_from_items = compute_stats_from_items
