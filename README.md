@@ -557,9 +557,10 @@ for ORGAN in breast lung pancreas; do
     done
 done
 
+./ray/submit.sh "python scripts/data/run_beat.py --config configs/data/remote/beat.yaml --executor ray --stage all --overwrite true"
+
 # copy default panel
 ./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
-
 
 ./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --items.name=all"  # note: feels a bit hacky
