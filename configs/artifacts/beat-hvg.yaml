@@ -25,3 +25,8 @@ split:
   include_targets: null
   group_column_name: sample_id
   random_state: 0
+panel:
+  name: hvg-default-default-outer=0-inner=0-seed=0
+  metadata_path: default/outer=0-inner=0-seed=0.parquet
+  n_top_genes: 100
+  flavor: seurat_v3
