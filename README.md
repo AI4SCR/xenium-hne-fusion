@@ -258,6 +258,24 @@ uv run scripts/artifacts/create_panel.py \
   --config configs/artifacts/hest1k-breast.yaml
 ```
 
+#### All artifacts
+
+`scripts/artifacts/create_artifacts.py` runs the full artifacts workflow for a single
+artifacts config:
+
+1. filter `items/all.json` into `items/<items.name>.json`
+2. build `splits/<split.name>/`
+3. create or validate `panels/<panel.name>.yaml` when `panel:` is set
+4. compute `statistics/all.parquet` for the filtered items
+
+```bash
+uv run python scripts/artifacts/create_artifacts.py \
+  --config configs/artifacts/hest1k-breast.yaml
+```
+
+If the config has no `panel:` section, panel creation is skipped. If `panel:` points to a
+predefined panel, the script only checks that the target YAML already exists.
+
 ### End-to-end runners
 
 The dataset runners execute the full pipeline:
@@ -465,17 +483,15 @@ bash ray/submit.sh "bash ray/scripts/test_env.sh"
 
 ### HEST1K
 
-For `hest1k-breast`, submit each step individually:
+For `hest1k-breast`, keep the data-prep steps separate and then run the bundled artifacts
+workflow:
 
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k.yaml"'
 
-./ray/submit.sh 'python scripts/artifacts/filter_items.py --config "configs/artifacts/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/artifacts/create_splits.py --config "configs/artifacts/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k-breast.yaml'
+./ray/submit.sh 'python scripts/artifacts/create_artifacts.py --config "configs/artifacts/hest1k-breast.yaml"'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
@@ -486,10 +502,7 @@ export CONFIG=configs/artifacts/hest1k-breast.yaml
 
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/artifacts/filter_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config $CONFIG"
-./ray/submit.sh "python scripts/artifacts/create_splits.py --config $CONFIG"
-./ray/submit.sh "python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k-breast.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config $CONFIG"
 ./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
 
