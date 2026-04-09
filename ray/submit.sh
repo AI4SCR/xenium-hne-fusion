@@ -2,17 +2,15 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ENV_TEMPLATE="${REPO_ROOT}/ray/runtime_envs/runtime_env_template.yml"
-ENV_FILE="${REPO_ROOT}/ray/runtime_envs/runtime_env.yml"
-XENIUM_MODULE_PATH="$(cd "${REPO_ROOT}/src/xenium_hne_fusion" && pwd -P)"
-AI4BMR_MODULE_PATH="$(cd "${REPO_ROOT}/ray/other_modules/ai4bmr-learn/src/ai4bmr_learn" && pwd -P)"
+ENV_TEMPLATE="ray/runtime_envs/runtime_env_template.yml"
+ENV_FILE="ray/runtime_envs/runtime_env.yml"
+XENIUM_MODULE_PATH="$(cd "src/xenium_hne_fusion" && pwd -P)"
+AI4BMR_MODULE_PATH="$(cd "ray/other_modules/ai4bmr-learn/src/ai4bmr_learn" && pwd -P)"
 
-if [[ -f "${REPO_ROOT}/.env.kaiko" ]]; then
+if [[ -f ".env.kaiko" ]]; then
     set -a
     # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.env.kaiko"
+    source ".env.kaiko"
     set +a
 fi
 
@@ -64,6 +62,8 @@ while [[ $# -gt 0 ]]; do
             cat <<'EOF'
 Usage: ray/submit.sh [--entrypoint-num-gpus N] [--] [REMOTE_CMD...]
 
+Pass multiple arguments to submit an exact command argv.
+Pass a single argument to run a shell snippet via `bash -lc`.
 Defaults to --entrypoint-num-gpus 0 and runs `pwd` when no remote command is given.
 EOF
             exit 0
@@ -78,11 +78,17 @@ EOF
     esac
 done
 
-REMOTE_CMD="${*:-pwd}"
+if [[ $# -eq 0 ]]; then
+    REMOTE_CMD=(pwd)
+elif [[ $# -eq 1 ]]; then
+    REMOTE_CMD=(bash -lc "$1")
+else
+    REMOTE_CMD=("$@")
+fi
 
 kray job submit \
     --address "$RAY_ADDRESS" \
     --entrypoint-num-gpus "$ENTRYPOINT_NUM_GPUS" \
-    --working-dir "${REPO_ROOT}" \
+    --working-dir . \
     --runtime-env "${ENV_FILE}" \
-    -- bash -c "$REMOTE_CMD"
+    -- "${REMOTE_CMD[@]}"
