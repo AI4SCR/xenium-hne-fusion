@@ -24,7 +24,7 @@ data:
   expr_pool: token
   items_path: breast.json
   metadata_path: breast/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-breast-breast-outer=0-seed=0.yaml
+  panel_path: hvg-breast-breast-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target
