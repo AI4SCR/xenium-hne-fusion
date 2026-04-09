@@ -484,3 +484,9 @@ uv run pytest
 uv add <pkg>
 uv add --dev <pkg>
 ```
+
+## Training
+
+```bash
+sbatch --wrap 'uv run python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml' --job-name beat_early_fusion --partition gpu-l40 --gres gpu:1 --cpus-per-task 8 --mem 64G --time 04:00:00 --output ~/logs/%j.log --error ~/logs/%j.err
+```
