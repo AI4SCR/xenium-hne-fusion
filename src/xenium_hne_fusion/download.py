@@ -56,13 +56,9 @@ def validate_hest_sample_mpp(
     if row is None:
         logger.warning(f"HEST MPP validation skipped for {sample_id}: expected 1 metadata row, found 0")
         return
-    expected = row.get("pixel_size_um_embedded")
-    estimated = row.get("pixel_size_um_estimated")
+    expected = row.get("pixel_size_um_estimated")
     if pd.isna(expected):
-        logger.warning(
-            f"HEST MPP validation skipped for {sample_id}: missing pixel_size_um_embedded "
-            f"(pixel_size_um_estimated={estimated!r})"
-        )
+        logger.warning(f"HEST MPP validation skipped for {sample_id}: missing pixel_size_um_estimated")
         return
 
     wsi_files = list((raw_dir / "wsis").glob(f"{sample_id}*"))
@@ -72,10 +68,7 @@ def validate_hest_sample_mpp(
 
     native_mpp = open_wsi(wsi_files[0]).properties.mpp
     if native_mpp is None:
-        logger.warning(
-            f"HEST MPP validation skipped for {sample_id}: WSI has no mpp metadata "
-            f"(pixel_size_um_embedded={float(expected):.6f}, pixel_size_um_estimated={estimated!r})"
-        )
+        logger.warning(f"HEST MPP validation skipped for {sample_id}: WSI has no mpp metadata")
         return
 
     expected = float(expected)
@@ -83,11 +76,9 @@ def validate_hest_sample_mpp(
     relative_error = abs(native_mpp - expected) / expected
 
     if relative_error > rel_tol:
-        estimated_msg = "nan" if pd.isna(estimated) else f"{float(estimated):.6f}"
         logger.warning(
             f"HEST MPP mismatch for {sample_id}: "
-            f"wsi_mpp={native_mpp:.6f}, pixel_size_um_embedded={expected:.6f}, "
-            f"pixel_size_um_estimated={estimated_msg}, relative_error={relative_error:.1%}"
+            f"wsi_mpp={native_mpp:.6f}, pixel_size_um_estimated={expected:.6f}, relative_error={relative_error:.1%}"
         )
 
 
@@ -103,8 +94,8 @@ def get_hest_metadata_row(sample_id: str, metadata_path: Path) -> pd.Series | No
 def get_hest_sample_mpp(sample_id: str, metadata_path: Path) -> float:
     row = get_hest_metadata_row(sample_id, metadata_path)
     assert row is not None, f"HEST metadata row not found for {sample_id}"
-    mpp = row.get("pixel_size_um_embedded")
-    assert not pd.isna(mpp), f"pixel_size_um_embedded missing for {sample_id}"
+    mpp = row.get("pixel_size_um_estimated")
+    assert not pd.isna(mpp), f"pixel_size_um_estimated missing for {sample_id}"
     return float(mpp)
 
 

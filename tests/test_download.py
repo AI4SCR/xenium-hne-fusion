@@ -54,7 +54,6 @@ def test_validate_hest_sample_mpp_is_silent_when_within_tolerance(monkeypatch: p
         [
             {
                 'id': 'NCBI783',
-                'pixel_size_um_embedded': 0.27398,
                 'pixel_size_um_estimated': 0.27396,
             }
         ]
@@ -86,7 +85,6 @@ def test_validate_hest_sample_mpp_warns_on_large_relative_error(monkeypatch: pyt
         [
             {
                 'id': 'NCBI856',
-                'pixel_size_um_embedded': 0.2125,
                 'pixel_size_um_estimated': 0.2125,
             }
         ]
@@ -120,7 +118,6 @@ def test_validate_hest_sample_mpp_warns_when_wsi_mpp_missing(monkeypatch: pytest
         [
             {
                 'id': 'TENX116',
-                'pixel_size_um_embedded': 0.136898,
                 'pixel_size_um_estimated': 0.136887,
             }
         ]
@@ -153,7 +150,6 @@ def test_validate_hest_sample_mpp_warns_when_metadata_row_missing(monkeypatch: p
         [
             {
                 'id': 'OTHER',
-                'pixel_size_um_embedded': 0.136898,
                 'pixel_size_um_estimated': 0.136887,
             }
         ]
@@ -168,19 +164,18 @@ def test_validate_hest_sample_mpp_warns_when_metadata_row_missing(monkeypatch: p
     assert 'expected 1 metadata row, found 0' in warnings[0]
 
 
-def test_get_hest_sample_mpp_reads_embedded_value(tmp_path: Path):
+def test_get_hest_sample_mpp_reads_estimated_value(tmp_path: Path):
     metadata_path = tmp_path / 'HEST_v1_3_0.csv'
     pd.DataFrame(
         [
             {
                 'id': 'NCBI783',
-                'pixel_size_um_embedded': 0.27398,
                 'pixel_size_um_estimated': 0.27396,
             }
         ]
     ).to_csv(metadata_path, index=False)
 
-    assert get_hest_sample_mpp('NCBI783', metadata_path) == pytest.approx(0.27398)
+    assert get_hest_sample_mpp('NCBI783', metadata_path) == pytest.approx(0.27396)
 
 
 def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
