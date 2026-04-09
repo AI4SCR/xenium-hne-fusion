@@ -1,4 +1,4 @@
-Code for the paper [Linking gene expression to morphology with vision-language models in spatial transcriptomics](https://openreview.net/forum?id=h2GcySraTP).
+Code for the paper [Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer](https://openreview.net/forum?id=h2GcySraTP).
 
 # xenium-hne-fusion
 
