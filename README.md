@@ -525,21 +525,11 @@ uv add --dev <pkg>
 
 ```bash
 
-for ORGAN in breast lung pancreas; do
-    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml
-    
-    for OUTER in 0 1 2 3; do
-        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+# data
+./ray/submit.sh "python scripts/data/run_hest1k.py --config configs/data/remote/hest1k.yaml --executor ray --stage all --overwrite true"
 
-        uv run python scripts/artifacts/create_panel.py \
-            --config "configs/artifacts/hest1k-${ORGAN}.yaml" \
-            --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
-            --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
-    done
-done
-
-for ORGAN in breast lung pancreas; do
+# artifacts
+for ORGAN in breast lung pancreas colon; do
   
     ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml"
     
@@ -557,8 +547,45 @@ for ORGAN in breast lung pancreas; do
     done
 done
 
-./ray/submit.sh "python scripts/data/run_beat.py --config configs/data/remote/beat.yaml --executor ray --stage all --overwrite true"
+./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-breast --splits_dir splits/hest1k/hescape/human-breast-panel/"
+./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-lung-healthy --splits_dir splits/hest1k/hescape/human-lung-healthy-panel/"
+./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-colon --splits_dir splits/hest1k/hescape/human-colon-panel/"
 
+# training
+for ORGAN in breast lung pancreas colon; do
+  for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
+    for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
+      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
+    done
+  done
+done
+
+```
+
+## HEST1k Slurm Commands
+
+```bash
+for ORGAN in breast lung pancreas colon; do
+    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml
+    
+    for OUTER in 0 1 2 3; do
+        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+        echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+
+        uv run python scripts/artifacts/create_panel.py \
+            --config "configs/artifacts/hest1k-${ORGAN}.yaml" \
+            --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
+            --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
+    done
+done
+```
+
+## BEAT Commands
+
+```bash
 # copy default panel
 ./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
 
@@ -574,20 +601,6 @@ for OUTER in 0 1 2 3; do
 #      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
     done
 done
-
-for ORGAN in breast lung pancreas; do
-  for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
-    for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
-    done
-  done
-done
-
-
-
 ```
 
 ## Data Processing Commands
