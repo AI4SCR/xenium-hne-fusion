@@ -22,7 +22,7 @@ data:
   num_workers: 10
   batch_size: 256
   expr_pool: tile
-  items_path: all.json
+  items_path: default.json
   metadata_path: default/outer=0-inner=0-seed=0.parquet
   panel_path: default.yaml
 
