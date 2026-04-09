@@ -1,0 +1,38 @@
+name: hest1k
+items:
+  name: hescape-human-multi-tissue
+  filter:
+    organs: null
+    include_ids:
+      - TENX105
+      - TENX106
+      - TENX116
+      - TENX118
+      - TENX119
+      - TENX120
+      - TENX121
+      - TENX122
+      - TENX123
+      - TENX124
+      - TENX125
+      - TENX126
+      - TENX132
+      - TENX133
+      - TENX134
+    exclude_ids: null
+    num_transcripts: 100
+    num_unique_transcripts: null
+    num_cells: null
+    num_unique_cells: null
+split:
+  name: hescape-human-multi-tissue
+  test_size: 0.25
+  val_size: 0.25
+  stratify: false
+  target_column_name: null
+  encode_targets: false
+  nan_value: -1
+  use_filtered_targets_for_train: false
+  include_targets: null
+  group_column_name: sample_id
+  random_state: 0
