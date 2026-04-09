@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from xenium_hne_fusion.download import create_structured_symlinks, get_hest_sample_mpp, validate_hest_sample_mpp
+from xenium_hne_fusion.utils.getters import load_processing_config
 
 
 def _load_script(path: str, module_name: str):
@@ -229,7 +230,7 @@ def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.Monke
     monkeypatch.setattr(module, 'create_structured_symlinks', fake_create_structured_symlinks)
     monkeypatch.setattr(module, 'resolve_samples', lambda cfg, metadata_csv: ['NCBI783'])
 
-    module.main('hest1k', config_path=config_path)
+    module.main(load_processing_config(config_path))
 
     structured_dir = data_dir / '01_structured' / 'hest1k'
     assert calls == [
@@ -291,7 +292,7 @@ def test_structure_hest1k_reuses_existing_raw_files(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(module, 'validate_hest_sample_mpp', fake_validate_hest_sample_mpp)
     monkeypatch.setattr(module, 'create_structured_symlinks', fake_create_structured_symlinks)
 
-    module.main('hest1k', config_path=config_path)
+    module.main(load_processing_config(config_path))
 
     structured_dir = data_dir / '01_structured' / 'hest1k'
     assert calls == [

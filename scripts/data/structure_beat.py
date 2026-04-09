@@ -1,17 +1,20 @@
 """Structure raw BEAT data into 01_structured canonical layout."""
 
-from pathlib import Path
+import sys
 
 from dotenv import load_dotenv
 from loguru import logger
 
+from xenium_hne_fusion.config import ProcessingConfig
+from xenium_hne_fusion.processing_cli import parse_processing_args
 from xenium_hne_fusion.structure import structure_metadata, structure_sample
-from xenium_hne_fusion.utils.getters import load_pipeline_config
+from xenium_hne_fusion.utils.getters import build_pipeline_config
 
 
-def main(dataset: str = "beat", config_path: Path | None = None) -> None:
+def main(processing_cfg: ProcessingConfig) -> None:
     load_dotenv()
-    cfg = load_pipeline_config(dataset, config_path)
+    assert processing_cfg.name == "beat", f"Expected dataset='beat', got {processing_cfg.name!r}"
+    cfg = build_pipeline_config(processing_cfg)
 
     metadata_path = cfg.raw_dir / "metadata.parquet"
     if metadata_path.exists():
@@ -27,5 +30,5 @@ def main(dataset: str = "beat", config_path: Path | None = None) -> None:
 
 
 if __name__ == "__main__":
-    from jsonargparse import auto_cli
-    auto_cli(main)
+    processing_cfg, _, _, _ = parse_processing_args(sys.argv[1:], include_executor=False)
+    main(processing_cfg)
