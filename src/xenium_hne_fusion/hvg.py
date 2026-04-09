@@ -6,6 +6,7 @@ from anndata import AnnData
 from loguru import logger
 from scipy import sparse
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
 
@@ -57,7 +58,7 @@ def build_hvg_anndata_from_split(
 
     rows = []
     obs_rows = []
-    for batch in dl:
+    for batch in tqdm(dl, desc='HVG'):
         target = batch['target']
         rows.append(sparse.csr_matrix(target.numpy()))
         obs_rows.extend(
