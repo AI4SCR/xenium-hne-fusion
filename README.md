@@ -192,67 +192,67 @@ Examples:
 --split.group_column_name sample_id
 ```
 
-## Data pipeline CLI
+## Local CLI
 
 ### Manual stages
 
-HEST1K structure:
+#### HEST1K structure
 
 ```bash
 uv run scripts/data/structure_hest1k.py hest1k \
   --config_path configs/data/local/hest1k.yaml
 ```
 
-BEAT structure:
+#### BEAT structure
 
 ```bash
 uv run scripts/data/structure_beat.py beat \
   --config_path configs/data/local/beat.yaml
 ```
 
-Metadata:
+#### Metadata
 
 ```bash
 uv run python scripts/data/process_metadata.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-HEST1K processing:
+#### HEST1K processing
 
 ```bash
 uv run python scripts/data/process_hest1k.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Items:
+#### Items
 
 ```bash
 uv run python scripts/data/create_items.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Tile stats:
+#### Tile stats
 
 ```bash
 uv run scripts/data/compute_tile_stats.py \
   --config configs/data/local/hest1k.yaml
 ```
 
-Filtered items:
+#### Filtered items
 
 ```bash
 uv run scripts/data/filter_items.py \
   --config configs/data/local/hest1k-breast.yaml
 ```
 
-Splits:
+#### Splits
 
 ```bash
 uv run scripts/data/create_splits.py \
   --config configs/data/local/hest1k-breast.yaml
 ```
 
-Panel:
+#### Panel
 
 ```bash
 uv run scripts/data/create_panel.py \
@@ -272,7 +272,7 @@ The dataset runners execute the full pipeline:
 7. write the filtered item set
 8. write the split collection
 
-HEST1K:
+#### HEST1K
 
 ```bash
 uv run scripts/data/run_hest1k.py \
@@ -281,7 +281,7 @@ uv run scripts/data/run_hest1k.py \
   --executor serial
 ```
 
-BEAT:
+#### BEAT
 
 ```bash
 uv run scripts/data/run_beat.py \
@@ -392,13 +392,38 @@ Default resources:
 
 Pass `--overwrite` to reprocess samples and overwrite finalized outputs.
 
-Examples:
+### HEST1K
 
 ```bash
 ./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k-breast.yaml
 ./slurm/run_hest1k_slurm.sh --config configs/data/remote/hest1k-breast.yaml --overwrite
-./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
 ./slurm/train_hest1k_early_fusion_organ.sh breast
+```
+
+For organ-specific or thresholded HEST1K runs, reuse the same config and override only what changes:
+
+```bash
+uv run python scripts/data/filter_items.py \
+  --config configs/data/remote/hest1k-breast.yaml
+
+uv run python scripts/data/create_splits.py \
+  --config configs/data/remote/hest1k-breast.yaml
+```
+
+### BEAT
+
+```bash
+./slurm/run_beat_slurm.sh --config configs/data/remote/beat.yaml
+
+sbatch --wrap 'uv run python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml' \
+  --job-name beat_early_fusion \
+  --partition gpu-l40 \
+  --gres gpu:1 \
+  --cpus-per-task 12 \
+  --mem 64G \
+  --time 04:00:00 \
+  --output ~/logs/%j.log \
+  --error ~/logs/%j.err
 ```
 
 The per-sample jobs run:
@@ -421,16 +446,6 @@ uv run python scripts/data/run_<dataset>.py \
   --stage finalize
 ```
 
-For organ-specific or thresholded HEST1K runs, reuse the same config and override only what changes:
-
-```bash
-uv run python scripts/data/filter_items.py \
-  --config configs/data/remote/hest1k-breast.yaml
-
-uv run python scripts/data/create_splits.py \
-  --config configs/data/remote/hest1k-breast.yaml
-```
-
 ## Kaiko Ray
 
 Ray helpers live under `ray/`:
@@ -440,6 +455,16 @@ bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/be
 ```
 
 Pass `--entrypoint-num-gpus N` to reserve GPUs for the Ray entrypoint itself.
+
+Useful helpers:
+
+```bash
+bash ray/submit.sh
+bash ray/scripts/disk_space.sh
+bash ray/submit.sh "bash ray/scripts/test_env.sh"
+```
+
+### HEST1K
 
 For `hest1k-breast`, submit each step individually:
 
@@ -453,14 +478,6 @@ For `hest1k-breast`, submit each step individually:
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
-```
-
-Useful helpers:
-
-```bash
-bash ray/submit.sh
-bash ray/scripts/disk_space.sh
-bash ray/submit.sh "bash ray/scripts/test_env.sh"
 ```
 
 To run the same sequence for other canonical configs:
@@ -479,16 +496,16 @@ export CONFIG=configs/data/remote/hest1k-breast.yaml
 
 Swap `hest1k-breast.yaml` for `hest1k-lung.yaml` to run the lung config.
 
+### BEAT
+
+```bash
+bash ray/submit.sh "python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml"
+```
+
 ## Development
 
 ```bash
 uv run pytest
 uv add <pkg>
 uv add --dev <pkg>
-```
-
-## Training
-
-```bash
-sbatch --wrap 'uv run python scripts/train/supervised.py --config configs/train/beat/expression/early-fusion.yaml' --job-name beat_early_fusion --partition gpu-l40 --gres gpu:1 --cpus-per-task 12 --mem 64G --time 04:00:00 --output ~/logs/%j.log --error ~/logs/%j.err
 ```
