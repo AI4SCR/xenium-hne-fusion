@@ -16,7 +16,7 @@ from xenium_hne_fusion.metadata import (
     process_dataset_metadata,
 )
 from xenium_hne_fusion.pipeline import (
-    compute_all_tile_stats,
+    compute_all_items_stats,
     create_all_items,
     load_ray_module,
     maybe_reset_sample,
@@ -268,7 +268,7 @@ def finalize_dataset(
         selected_sample_ids=retained_sample_ids,
     )
     create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
-    compute_all_tile_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
+    compute_all_items_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
 
 
 def main(

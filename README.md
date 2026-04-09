@@ -234,7 +234,7 @@ uv run python scripts/data/create_items.py \
 #### Tile stats
 
 ```bash
-uv run scripts/data/compute_tile_stats.py \
+uv run scripts/data/compute_items_stats.py \
   --config configs/data/local/hest1k.yaml
 ```
 
@@ -471,10 +471,10 @@ For `hest1k-breast`, submit each step individually:
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/data/compute_tile_stats.py --config "configs/data/remote/hest1k.yaml"'
+./ray/submit.sh 'python scripts/data/compute_items_stats.py --config "configs/data/remote/hest1k.yaml"'
 
 ./ray/submit.sh 'python scripts/data/filter_items.py --config "configs/data/remote/hest1k-breast.yaml"'
-./ray/submit.sh 'python scripts/data/compute_tile_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/data/compute_items_stats.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/create_splits.py --config "configs/data/remote/hest1k-breast.yaml"'
 ./ray/submit.sh 'python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
@@ -488,7 +488,7 @@ export CONFIG=configs/data/remote/hest1k-breast.yaml
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/filter_items.py --config $CONFIG"
-./ray/submit.sh "python scripts/data/compute_tile_stats.py --config $CONFIG"
+./ray/submit.sh "python scripts/data/compute_items_stats.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_splits.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_panel.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"

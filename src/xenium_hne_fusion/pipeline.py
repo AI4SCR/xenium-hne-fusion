@@ -16,11 +16,10 @@ from tqdm import tqdm
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.hvg import load_transcript_gene_categories
 from xenium_hne_fusion.metadata import build_split_metadata_frame, load_items_dataframe, save_split_metadata
-from xenium_hne_fusion.config import FilterConfig
+from xenium_hne_fusion.config import FilterConfig, ItemsConfig
 from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
     DEFAULT_SOURCE_ITEMS_NAME,
-    ItemsFilterConfig,
     STAT_COLS,
     PipelineConfig,
     apply_filter,
@@ -124,7 +123,7 @@ def _plot_transcript_scatter(stats: pd.DataFrame, output_dir: Path, *, log_axes:
     logger.info(f"Saved diagnostic plot -> {output_path}")
 
 
-def plot_tile_stats(stats: pd.DataFrame, output_dir: Path) -> None:
+def plot_items_stats(stats: pd.DataFrame, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     cols = [c for c in STAT_COLS if c in stats.columns and stats[c].notna().any()]
 
@@ -204,7 +203,7 @@ def _resolve_feature_universe_path(tile_dir: Path) -> Path:
     return feature_universe_path
 
 
-def compute_stats_from_items(
+def compute_items_stats(
     items_path: Path,
     output_dir: Path,
     overwrite: bool = False,
@@ -294,14 +293,14 @@ def compute_stats_from_items(
     _write_tile_stats_summary(items_df, stats, stats_path.with_suffix(".md"))
 
     figures_dir = output_dir / "figures" / "tile_stats" / items_path.stem
-    plot_tile_stats(stats, figures_dir)
+    plot_items_stats(stats, figures_dir)
     return stats_path
 
 
-def filter_items_from_items_path(
+def filter_items(
     items_path: Path,
     output_path: Path,
-    items_filter_cfg: ItemsFilterConfig,
+    items_cfg: ItemsConfig,
     metadata_path: Path | None = None,
     overwrite: bool = False,
 ) -> tuple[Path, int]:
@@ -321,34 +320,34 @@ def filter_items_from_items_path(
     loaded_count = len(items_df)
     logger.info(f"Loaded {loaded_count} items from {items_path}")
 
-    if items_filter_cfg.organs is not None:
+    if items_cfg.filter.organs is not None:
         assert metadata_path is not None, "metadata_path is required for organ filtering"
         meta = pd.read_parquet(metadata_path)
         before = len(items_df)
-        allowed_samples = set(meta.loc[meta.organ.isin(items_filter_cfg.organs), "sample_id"])
+        allowed_samples = set(meta.loc[meta.organ.isin(items_cfg.filter.organs), "sample_id"])
         items_df = items_df[items_df["sample_id"].isin(allowed_samples)]
         logger.info(
-            f"Organ filter {items_filter_cfg.organs}: {before} -> {len(items_df)} tiles "
+            f"Organ filter {items_cfg.filter.organs}: {before} -> {len(items_df)} tiles "
             f"({before - len(items_df)} removed)"
         )
-    if items_filter_cfg.include_ids is not None or items_filter_cfg.exclude_ids is not None:
+    if items_cfg.filter.include_ids is not None or items_cfg.filter.exclude_ids is not None:
         before = len(items_df)
         selected_sample_ids = select_sample_ids(
             sorted(items_df["sample_id"].unique().tolist()),
             FilterConfig(
-                include_ids=items_filter_cfg.include_ids,
-                exclude_ids=items_filter_cfg.exclude_ids,
+                include_ids=items_cfg.filter.include_ids,
+                exclude_ids=items_cfg.filter.exclude_ids,
             ),
         )
         items_df = items_df[items_df["sample_id"].isin(selected_sample_ids)]
         logger.info(
-            f"Sample filter include_ids={items_filter_cfg.include_ids} exclude_ids={items_filter_cfg.exclude_ids}: "
+            f"Sample filter include_ids={items_cfg.filter.include_ids} exclude_ids={items_cfg.filter.exclude_ids}: "
             f"{before} -> {len(items_df)} tiles ({before - len(items_df)} removed)"
         )
 
     stats = pd.read_parquet(stats_path)
     before = len(items_df)
-    kept_ids = set(stats.index[apply_filter(stats, items_filter_cfg)])
+    kept_ids = set(stats.index[apply_filter(stats, items_cfg)])
     filtered = items_df[items_df["id"].isin(kept_ids)]
     logger.info(
         f"Stats filter {stats_path.name}: {before} -> {len(filtered)} tiles "
@@ -357,18 +356,18 @@ def filter_items_from_items_path(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(filtered.to_dict("records"), indent=2))
-    logger.info(f"Filter {items_filter_cfg.name}: {loaded_count} loaded -> {len(filtered)} kept")
+    logger.info(f"Filter {items_cfg.name}: {loaded_count} loaded -> {len(filtered)} kept")
     logger.info(f"Saved filtered items -> {output_path}")
     return output_path, len(filtered)
 
 
-def compute_all_tile_stats(
+def compute_all_items_stats(
     cfg: PipelineConfig,
     cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
 ) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    return compute_stats_from_items(items_path, cfg.paths.output_dir, overwrite=overwrite)
+    return compute_items_stats(items_path, cfg.paths.output_dir, overwrite=overwrite)
 
 
 def create_split_collection(
@@ -392,6 +391,3 @@ def create_split_collection(
     )
     save_split_metadata(split_metadata, split_dir, split_cfg, overwrite=overwrite)
     return split_dir
-
-
-compute_tile_stats_from_items = compute_stats_from_items

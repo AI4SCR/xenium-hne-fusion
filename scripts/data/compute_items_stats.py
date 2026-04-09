@@ -3,7 +3,7 @@
 from dotenv import load_dotenv
 
 from xenium_hne_fusion.config import ArtifactsConfig
-from xenium_hne_fusion.pipeline import compute_stats_from_items
+from xenium_hne_fusion.pipeline import compute_items_stats, plot_items_stats
 from xenium_hne_fusion.processing_cli import parse_artifacts_args
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
@@ -18,7 +18,7 @@ def main(
     output_dir = get_managed_paths(artifacts_cfg.name).output_dir
     items_path = output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
     assert items_path.exists(), f'Items not found: {items_path}'
-    compute_stats_from_items(
+    compute_items_stats(
         items_path,
         output_dir,
         overwrite=overwrite,

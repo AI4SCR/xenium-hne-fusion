@@ -2,14 +2,13 @@ import importlib.util
 import json
 import io
 from pathlib import Path
-from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 from loguru import logger
 
-from xenium_hne_fusion.pipeline import filter_items_from_items_path
-from xenium_hne_fusion.utils.getters import load_processing_config
+from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, ItemsThresholdConfig
+from xenium_hne_fusion.pipeline import filter_items
 
 
 def _load_filter_items_module():
@@ -25,25 +24,6 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     data_dir = tmp_path / 'data'
     raw_dir = tmp_path / 'raw' / 'beat'
     output_dir = data_dir / '03_output' / 'beat'
-    config_path = tmp_path / 'beat.yaml'
-
-    config_path.write_text(
-        'name: beat\n'
-        'tile_px: 512\n'
-        'stride_px: 512\n'
-        'tile_mpp: 0.5\n'
-        'img_size: 224\n'
-        'filter:\n'
-        '  include_ids: null\n'
-        '  exclude_ids: null\n'
-    )
-    items_config_path = tmp_path / 'beat-items.yaml'
-    items_config_path.write_text(
-        'name: default\n'
-        'filter:\n'
-        '  num_transcripts: 200\n'
-    )
-
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
     (output_dir / 'items' / 'all.json').write_text(
@@ -69,15 +49,11 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv('BEAT_RAW_DIR', str(raw_dir))
 
     module = _load_filter_items_module()
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.items.name = 'default'
-    processing_cfg.items.filter.num_transcripts = 200
-    module.main(
-        'beat',
-        config_path=None,
-        overwrite=True,
-        processing_cfg=processing_cfg,
+    artifacts_cfg = ArtifactsConfig(
+        name='beat',
+        items=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
     )
+    module.main(artifacts_cfg=artifacts_cfg, overwrite=True)
 
     filtered = json.loads((output_dir / 'items' / 'default.json').read_text())
     assert [item['id'] for item in filtered] == ['S1_1', 'S1_2']
@@ -88,19 +64,6 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
     raw_dir = tmp_path / 'raw' / 'hest1k'
     output_dir = data_dir / '03_output' / 'hest1k'
     processed_dir = data_dir / '02_processed' / 'hest1k'
-    config_path = tmp_path / 'hest1k.yaml'
-
-    config_path.write_text(
-        'name: hest1k\n'
-        'tile_px: 256\n'
-        'stride_px: 256\n'
-        'tile_mpp: 0.5\n'
-        'img_size: 224\n'
-        'filter:\n'
-        '  include_ids: null\n'
-        '  exclude_ids: null\n'
-    )
-
     (output_dir / 'items').mkdir(parents=True, exist_ok=True)
     (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
     processed_dir.mkdir(parents=True, exist_ok=True)
@@ -134,22 +97,17 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
     monkeypatch.setenv('HEST1K_RAW_DIR', str(raw_dir))
 
     module = _load_filter_items_module()
-    processing_cfg = load_processing_config(config_path)
-    processing_cfg.items.name = 'lung'
-    processing_cfg.items.filter.organs = ['Lung']
-    processing_cfg.items.filter.num_transcripts = 100
-    module.main(
-        'hest1k',
-        config_path=None,
-        overwrite=True,
-        processing_cfg=processing_cfg,
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='lung', filter=ItemsThresholdConfig(organs=['Lung'], num_transcripts=100)),
     )
+    module.main(artifacts_cfg=artifacts_cfg, overwrite=True)
 
     filtered = json.loads((output_dir / 'items' / 'lung.json').read_text())
     assert [item['id'] for item in filtered] == ['L1_0']
 
 
-def test_filter_items_from_items_path_derives_stats_from_items_stem(tmp_path: Path):
+def test_filter_items_derives_stats_from_items_stem(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'beat'
     items_path = output_dir / 'items' / 'subset.json'
     output_path = output_dir / 'items' / 'default.json'
@@ -174,19 +132,10 @@ def test_filter_items_from_items_path_derives_stats_from_items_stem(tmp_path: Pa
         index=pd.Index(['S1_0', 'S1_1'], name='id'),
     ).to_parquet(output_dir / 'statistics' / 'subset.parquet')
 
-    output_path, n_kept = filter_items_from_items_path(
+    output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
-        items_filter_cfg=SimpleNamespace(
-            name='default',
-            organs=None,
-            include_ids=None,
-            exclude_ids=None,
-            num_transcripts=200,
-            num_unique_transcripts=None,
-            num_cells=None,
-            num_unique_cells=None,
-        ),
+        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
 
@@ -196,7 +145,7 @@ def test_filter_items_from_items_path_derives_stats_from_items_stem(tmp_path: Pa
     assert [item['id'] for item in filtered] == ['S1_1']
 
 
-def test_filter_items_from_items_path_supports_sample_exclude_ids(tmp_path: Path):
+def test_filter_items_supports_sample_exclude_ids(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'beat'
     items_path = output_dir / 'items' / 'all.json'
     output_path = output_dir / 'items' / 'default.json'
@@ -221,19 +170,10 @@ def test_filter_items_from_items_path_supports_sample_exclude_ids(tmp_path: Path
         index=pd.Index(['S1_0', 'S2_0'], name='id'),
     ).to_parquet(output_dir / 'statistics' / 'all.parquet')
 
-    output_path, n_kept = filter_items_from_items_path(
+    output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
-        items_filter_cfg=SimpleNamespace(
-            name='default',
-            organs=None,
-            include_ids=None,
-            exclude_ids=['S2'],
-            num_transcripts=200,
-            num_unique_transcripts=None,
-            num_cells=None,
-            num_unique_cells=None,
-        ),
+        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(exclude_ids=['S2'], num_transcripts=200)),
         overwrite=True,
     )
 
@@ -243,7 +183,7 @@ def test_filter_items_from_items_path_supports_sample_exclude_ids(tmp_path: Path
     assert [item['id'] for item in filtered] == ['S1_0']
 
 
-def test_filter_items_from_items_path_drops_items_with_missing_threshold_stats(tmp_path: Path):
+def test_filter_items_drops_items_with_missing_threshold_stats(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'beat'
     items_path = output_dir / 'items' / 'all.json'
     output_path = output_dir / 'items' / 'default.json'
@@ -268,19 +208,10 @@ def test_filter_items_from_items_path_drops_items_with_missing_threshold_stats(t
         index=pd.Index(['S1_0', 'S1_1'], name='id'),
     ).to_parquet(output_dir / 'statistics' / 'all.parquet')
 
-    output_path, n_kept = filter_items_from_items_path(
+    output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
-        items_filter_cfg=SimpleNamespace(
-            name='default',
-            organs=None,
-            include_ids=None,
-            exclude_ids=None,
-            num_transcripts=200,
-            num_unique_transcripts=None,
-            num_cells=None,
-            num_unique_cells=None,
-        ),
+        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
 
@@ -318,19 +249,10 @@ def test_filter_items_logs_stage_counts(tmp_path: Path):
     sink = io.StringIO()
     sink_id = logger.add(sink, level='INFO')
     try:
-        output_path, n_kept = filter_items_from_items_path(
+        output_path, n_kept = filter_items(
             items_path=items_path,
             output_path=output_path,
-            items_filter_cfg=SimpleNamespace(
-                name='default',
-                organs=None,
-                include_ids=None,
-                exclude_ids=None,
-                num_transcripts=200,
-                num_unique_transcripts=None,
-                num_cells=None,
-                num_unique_cells=None,
-            ),
+            items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
             overwrite=True,
         )
     finally:

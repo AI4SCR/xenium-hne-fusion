@@ -5,9 +5,10 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
 
-from scripts.data import compute_tile_stats as module
-from xenium_hne_fusion.pipeline import compute_tile_stats_from_items
-from xenium_hne_fusion.utils.getters import compute_item_stats, load_processing_config
+from scripts.data import compute_items_stats as module
+from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig
+from xenium_hne_fusion.pipeline import compute_items_stats
+from xenium_hne_fusion.utils.getters import compute_item_stats
 
 
 def _write_expr_tile_inputs(
@@ -67,7 +68,7 @@ def test_compute_item_stats_reads_tile_local_cells_parquet(tmp_path: Path):
     }
 
 
-def test_plot_tile_stats_writes_transcript_scatter_plots(tmp_path: Path):
+def test_plot_items_stats_writes_transcript_scatter_plots(tmp_path: Path):
     stats = pd.DataFrame(
         {
             'num_transcripts': [10, 100, 1000],
@@ -78,7 +79,7 @@ def test_plot_tile_stats_writes_transcript_scatter_plots(tmp_path: Path):
         index=['a', 'b', 'c'],
     )
 
-    module.plot_tile_stats(stats, tmp_path)
+    module.plot_items_stats(stats, tmp_path)
 
     assert (tmp_path / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
     assert (tmp_path / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
@@ -88,7 +89,6 @@ def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
     data_dir = tmp_path / 'data'
     output_dir = data_dir / '03_output' / 'hest1k'
     tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
-    config_path = tmp_path / 'hest1k.yaml'
     items_path = output_dir / 'items' / 'subset.json'
     monkeypatch.setenv('DATA_DIR', str(data_dir))
     monkeypatch.setenv('HEST1K_RAW_DIR', str(tmp_path / 'raw' / 'hest1k'))
@@ -117,24 +117,9 @@ def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
         feature_universe=['A', 'B', 'C'],
     )
 
-    config_path.write_text(
-        'name: hest1k\n'
-        'tile_px: 512\n'
-        'stride_px: 256\n'
-        'tile_mpp: 0.5\n'
-        'img_size: 224\n'
-        'items:\n'
-        '  name: subset\n'
-        'split:\n'
-        '  name: default\n'
-        'panel:\n'
-        '  name: default\n'
-        '  n_top_genes: null\n'
-        '  flavor: null\n'
-    )
-    processing_cfg = load_processing_config(config_path)
+    artifacts_cfg = ArtifactsConfig(name='hest1k', items=ItemsConfig(name='subset'))
 
-    module.main(processing_cfg, overwrite=True, batch_size=2, num_workers=0)
+    module.main(artifacts_cfg, overwrite=True, batch_size=2, num_workers=0)
 
     assert (output_dir / 'statistics' / 'subset.parquet').exists()
     figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'
@@ -142,7 +127,7 @@ def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
 
 
-def test_compute_tile_stats_from_items_batches_transcript_targets(tmp_path: Path):
+def test_compute_items_stats_batches_transcript_targets(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'hest1k'
     tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
 
@@ -172,7 +157,7 @@ def test_compute_tile_stats_from_items_batches_transcript_targets(tmp_path: Path
         }
     ]))
 
-    stats_path = compute_tile_stats_from_items(items_path, output_dir, batch_size=2, num_workers=0)
+    stats_path = compute_items_stats(items_path, output_dir, batch_size=2, num_workers=0)
 
     assert stats_path == output_dir / 'statistics' / 'subset.parquet'
     assert stats_path.exists()
@@ -186,7 +171,7 @@ def test_compute_tile_stats_from_items_batches_transcript_targets(tmp_path: Path
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
 
 
-def test_compute_tile_stats_from_items_writes_markdown_summary(tmp_path: Path):
+def test_compute_items_stats_writes_markdown_summary(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'hest1k'
     s1_tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
     s2_tile_dir = tmp_path / 'tiles' / 'S2' / '256_256' / '0'
@@ -237,7 +222,7 @@ def test_compute_tile_stats_from_items_writes_markdown_summary(tmp_path: Path):
         },
     ]))
 
-    compute_tile_stats_from_items(items_path, output_dir, batch_size=2, num_workers=0)
+    compute_items_stats(items_path, output_dir, batch_size=2, num_workers=0)
 
     summary_path = output_dir / 'statistics' / 'subset.md'
     assert summary_path.exists()

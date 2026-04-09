@@ -84,33 +84,6 @@ class PipelineConfig:
         return self.data.filter
 
 
-@dataclass
-class ItemsFilterConfig:
-    name: str
-    organs: list[str] | None = None
-    include_ids: list[str] | None = None
-    exclude_ids: list[str] | None = None
-    num_transcripts: int | None = None
-    num_unique_transcripts: int | None = None
-    num_cells: int | None = None
-    num_unique_cells: int | None = None
-
-
-def load_items_filter_config(path: Path) -> ItemsFilterConfig:
-    data = yaml.safe_load(path.read_text()) or {}
-    filter_data = data.get('filter', data)
-    return ItemsFilterConfig(
-        name=data['name'],
-        organs=filter_data.get('organs'),
-        include_ids=filter_data.get('include_ids'),
-        exclude_ids=filter_data.get('exclude_ids'),
-        num_transcripts=filter_data.get('num_transcripts'),
-        num_unique_transcripts=filter_data.get('num_unique_transcripts'),
-        num_cells=filter_data.get('num_cells'),
-        num_unique_cells=filter_data.get('num_unique_cells'),
-    )
-
-
 def load_data_config(path: Path) -> DataConfig:
     data = yaml.safe_load(path.read_text()) or {}
     tiles = data.get('tiles') or {
@@ -385,10 +358,10 @@ def compute_item_stats(item: dict, cell_type_col: str) -> dict:
     }
 
 
-def apply_filter(stats: pd.DataFrame, cfg: 'ItemsFilterConfig') -> pd.Series:
+def apply_filter(stats: pd.DataFrame, cfg: ItemsConfig) -> pd.Series:
     mask = pd.Series(True, index=stats.index)
     for field in STAT_COLS:
-        threshold = getattr(cfg, field)
+        threshold = getattr(cfg.filter, field)
         if threshold is None:
             continue
         mask &= stats[field].notna() & (stats[field] >= threshold)
