@@ -123,8 +123,8 @@ class FusionModel(nn.Module):
 
         self.epsilon = 1e-5  # needed for token normalization
 
-        # Learnable gate for "add" fusion: morph as base, expr added with sigmoid-gated weight.
-        # sigmoid(0) = 0.5 at init; bounded to (0,1) so the gate cannot subtract.
+        # Learnable residual scale for "add" fusion. tanh(0) = 0, so the
+        # learnable-gate path starts from the pure morph baseline.
         self.fusion_alpha = nn.Parameter(torch.zeros(1), requires_grad=learnable_gate) if fusion_strategy == "add" else None
 
         self.pos_embed_layer_name = pos_embed_layer_name
@@ -163,6 +163,11 @@ class FusionModel(nn.Module):
     def forward_morph(self, images: torch.Tensor) -> torch.Tensor:
         return self.morph_encoder(images)
 
+    def get_fusion_gate(self) -> torch.Tensor:
+        assert self.fusion_alpha is not None, 'fusion_alpha'
+        if self.fusion_alpha.requires_grad:
+            return torch.tanh(self.fusion_alpha)
+        return torch.ones_like(self.fusion_alpha)
 
     def forward_late_fusion(self, *, morph_features: torch.Tensor, expr_features: torch.Tensor) -> torch.Tensor:
 
@@ -174,7 +179,7 @@ class FusionModel(nn.Module):
 
         match self.fusion_strategy:
             case 'add':
-                x = morph_features + torch.sigmoid(self.fusion_alpha) * expr_features
+                x = morph_features + self.get_fusion_gate() * expr_features
             case 'concat':
                 x = torch.cat([morph_features, expr_features], dim=1)
             case _:
@@ -198,7 +203,7 @@ class FusionModel(nn.Module):
         #  - how to embed the modality?
         match self.fusion_strategy:
             case 'add':
-                x = morph_tokens + torch.sigmoid(self.fusion_alpha) * expr_scaled
+                x = morph_tokens + self.get_fusion_gate() * expr_scaled
                 x = getattr(self.morph_encoder, self.pos_embed_layer_name)(x)
 
             case 'concat':

@@ -153,3 +153,12 @@ def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
             assert cfg.data.metadata_path == Path(f'{organ}/outer=0-inner=0-seed=0.parquet')
             assert cfg.data.panel_path == Path(f'hvg-{organ}-{organ}-outer=0-inner=0-seed=0.yaml')
             assert cfg.wandb.tags == [organ]
+
+
+def test_train_configs_explicitly_set_learnable_gate_false():
+    for path in Path('configs/train').rglob('*.yaml'):
+        text = path.read_text()
+        assert 'learnable_gate: false' in text, path
+
+        cfg = Config.from_yaml(path)
+        assert cfg.backbone.learnable_gate is False

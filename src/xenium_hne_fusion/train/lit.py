@@ -104,10 +104,10 @@ class RegressionLit(L.LightningModule):
         self.log_dict({f"{k}_std": v.std() for k, v in scores.items()})
 
     def _log_alpha(self, *, stage: str, batch_size: int) -> None:
-        alpha_param = getattr(self.backbone, "fusion_alpha", None)
-        if alpha_param is None:
+        fusion_alpha = getattr(self.backbone, "fusion_alpha", None)
+        if fusion_alpha is None:
             return
-        alpha = torch.sigmoid(alpha_param.detach()).squeeze()
+        alpha = self.backbone.get_fusion_gate().detach().squeeze()
         self.log(
             f"{stage}/alpha",
             alpha,
