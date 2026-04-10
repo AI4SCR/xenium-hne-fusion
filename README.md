@@ -172,11 +172,11 @@ split:
 
 Examples:
 
-- [configs/artifacts/hest1k.yaml](configs/artifacts/hest1k.yaml)
-- [configs/artifacts/hest1k-breast.yaml](configs/artifacts/hest1k-breast.yaml)
-- [configs/artifacts/hest1k-lung.yaml](configs/artifacts/hest1k-lung.yaml)
-- [configs/artifacts/hest1k-pancreas.yaml](configs/artifacts/hest1k-pancreas.yaml)
-- [configs/artifacts/beat.yaml](configs/artifacts/beat.yaml)
+- [configs/artifacts/hest1k/default.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/default.yaml)
+- [configs/artifacts/hest1k/breast.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/breast.yaml)
+- [configs/artifacts/hest1k/lung.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/lung.yaml)
+- [configs/artifacts/hest1k/pancreas.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/pancreas.yaml)
+- [configs/artifacts/beat/default.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/beat/default.yaml)
 
 `scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/artifacts/filter_items.py`, and `scripts/artifacts/create_splits.py` all use this schema. `filter.include_ids` and `filter.exclude_ids` are mutually exclusive:
 
@@ -234,28 +234,28 @@ Intended to compute summary stats for `items/<items.name>.json` using the artifa
 
 ```bash
 uv run scripts/artifacts/compute_items_stats.py \
-  --config configs/artifacts/hest1k.yaml
+  --config configs/artifacts/hest1k/default.yaml
 ```
 
 #### Filtered items
 
 ```bash
 uv run scripts/artifacts/filter_items.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 ```
 
 #### Splits
 
 ```bash
 uv run scripts/artifacts/create_splits.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 ```
 
 #### Panel
 
 ```bash
 uv run scripts/artifacts/create_panel.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 ```
 
 #### All artifacts
@@ -270,7 +270,7 @@ artifacts config:
 
 ```bash
 uv run python scripts/artifacts/create_artifacts.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 ```
 
 If the config has no `panel:` section, panel creation is skipped. If `panel:` points to a
@@ -421,10 +421,10 @@ For organ-specific or thresholded HEST1K runs, reuse the same config and overrid
 
 ```bash
 uv run python scripts/artifacts/filter_items.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 
 uv run python scripts/artifacts/create_splits.py \
-  --config configs/artifacts/hest1k-breast.yaml
+  --config configs/artifacts/hest1k/breast.yaml
 ```
 
 ### BEAT
@@ -489,16 +489,16 @@ workflow:
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k.yaml"'
+./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k/default.yaml"'
 
-./ray/submit.sh 'python scripts/artifacts/create_artifacts.py --config "configs/artifacts/hest1k-breast.yaml"'
+./ray/submit.sh 'python scripts/artifacts/create_artifacts.py --config "configs/artifacts/hest1k/breast.yaml"'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
 ```
 
 To run the same sequence for other canonical configs:
 
 ```bash
-export CONFIG=configs/artifacts/hest1k-breast.yaml
+export CONFIG=configs/artifacts/hest1k/breast.yaml
 
 ./ray/submit.sh "python scripts/data/process_metadata.py --config $CONFIG"
 ./ray/submit.sh "python scripts/data/create_items.py --config $CONFIG"
@@ -506,7 +506,7 @@ export CONFIG=configs/artifacts/hest1k-breast.yaml
 ./ray/submit.sh "python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml"
 ```
 
-Swap `hest1k-breast.yaml` for `hest1k-lung.yaml` to run the lung config.
+Swap `hest1k/breast.yaml` for `hest1k/lung.yaml` to run the lung config.
 
 ### BEAT
 
@@ -531,14 +531,14 @@ uv add --dev <pkg>
 # artifacts
 for ORGAN in breast lung pancreas bowel; do
   
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
     
     for OUTER in 0 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
 
         cmd="python scripts/artifacts/create_panel.py \
-            --config configs/artifacts/hest1k-${ORGAN}.yaml \
+            --config configs/artifacts/hest1k/${ORGAN}.yaml \
             --panel.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet \
             --panel.name hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
 
@@ -556,7 +556,7 @@ for PANEL in \
   "human-immuno-oncology human-immuno-oncology-panel" \
   "human-multi-tissue human-multi-tissue-panel"; do
   read -r ARTIFACT_NAME SPLIT_DIR <<< "${PANEL}"
-  ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape-${ARTIFACT_NAME}.yaml"
+  ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape/${ARTIFACT_NAME}.yaml"
   ./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-${ARTIFACT_NAME} --splits_dir splits/hest1k/hescape/${SPLIT_DIR}/"
 done
 
@@ -579,14 +579,14 @@ done
 
 ```bash
 for ORGAN in breast lung pancreas colon; do
-    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml
+    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml
     
     for OUTER in 0 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
 
         uv run python scripts/artifacts/create_panel.py \
-            --config "configs/artifacts/hest1k-${ORGAN}.yaml" \
+            --config "configs/artifacts/hest1k/${ORGAN}.yaml" \
             --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
             --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
     done
@@ -601,10 +601,10 @@ done
 ./ray/submit.sh 'cp metadata.bak /raid/ray/shared/fmx/data/processed-v0/datasets/beat/metadata.parquet'
 
 ./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
-./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --items.name=all"  # note: feels a bit hacky
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat-kaiko.yaml"
-./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat.yaml"
-./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml --items.name=all"  # note: feels a bit hacky
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml"
+./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat/default.yaml"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml"
 
 TASK=expression
 TASK=cell_types

@@ -168,7 +168,7 @@ def get_data_config_path(dataset: str, config_root: Path | None = None) -> Path:
 
 def get_artifacts_config_path(dataset: str, config_root: Path | None = None) -> Path:
     root = config_root or Path('configs/artifacts')
-    return root / f'{dataset}.yaml'
+    return root / dataset / 'default.yaml'
 
 
 load_processing_config = load_data_config
