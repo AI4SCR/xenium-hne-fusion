@@ -174,10 +174,13 @@ def plot_pairwise_overlap(sample_summaries: list[dict], overlap: pd.DataFrame, o
     plt.yticks(rotation=0)
     plt.tight_layout()
 
+    png_path = output_path.with_suffix('.png')
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, bbox_inches='tight')
+    plt.savefig(png_path, dpi=300, bbox_inches='tight')
     plt.close()
     assert output_path.exists(), f'Plot not written: {output_path}'
+    assert png_path.exists(), f'Plot not written: {png_path}'
     return output_path
 
 
@@ -191,7 +194,6 @@ def report_feature_overlap(artifacts_cfg: ArtifactsConfig) -> tuple[str, Path]:
         / 'figures'
         / 'items'
         / 'gene_panel_overlap'
-        / artifacts_cfg.items.name
         / f'{artifacts_cfg.items.name}.pdf'
     )
 

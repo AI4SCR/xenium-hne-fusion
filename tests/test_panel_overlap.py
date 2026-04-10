@@ -188,5 +188,6 @@ def test_report_feature_overlap_from_artifacts_config(tmp_path: Path, monkeypatc
     assert '- S1: organ=Breast genes=3' in report
     assert '- S2: organ=Lung genes=3' in report
     assert '- S1 vs S2: intersection=2 union=4 jaccard=0.500' in report
-    assert output_path == output_dir / 'figures' / 'items' / 'gene_panel_overlap' / 'toy' / 'toy.pdf'
+    assert output_path == output_dir / 'figures' / 'items' / 'gene_panel_overlap' / 'toy.pdf'
     assert output_path.exists()
+    assert output_path.with_suffix('.png').exists()
