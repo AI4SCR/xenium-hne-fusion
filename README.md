@@ -602,6 +602,15 @@ for OUTER in 0 1 2 3; do
       ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
     done
 done
+
+# gated fusion
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    MODEL=early-fusion
+    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml ----data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${model}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
+done
+
 ```
 
 ## Data Processing Commands
