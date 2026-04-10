@@ -175,7 +175,7 @@ def plot_pairwise_overlap(sample_summaries: list[dict], overlap: pd.DataFrame, o
     plt.tight_layout()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=200, bbox_inches='tight')
+    plt.savefig(output_path, bbox_inches='tight')
     plt.close()
     assert output_path.exists(), f'Plot not written: {output_path}'
     return output_path
@@ -186,7 +186,7 @@ def report_feature_overlap(artifacts_cfg: ArtifactsConfig) -> tuple[str, Path]:
     items_path = managed_paths.output_dir / 'items' / 'all.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet'
     stats_path = managed_paths.output_dir / 'statistics' / 'all.parquet'
-    output_path = managed_paths.output_dir / 'panels' / f'{artifacts_cfg.items.name}.png'
+    output_path = managed_paths.output_dir / 'panels' / f'{artifacts_cfg.items.name}.pdf'
 
     assert items_path.exists(), f'Items not found: {items_path}'
     assert metadata_path.exists(), f'Metadata not found: {metadata_path}'
