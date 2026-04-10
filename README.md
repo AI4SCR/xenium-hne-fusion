@@ -529,7 +529,7 @@ uv add --dev <pkg>
 ./ray/submit.sh "python scripts/data/run_hest1k.py --config configs/data/remote/hest1k.yaml --executor ray --stage all --overwrite true"
 
 # artifacts
-for ORGAN in breast lung pancreas colon; do
+for ORGAN in breast lung pancreas bowel; do
   
     ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k-${ORGAN}.yaml"
     
@@ -552,12 +552,12 @@ done
 ./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-colon --splits_dir splits/hest1k/hescape/human-colon-panel/"
 
 # training
-for ORGAN in breast lung pancreas colon; do
+for ORGAN in breast lung pancreas bowel; do
   for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
     for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
 #      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/expression/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
     done
   done
@@ -591,7 +591,7 @@ done
 
 ./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml --items.name=all"  # note: feels a bit hacky
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat.yaml --overwrite true"
 ./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat.yaml"
 for OUTER in 0 1 2 3; do
