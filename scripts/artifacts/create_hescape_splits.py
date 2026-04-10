@@ -12,21 +12,21 @@ from xenium_hne_fusion.metadata import join_items_with_metadata
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
 PANEL_TO_SPLITS = {
-    'hescape-human-5k': {
-        'fit': {
-            4: 'Xenium_Prime_Human_Lung_Cancer_FFPE',
-            2: 'Xenium_Prime_Breast_Cancer_FFPE',
-            3: 'Xenium_Prime_Cervical_Cancer_FFPE',
-            5: 'Xenium_Prime_Human_Ovary_FF',
-        },
-        'val': {
-            6: 'Xenium_Prime_Ovarian_Cancer_FFPE_XRrun',
-        },
-        'test': {
-            1: 'TENX158',
-            0: 'TENX157',
-        },
-    },
+    # 'hescape-human-5k': {
+    #     'fit': {
+    #         4: 'Xenium_Prime_Human_Lung_Cancer_FFPE',
+    #         2: 'Xenium_Prime_Breast_Cancer_FFPE',
+    #         3: 'Xenium_Prime_Cervical_Cancer_FFPE',
+    #         5: 'Xenium_Prime_Human_Ovary_FF',
+    #     },
+    #     'val': {
+    #         6: 'Xenium_Prime_Ovarian_Cancer_FFPE_XRrun',
+    #     },
+    #     'test': {
+    #         1: 'TENX158',
+    #         0: 'TENX157',
+    #     },
+    # },
     'hescape-breast': {
         'fit': {
             8: 'TENX99',

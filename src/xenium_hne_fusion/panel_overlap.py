@@ -186,7 +186,14 @@ def report_feature_overlap(artifacts_cfg: ArtifactsConfig) -> tuple[str, Path]:
     items_path = managed_paths.output_dir / 'items' / 'all.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet'
     stats_path = managed_paths.output_dir / 'statistics' / 'all.parquet'
-    output_path = managed_paths.output_dir / 'panels' / f'{artifacts_cfg.items.name}.pdf'
+    output_path = (
+        managed_paths.output_dir
+        / 'figures'
+        / 'items'
+        / 'gene_panel_overlap'
+        / artifacts_cfg.items.name
+        / f'{artifacts_cfg.items.name}.pdf'
+    )
 
     assert items_path.exists(), f'Items not found: {items_path}'
     assert metadata_path.exists(), f'Metadata not found: {metadata_path}'
