@@ -557,8 +557,8 @@ for PANEL in \
   "human-multi-tissue human-multi-tissue-panel"; do
   read -r ARTIFACT_NAME SPLIT_DIR <<< "${PANEL}"
   ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape/${ARTIFACT_NAME}.yaml"
-  ./ray/submit.sh "python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/create_hescape_splits.py --name hescape-${ARTIFACT_NAME} --splits_dir splits/hest1k/hescape/${SPLIT_DIR}/"
 done
+./ray/submit.sh "python scripts/artifacts/create_hescape_splits.py"
 
 # training
 TASK=expression

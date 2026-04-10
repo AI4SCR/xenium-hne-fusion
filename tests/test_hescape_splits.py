@@ -18,15 +18,9 @@ def test_create_hescape_split_script_smoke(monkeypatch, tmp_path: Path):
     data_dir = tmp_path / 'data'
     output_dir = data_dir / '03_output' / 'hest1k'
     processed_dir = data_dir / '02_processed' / 'hest1k'
-    splits_dir = tmp_path / 'splits'
 
     output_dir.joinpath('items').mkdir(parents=True, exist_ok=True)
     processed_dir.mkdir(parents=True, exist_ok=True)
-    splits_dir.mkdir(parents=True, exist_ok=True)
-
-    pd.DataFrame({'id': ['TENX95']}).to_csv(splits_dir / 'train.csv', index=False)
-    pd.DataFrame({'id': ['NCBI785']}).to_csv(splits_dir / 'val.csv', index=False)
-    pd.DataFrame({'id': ['NCBI783']}).to_csv(splits_dir / 'test.csv', index=False)
 
     (output_dir / 'items' / 'all.json').write_text(
         json.dumps(
@@ -47,10 +41,29 @@ def test_create_hescape_split_script_smoke(monkeypatch, tmp_path: Path):
 
     monkeypatch.setenv('DATA_DIR', str(data_dir))
 
-    module = _load_script('scripts/data/create_hescape_splits.py', 'create_hescape_splits_script')
-    split_path = module.create_hescape_split('hescape-breast', splits_dir, overwrite=True)
+    module = _load_script('scripts/artifacts/create_hescape_splits.py', 'create_hescape_splits_script')
+    monkeypatch.setattr(
+        module,
+        'PANEL_TO_SPLITS',
+        {
+            'hescape-breast': {
+                'fit': {
+                    4: 'TENX95',
+                },
+                'val': {
+                    2: 'NCBI785',
+                },
+                'test': {
+                    0: 'NCBI783',
+                },
+            }
+        },
+    )
+    output_paths = module.create_hescape_splits(overwrite=True)
+    split_path = output_dir / 'splits' / 'hescape' / 'hescape-breast.parquet'
 
     assert split_path.exists()
+    assert split_path in output_paths
     split_metadata = pd.read_parquet(split_path)
     assert split_metadata.loc['TENX95_0', 'split'] == 'fit'
     assert split_metadata.loc['NCBI785_0', 'split'] == 'val'
