@@ -1,6 +1,6 @@
 name: hest1k
 items:
-  name: hescape-lung
+  name: hescape-lung-healthy
   filter:
     organs:
       - Lung
@@ -31,7 +31,7 @@ items:
     num_cells: null
     num_unique_cells: null
 split:
-  name: hescape-lung
+  name: hescape-lung-healthy
   test_size: 0.25
   val_size: 0.25
   stratify: false

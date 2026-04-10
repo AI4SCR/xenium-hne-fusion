@@ -6,6 +6,9 @@ import pandas as pd
 import pytest
 import yaml
 
+from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig
+from xenium_hne_fusion.panel_overlap import report_feature_overlap
+
 
 def _load_script(path: str, module_name: str):
     script_path = Path(path).resolve()
@@ -86,3 +89,58 @@ def test_hest1k_organ_panels_match_selected_items_when_data_available():
 
         assert compatibility
         assert all(row['missing'] == 0 for row in compatibility)
+
+
+def test_report_feature_overlap_from_artifacts_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    data_dir = tmp_path / 'data'
+    output_dir = data_dir / '03_output' / 'hest1k'
+    processed_dir = data_dir / '02_processed' / 'hest1k'
+    monkeypatch.setenv('DATA_DIR', str(data_dir))
+
+    s1_tile = data_dir / '02_processed' / 'hest1k' / 'S1' / '256_256' / '0'
+    s2_tile = data_dir / '02_processed' / 'hest1k' / 'S2' / '256_256' / '0'
+    _write_expr(s1_tile, ['A', 'B', 'C'])
+    _write_expr(s2_tile, ['A', 'C', 'D'])
+
+    items_path = output_dir / 'items' / 'all.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    items_path.write_text(
+        json.dumps(
+            [
+                {'id': 'S2_0', 'sample_id': 'S2', 'tile_id': 0, 'tile_dir': str(s2_tile)},
+                {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(s1_tile)},
+            ]
+        )
+    )
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / 'statistics').mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {'sample_id': 'S1', 'organ': 'Breast'},
+            {'sample_id': 'S2', 'organ': 'Lung'},
+        ]
+    ).to_parquet(processed_dir / 'metadata.parquet', index=False)
+    pd.DataFrame(
+        {
+            'num_transcripts': [100, 100],
+            'num_unique_transcripts': [10, 10],
+            'num_cells': [None, None],
+            'num_unique_cells': [None, None],
+        },
+        index=pd.Index(['S2_0', 'S1_0'], name='id'),
+    ).to_parquet(output_dir / 'statistics' / 'all.parquet')
+
+    report, output_path = report_feature_overlap(
+        ArtifactsConfig(
+            name='hest1k',
+            items=ItemsConfig(name='toy'),
+        )
+    )
+
+    assert 'Sample feature universes' in report
+    assert '- S1: organ=Breast genes=3' in report
+    assert '- S2: organ=Lung genes=3' in report
+    assert '- S1 vs S2: intersection=2 union=4 jaccard=0.500' in report
+    assert output_path == output_dir / 'panels' / 'toy.png'
+    assert output_path.exists()
