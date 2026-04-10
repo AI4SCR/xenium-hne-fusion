@@ -16,6 +16,7 @@ backbone:
   fusion_strategy: add
   fusion_stage: late
   use_proj: true
+  learnable_gate: false
   expr_token_pool: null
   morph_token_pool: token
   global_pool: null

@@ -13,6 +13,7 @@ backbone:
   fusion_strategy: null
   fusion_stage: null
   use_proj: false
+  learnable_gate: false
   expr_token_pool: null
   morph_token_pool: null
   global_pool: token

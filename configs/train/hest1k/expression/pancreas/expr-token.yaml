@@ -15,6 +15,7 @@ backbone:
   fusion_strategy: null
   fusion_stage: null
   use_proj: false
+  learnable_gate: false
   global_pool: avg
 
 data:

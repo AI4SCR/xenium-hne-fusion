@@ -17,6 +17,7 @@ backbone:
   fusion_strategy: add
   fusion_stage: early
   use_proj: true
+  learnable_gate: false
   global_pool: token
 
 data:
