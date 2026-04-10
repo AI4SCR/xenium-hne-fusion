@@ -1,5 +1,7 @@
 """Compute statistics for the items artifact defined by an artifacts config."""
 
+import sys
+
 from dotenv import load_dotenv
 
 from xenium_hne_fusion.config import ArtifactsConfig
@@ -27,6 +29,11 @@ def main(
     )
 
 
-if __name__ == '__main__':
-    artifacts_cfg, overwrite_arg = parse_artifacts_args()
+def cli(argv: list[str] | None = None) -> int:
+    artifacts_cfg, overwrite_arg = parse_artifacts_args(argv)
     main(artifacts_cfg, overwrite=overwrite_arg)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

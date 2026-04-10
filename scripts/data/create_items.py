@@ -52,6 +52,11 @@ def _ensure_output_scaffold(output_dir: Path) -> None:
     items_dir.mkdir(parents=True, exist_ok=True)
 
 
-if __name__ == '__main__':
-    data_cfg, overwrite_arg, _, _ = parse_data_args(sys.argv[1:], include_executor=False)
+def cli(argv: list[str] | None = None) -> int:
+    data_cfg, overwrite_arg, _, _ = parse_data_args(argv, include_executor=False)
     main(data_cfg, overwrite=overwrite_arg)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

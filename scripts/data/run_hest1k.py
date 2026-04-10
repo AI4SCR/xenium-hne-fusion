@@ -166,6 +166,13 @@ def _run(
         )
 
 
+def cli(argv: list[str] | None = None) -> int:
+    data_cfg, overwrite, executor, stage = parse_data_args(argv)
+    assert executor is not None, "executor is required"
+    _run(data_cfg, overwrite, executor, stage=stage)
+    return 0
+
+
 def prepare_driver_context(config: DataConfig) -> tuple[PipelineConfig, Path, list[str]]:
     assert config.name == "hest1k", f"Expected dataset='hest1k', got {config.name!r}"
     cfg = build_pipeline_config(config)
@@ -340,4 +347,4 @@ def cli(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
-    cli(sys.argv[1:])
+    raise SystemExit(cli(sys.argv[1:]))

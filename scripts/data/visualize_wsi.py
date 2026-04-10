@@ -17,5 +17,10 @@ def main(
     save_sample_overview(wsi_path, transcripts_path, output_dir, n=n, max_size=max_size)
 
 
-if __name__ == "__main__":
+def cli() -> int:
     auto_cli(main)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

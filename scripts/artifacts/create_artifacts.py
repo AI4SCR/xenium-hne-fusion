@@ -90,6 +90,11 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
     compute_items_stats(filtered_items_path, managed_paths.output_dir, overwrite=overwrite)
 
 
-if __name__ == '__main__':
-    artifacts_cfg, overwrite_arg = parse_artifacts_args(sys.argv[1:])
+def cli(argv: list[str] | None = None) -> int:
+    artifacts_cfg, overwrite_arg = parse_artifacts_args(argv)
     main(artifacts_cfg=artifacts_cfg, overwrite=overwrite_arg)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

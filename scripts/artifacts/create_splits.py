@@ -1,5 +1,7 @@
 """Generate tile-level split metadata collection from items, optionally joined with sample metadata."""
 
+import sys
+
 from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
 from loguru import logger
@@ -47,8 +49,11 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False, with_metadata:
     save_split_metadata(split_metadata, split_dir, split_cfg, overwrite=overwrite)
 
 
-if __name__ == '__main__':
-    import sys
-
-    artifacts_cfg, overwrite_arg, with_metadata_arg = parse_args(sys.argv[1:])
+def cli(argv: list[str] | None = None) -> int:
+    artifacts_cfg, overwrite_arg, with_metadata_arg = parse_args(argv)
     main(artifacts_cfg, overwrite=overwrite_arg, with_metadata=with_metadata_arg)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

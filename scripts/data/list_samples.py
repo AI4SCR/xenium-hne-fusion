@@ -38,8 +38,13 @@ def main(config: Path) -> None:
     print("\n".join(sample_ids))
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
     parser = ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
-    namespace = parser.parse_args()
+    namespace = parser.parse_args(argv)
     main(namespace.config)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli(sys.argv[1:]))

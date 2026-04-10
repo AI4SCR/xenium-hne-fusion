@@ -38,6 +38,11 @@ def main(data_cfg: DataConfig) -> None:
     )
 
 
-if __name__ == '__main__':
-    data_cfg, _, _, _ = parse_data_args(sys.argv[1:], include_executor=False)
+def cli(argv: list[str] | None = None) -> int:
+    data_cfg, _, _, _ = parse_data_args(argv, include_executor=False)
     main(data_cfg)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

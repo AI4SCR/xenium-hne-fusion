@@ -64,11 +64,11 @@ def main(
     )
 
 
-if __name__ == '__main__':
+def cli(argv: list[str] | None = None) -> int:
     parser = build_artifacts_parser()
     parser.add_argument('--batch_size', type=int, default=None)
     parser.add_argument('--num_workers', type=int, default=None)
-    namespace = parser.parse_args(sys.argv[1:])
+    namespace = parser.parse_args(argv)
     artifacts_cfg = namespace_to_artifacts_config(namespace)
     main(
         artifacts_cfg=artifacts_cfg,
@@ -76,3 +76,8 @@ if __name__ == '__main__':
         batch_size=namespace.batch_size,
         num_workers=namespace.num_workers,
     )
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli(sys.argv[1:]))

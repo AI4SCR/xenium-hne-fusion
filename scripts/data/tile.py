@@ -19,5 +19,10 @@ def main(
     tile_tissues(wsi_path, tissues_parquet, tile_px, stride_px, mpp, output_parquet, slide_mpp=slide_mpp)
 
 
-if __name__ == "__main__":
+def cli() -> int:
     auto_cli(main)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

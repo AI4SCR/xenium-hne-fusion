@@ -41,5 +41,10 @@ def main(
         process_cells(tiles, output_dir, img_size)
 
 
-if __name__ == "__main__":
+def cli() -> int:
     auto_cli(main)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

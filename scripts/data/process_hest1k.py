@@ -1,6 +1,7 @@
 """Process HEST1k samples using slide MPP from HEST metadata."""
 
 import shutil
+import sys
 
 import geopandas as gpd
 from dotenv import load_dotenv
@@ -70,6 +71,11 @@ def main(
         process_cells(tiles, processed_dir, img_size=img_size)
 
 
-if __name__ == "__main__":
-    data_cfg, overwrite, _, _ = parse_data_args(include_executor=False)
+def cli(argv: list[str] | None = None) -> int:
+    data_cfg, overwrite, _, _ = parse_data_args(argv, include_executor=False)
     main(data_cfg, overwrite=overwrite)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli(sys.argv[1:]))

@@ -1,5 +1,6 @@
 """Materialize fixed HESCAPE sample splits from HEST1K all.json."""
 
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -55,5 +56,10 @@ def create_hescape_split(
     return output_path
 
 
-if __name__ == '__main__':
+def cli() -> int:
     auto_cli(create_hescape_split)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(cli())

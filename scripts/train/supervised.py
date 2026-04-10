@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -56,7 +57,12 @@ def _namespace_to_config(ns) -> Config:
     )
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
     parser = _build_parser()
-    namespace = parser.parse_args()
+    namespace = parser.parse_args(argv)
     main(_namespace_to_config(namespace))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli(sys.argv[1:]))
