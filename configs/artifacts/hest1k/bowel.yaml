@@ -1,0 +1,29 @@
+name: hest1k
+items:
+  name: bowel
+  filter:
+    organs:
+      - Bowel
+    include_ids: null
+    exclude_ids: null
+    num_transcripts: 100
+    num_unique_transcripts: null
+    num_cells: null
+    num_unique_cells: null
+split:
+  name: bowel
+  test_size: 0.25
+  val_size: 0.25
+  stratify: false
+  target_column_name: null
+  encode_targets: false
+  nan_value: -1
+  use_filtered_targets_for_train: false
+  include_targets: null
+  group_column_name: null
+  random_state: 0
+panel:
+  name: hvg-bowel-bowel-outer=0-inner=0-seed=0
+  metadata_path: bowel/outer=0-inner=0-seed=0.parquet
+  n_top_genes: 18
+  flavor: seurat_v3
