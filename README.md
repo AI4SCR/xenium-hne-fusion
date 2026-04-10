@@ -602,7 +602,21 @@ done
 
 ./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml --items.name=all"  # note: feels a bit hacky
+
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/default.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/default.yaml --items.filter.num_cells=1"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml --items.filter.num_cells=1"
+
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml --items.filter.num_cells=1 --items.name=cells"
+
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml" --items.filter.num_cells=1
+done
+
 ./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat/default.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml"
 
