@@ -144,6 +144,29 @@ def build_overlap_report(sample_summaries: list[dict], overlap: pd.DataFrame, mi
     return '\n'.join(lines)
 
 
+def build_overlap_title(sample_summaries: list[dict], overlap: pd.DataFrame) -> str:
+    sample_ids = [summary['sample_id'] for summary in sample_summaries]
+    pairwise = overlap[overlap['left'] != overlap['right']]
+    if len(sample_ids) > 1:
+        pairwise_intersections = pairwise['intersection'].tolist()
+        min_pairwise_intersection = min(pairwise_intersections)
+        max_pairwise_intersection = max(pairwise_intersections)
+    else:
+        only_genes = len(sample_summaries[0]['genes'])
+        min_pairwise_intersection = only_genes
+        max_pairwise_intersection = only_genes
+
+    shared_genes = set(sample_summaries[0]['genes'])
+    for summary in sample_summaries[1:]:
+        shared_genes &= set(summary['genes'])
+
+    return (
+        'Pairwise gene-panel overlap\n'
+        f'pairwise intersection min={min_pairwise_intersection} max={max_pairwise_intersection} '
+        f'all-sample intersection={len(shared_genes)}'
+    )
+
+
 def plot_pairwise_overlap(sample_summaries: list[dict], overlap: pd.DataFrame, output_path: Path) -> Path:
     ordered_ids = [summary['sample_id'] for summary in sample_summaries]
     labels = [
@@ -167,7 +190,7 @@ def plot_pairwise_overlap(sample_summaries: list[dict], overlap: pd.DataFrame, o
         linewidths=0.5,
         cbar_kws={'label': 'Jaccard overlap'},
     )
-    ax.set_title('Pairwise gene-panel overlap')
+    ax.set_title(build_overlap_title(sample_summaries, overlap))
     ax.set_xlabel('Sample')
     ax.set_ylabel('Sample')
     plt.xticks(rotation=45, ha='right')

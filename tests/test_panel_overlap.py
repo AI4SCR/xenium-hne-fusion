@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig
-from xenium_hne_fusion.panel_overlap import collect_sample_summaries, report_feature_overlap
+from xenium_hne_fusion.panel_overlap import build_overlap_title, collect_sample_summaries, report_feature_overlap
 
 
 def _load_script(path: str, module_name: str):
@@ -108,6 +108,32 @@ def test_report_overlap_script_smoke(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert '- S2: organ=Lung genes=2' in output
     assert '- Breast vs Lung: intersection=1 union=4 jaccard=0.250' in output
     assert '- S2: present=1 missing=1' in output
+
+
+def test_build_overlap_title_reports_pairwise_and_global_intersections():
+    sample_summaries = [
+        {'sample_id': 'S1', 'organ': 'Breast', 'num_tiles': 1, 'genes': ('A', 'B', 'C', 'D')},
+        {'sample_id': 'S2', 'organ': 'Lung', 'num_tiles': 1, 'genes': ('B', 'C', 'D', 'E')},
+        {'sample_id': 'S3', 'organ': 'Pancreas', 'num_tiles': 1, 'genes': ('C', 'D', 'F')},
+    ]
+    overlap_rows = [
+        {'left': 'S1', 'right': 'S1', 'intersection': 4, 'union': 4, 'jaccard': 1.0},
+        {'left': 'S1', 'right': 'S2', 'intersection': 3, 'union': 5, 'jaccard': 0.6},
+        {'left': 'S1', 'right': 'S3', 'intersection': 2, 'union': 5, 'jaccard': 0.4},
+        {'left': 'S2', 'right': 'S1', 'intersection': 3, 'union': 5, 'jaccard': 0.6},
+        {'left': 'S2', 'right': 'S2', 'intersection': 4, 'union': 4, 'jaccard': 1.0},
+        {'left': 'S2', 'right': 'S3', 'intersection': 2, 'union': 5, 'jaccard': 0.4},
+        {'left': 'S3', 'right': 'S1', 'intersection': 2, 'union': 5, 'jaccard': 0.4},
+        {'left': 'S3', 'right': 'S2', 'intersection': 2, 'union': 5, 'jaccard': 0.4},
+        {'left': 'S3', 'right': 'S3', 'intersection': 3, 'union': 3, 'jaccard': 1.0},
+    ]
+
+    title = build_overlap_title(sample_summaries, pd.DataFrame(overlap_rows))
+
+    assert title == (
+        'Pairwise gene-panel overlap\n'
+        'pairwise intersection min=2 max=3 all-sample intersection=2'
+    )
 
 
 def test_hest1k_organ_panels_match_selected_items_when_data_available():
