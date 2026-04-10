@@ -603,12 +603,20 @@ for OUTER in 0 1 2 3; do
     done
 done
 
+# concat fusion
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    MODEL=early-fusion
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --debug true"
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat"
+done
+
 # gated fusion
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     MODEL=early-fusion
-    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --debug true"
-#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --debug true"
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/expression/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true"
 done
 
 ```
