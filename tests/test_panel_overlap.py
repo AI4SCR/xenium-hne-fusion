@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig
-from xenium_hne_fusion.panel_overlap import report_feature_overlap
+from xenium_hne_fusion.panel_overlap import collect_sample_summaries, report_feature_overlap
 
 
 def _load_script(path: str, module_name: str):
@@ -27,6 +27,48 @@ def _write_expr(tile_dir: Path, genes: list[str], *, include_token_index: bool =
     pd.DataFrame(data).to_parquet(tile_dir / 'expr-kernel_size=16.parquet', index=False)
 
 
+def _write_feature_universe(tile_dir: Path, genes: list[str]) -> None:
+    sample_dir = tile_dir.parent.parent
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    (sample_dir / 'feature_universe.txt').write_text('\n'.join(genes) + '\n')
+
+
+def test_collect_sample_summaries_uses_sample_feature_universe(tmp_path: Path):
+    s1_tile0 = tmp_path / 'S1' / '256_256' / '0'
+    s1_tile1 = tmp_path / 'S1' / '256_256' / '1'
+    s2_tile0 = tmp_path / 'S2' / '256_256' / '0'
+    s1_tile0.mkdir(parents=True, exist_ok=True)
+    s1_tile1.mkdir(parents=True, exist_ok=True)
+    s2_tile0.mkdir(parents=True, exist_ok=True)
+    _write_feature_universe(s1_tile0, ['A', 'B', 'C'])
+    _write_feature_universe(s2_tile0, ['A', 'C', 'D'])
+
+    items = pd.DataFrame(
+        [
+            {'id': 'S2_0', 'sample_id': 'S2', 'tile_id': 0, 'tile_dir': str(s2_tile0), 'organ': 'Lung'},
+            {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': str(s1_tile1), 'organ': 'Breast'},
+            {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(s1_tile0), 'organ': 'Breast'},
+        ]
+    )
+
+    summaries = collect_sample_summaries(items)
+
+    assert summaries == [
+        {
+            'sample_id': 'S1',
+            'organ': 'Breast',
+            'num_tiles': 2,
+            'genes': ('A', 'B', 'C'),
+        },
+        {
+            'sample_id': 'S2',
+            'organ': 'Lung',
+            'num_tiles': 1,
+            'genes': ('A', 'C', 'D'),
+        },
+    ]
+
+
 def test_report_overlap_script_smoke(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     module = _load_script('.codex/skills/hest1k-panel-overlap/scripts/report_overlap.py', 'report_overlap_script')
 
@@ -34,6 +76,8 @@ def test_report_overlap_script_smoke(tmp_path: Path, capsys: pytest.CaptureFixtu
     s2_tile = tmp_path / 'S2' / '0'
     _write_expr(s1_tile, ['A', 'B', 'C'])
     _write_expr(s2_tile, ['A', 'D'], include_token_index=True)
+    _write_feature_universe(s1_tile, ['A', 'B', 'C'])
+    _write_feature_universe(s2_tile, ['A', 'D'])
 
     items_path = tmp_path / 'items.json'
     items_path.write_text(
@@ -101,6 +145,8 @@ def test_report_feature_overlap_from_artifacts_config(tmp_path: Path, monkeypatc
     s2_tile = data_dir / '02_processed' / 'hest1k' / 'S2' / '256_256' / '0'
     _write_expr(s1_tile, ['A', 'B', 'C'])
     _write_expr(s2_tile, ['A', 'C', 'D'])
+    _write_feature_universe(s1_tile, ['A', 'B', 'C'])
+    _write_feature_universe(s2_tile, ['A', 'C', 'D'])
 
     items_path = output_dir / 'items' / 'all.json'
     items_path.parent.mkdir(parents=True, exist_ok=True)

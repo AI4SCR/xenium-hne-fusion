@@ -52,7 +52,20 @@ def process_hest1k_metadata(
     output_path: Path,
     selected_sample_ids: list[str] | None = None,
 ) -> Path:
-    return clean_sample_metadata(metadata_path, output_path, selected_sample_ids=selected_sample_ids)
+    metadata = normalize_hest1k_metadata(read_metadata_table(metadata_path))
+
+    if selected_sample_ids is not None:
+        keep = metadata['sample_id'].isin(selected_sample_ids)
+        metadata = metadata.loc[keep].copy()
+
+    missing = sorted(set(selected_sample_ids or []) - set(metadata['sample_id']))
+    assert not missing, f'Some requested sample_ids are missing from metadata: {missing}'
+    assert metadata['sample_id'].is_unique, 'Processed metadata must have one row per sample_id'
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata.to_parquet(output_path, index=False)
+    logger.info(f'Saved cleaned sample metadata → {output_path}')
+    return output_path
 
 
 def process_beat_metadata(
@@ -105,14 +118,20 @@ def read_metadata_table(metadata_path: Path) -> pd.DataFrame:
 def normalize_sample_metadata(metadata: pd.DataFrame) -> pd.DataFrame:
     metadata = metadata.copy()
 
-    if 'sample_id' in metadata.columns and 'id' in metadata.columns:
-        assert metadata['sample_id'].equals(metadata['id']), "Expected 'sample_id' and 'id' to match"
-        metadata = metadata.drop(columns=['id'])
-    elif 'sample_id' not in metadata.columns:
-        assert 'id' in metadata.columns, "Metadata must contain 'sample_id' or 'id'"
-        metadata = metadata.rename(columns={'id': 'sample_id'})
+    if 'sample_id' not in metadata.columns:
+        assert metadata.index.name == 'sample_id', 'Metadata must contain sample_id column'
+        metadata = metadata.reset_index()
 
     assert metadata['sample_id'].notna().all(), 'Metadata contains null sample_id values'
+    return metadata
+
+
+def normalize_hest1k_metadata(metadata: pd.DataFrame) -> pd.DataFrame:
+    metadata = metadata.copy()
+    assert 'sample_id' not in metadata.columns, 'HEST metadata should not already contain sample_id'
+    assert 'id' in metadata.columns, "HEST metadata must contain 'id'"
+    metadata = metadata.rename(columns={'id': 'sample_id'})
+    assert metadata['sample_id'].notna().all(), 'HEST metadata contains null sample_id values'
     return metadata
 
 

@@ -15,7 +15,7 @@ from xenium_hne_fusion.config import (
     SplitConfig,
     TilesConfig,
 )
-from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
+from xenium_hne_fusion.metadata import normalize_hest1k_metadata, normalize_sample_metadata, read_metadata_table
 
 
 def get_repo_root() -> Path:
@@ -372,7 +372,11 @@ def resolve_samples(cfg: DataConfig | PipelineConfig, metadata_path: Path) -> li
     filter_cfg = cfg.data.filter if isinstance(cfg, PipelineConfig) else cfg.filter
     validate_filter_ids(filter_cfg)
 
-    meta = normalize_sample_metadata(read_metadata_table(metadata_path))
+    dataset_name = cfg.data.name if isinstance(cfg, PipelineConfig) else cfg.name
+    if dataset_name == 'hest1k':
+        meta = normalize_hest1k_metadata(read_metadata_table(metadata_path))
+    else:
+        meta = normalize_sample_metadata(read_metadata_table(metadata_path))
     mask = pd.Series(True, index=meta.index)
 
     platform_col = 'platform' if 'platform' in meta.columns else 'st_technology' if 'st_technology' in meta.columns else None

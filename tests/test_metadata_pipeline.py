@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, SplitConfig
-from xenium_hne_fusion.metadata import link_structured_metadata
+from xenium_hne_fusion.metadata import link_structured_metadata, normalize_sample_metadata
 from xenium_hne_fusion.utils.getters import load_processing_config
 
 
@@ -103,6 +103,13 @@ def test_process_metadata_writes_beat_metadata_to_processed(monkeypatch: pytest.
 
     metadata = pd.read_parquet(output_path)
     assert metadata['sample_id'].tolist() == ['S2']
+
+
+def test_normalize_sample_metadata_rejects_plain_id_column():
+    metadata = pd.DataFrame([{'id': 'S1', 'patient': 'P1'}])
+
+    with pytest.raises(AssertionError, match='Metadata must contain sample_id column'):
+        normalize_sample_metadata(metadata)
 
 
 def test_create_splits_writes_tile_level_metadata_with_sample_columns(

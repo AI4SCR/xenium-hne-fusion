@@ -6,7 +6,7 @@ from huggingface_hub import snapshot_download
 from loguru import logger
 from wsidata import open_wsi
 
-from xenium_hne_fusion.metadata import normalize_sample_metadata, read_metadata_table
+from xenium_hne_fusion.metadata import normalize_hest1k_metadata, read_metadata_table
 from xenium_hne_fusion.structure import structure_metadata, structure_sample, symlink
 
 
@@ -83,7 +83,7 @@ def validate_hest_sample_mpp(
 
 
 def get_hest_metadata_row(sample_id: str, metadata_path: Path) -> pd.Series | None:
-    metadata = normalize_sample_metadata(read_metadata_table(metadata_path))
+    metadata = normalize_hest1k_metadata(read_metadata_table(metadata_path))
     rows = metadata.loc[metadata["sample_id"] == sample_id]
     assert len(rows) <= 1, f"Expected at most 1 metadata row for {sample_id}, found {len(rows)}"
     if len(rows) == 0:
