@@ -8,6 +8,7 @@ from torchvision.transforms import v2
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.models.encoders import log1p_transform
+from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.lit import RegressionLit
 from xenium_hne_fusion.train.supervised import infer_head_input_dim, resolve_num_outputs, validate_task_config
@@ -87,6 +88,48 @@ def test_infer_head_input_dim_for_late_concat_doubles_morph_dim():
     )
 
     assert input_dim == 768
+
+
+def test_fusion_model_accepts_learnable_gate_for_add_fusion():
+    model = FusionModel(
+        morph_encoder=nn.Identity(),
+        expr_encoder=nn.Identity(),
+        morph_encoder_dim=4,
+        expr_encoder_dim=4,
+        fusion_strategy='add',
+        fusion_stage='late',
+        global_pool='avg',
+        learnable_gate=True,
+    )
+
+    assert model.fusion_alpha is not None
+    assert model.fusion_alpha.requires_grad
+
+
+@pytest.mark.parametrize(
+    ('fusion_strategy', 'morph_encoder', 'expr_encoder'),
+    [
+        ('concat', nn.Identity(), nn.Identity()),
+        (None, nn.Identity(), None),
+        (None, None, nn.Identity()),
+    ],
+)
+def test_fusion_model_rejects_learnable_gate_outside_add_fusion(
+    fusion_strategy: str | None,
+    morph_encoder: nn.Module | None,
+    expr_encoder: nn.Module | None,
+):
+    with pytest.raises(AssertionError, match='learnable_gate requires fusion_strategy=\"add\"'):
+        FusionModel(
+            morph_encoder=morph_encoder,
+            expr_encoder=expr_encoder,
+            morph_encoder_dim=4 if morph_encoder is not None else None,
+            expr_encoder_dim=4 if expr_encoder is not None else None,
+            fusion_strategy=fusion_strategy,
+            fusion_stage='late' if fusion_strategy is not None else None,
+            global_pool='avg',
+            learnable_gate=True,
+        )
 
 
 def test_regression_lit_reads_target_from_target_key():

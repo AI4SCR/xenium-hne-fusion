@@ -6,7 +6,16 @@ from ai4bmr_learn.utils.pooling import pool
 from typing import Literal
 
 
-def _validate_config(morph_encoder, expr_encoder, fusion_strategy, fusion_stage, global_pool, morph_token_pool, expr_token_pool):
+def _validate_config(
+    morph_encoder,
+    expr_encoder,
+    fusion_strategy,
+    fusion_stage,
+    global_pool,
+    morph_token_pool,
+    expr_token_pool,
+    learnable_gate,
+):
     assert morph_encoder is not None or expr_encoder is not None, (
         'At least one of morph_encoder or expr_model should be provided.'
     )
@@ -31,6 +40,8 @@ def _validate_config(morph_encoder, expr_encoder, fusion_strategy, fusion_stage,
         assert fusion_stage == 'late', f'morph_token_pool is only used for late fusion.'
     if expr_token_pool is not None:
         assert fusion_stage == 'late' or fusion_strategy is None, f'expr_token_pool is only used for late fusion or uni-modal expr encoder.'
+    if learnable_gate:
+        assert fusion_strategy == 'add', 'learnable_gate requires fusion_strategy="add".'
 
 
 _MISSING = object()  # NOTE: None can be a valid path in a dict, this we need sentinel value to detect missing keys
@@ -78,7 +89,16 @@ class FusionModel(nn.Module):
         with `fusion_strategy=None`.
         """
 
-        _validate_config(morph_encoder, expr_encoder, fusion_strategy, fusion_stage, global_pool, morph_token_pool, expr_token_pool)
+        _validate_config(
+            morph_encoder,
+            expr_encoder,
+            fusion_strategy,
+            fusion_stage,
+            global_pool,
+            morph_token_pool,
+            expr_token_pool,
+            learnable_gate,
+        )
 
         super().__init__()
 
