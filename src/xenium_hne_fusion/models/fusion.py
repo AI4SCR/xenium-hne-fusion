@@ -41,7 +41,7 @@ def _validate_config(
     if expr_token_pool is not None:
         assert fusion_stage == 'late' or fusion_strategy is None, f'expr_token_pool is only used for late fusion or uni-modal expr encoder.'
     if learnable_gate:
-        assert fusion_strategy == 'add', 'learnable_gate requires fusion_strategy="add".'
+        assert fusion_strategy == 'add', f'learnable_gate requires fusion_strategy="add" not {fusion_strategy}.'
 
 
 _MISSING = object()  # NOTE: None can be a valid path in a dict, this we need sentinel value to detect missing keys

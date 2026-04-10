@@ -106,5 +106,5 @@ kray job submit \
     --entrypoint-num-gpus "$ENTRYPOINT_NUM_GPUS" \
     --working-dir . \
     --runtime-env "${ENV_FILE}" \
-    --no-wait \
     -- "${REMOTE_CMD[@]}"
+#    --no-wait \
