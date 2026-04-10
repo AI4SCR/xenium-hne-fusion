@@ -162,3 +162,19 @@ def test_train_configs_explicitly_set_learnable_gate_false():
 
         cfg = Config.from_yaml(path)
         assert cfg.backbone.learnable_gate is False
+
+
+def test_beat_cell_type_configs_match_expression_variants():
+    expr_paths = sorted(Path('configs/train/beat/expression').glob('*.yaml'))
+    cell_paths = sorted(Path('configs/train/beat/cell_types').glob('*.yaml'))
+
+    assert [path.name for path in cell_paths] == [path.name for path in expr_paths]
+
+    for path in cell_paths:
+        cfg = Config.from_yaml(path)
+        assert cfg.task.target == 'cell_types'
+        assert cfg.head.output_dim == 39
+        assert cfg.wandb.project == 'xe-hne-fus-cell'
+        assert cfg.data.items_path == Path('default.json')
+        assert cfg.data.metadata_path == Path('default/outer=0-inner=0-seed=0.parquet')
+        assert cfg.data.panel_path == Path('default.yaml')
