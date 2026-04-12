@@ -178,6 +178,7 @@ def _write_tile_stats_summary(items_df: pd.DataFrame, stats: pd.DataFrame, outpu
     panel_union = len(set.union(*sample_panels))
 
     num_unique_transcripts = stats["num_unique_transcripts"].dropna()
+    num_unique_cells = stats["num_unique_cells"].dropna()
     summary = {
         "num_tiles": len(items_df),
         "num_samples": items_df["sample_id"].nunique(),
@@ -185,6 +186,10 @@ def _write_tile_stats_summary(items_df: pd.DataFrame, stats: pd.DataFrame, outpu
         "num_unique_transcripts_min": int(num_unique_transcripts.min()),
         "num_unique_transcripts_median": float(num_unique_transcripts.median()),
         "num_unique_transcripts_max": int(num_unique_transcripts.max()),
+        "num_cells": int(stats["num_cells"].sum()),
+        "num_unique_cells_min": int(num_unique_cells.min()),
+        "num_unique_cells_median": float(num_unique_cells.median()),
+        "num_unique_cells_max": int(num_unique_cells.max()),
         "gene_panel_min": min(panel_sizes),
         "gene_panel_max": max(panel_sizes),
         "gene_panel_intersection": panel_intersection,
