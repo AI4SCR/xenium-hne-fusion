@@ -5,7 +5,7 @@ from pathlib import Path
 from loguru import logger
 
 from xenium_hne_fusion.metadata import link_structured_metadata
-from xenium_hne_fusion.tiling import save_sample_overview
+from xenium_hne_fusion.tiling import save_points_overview, save_sample_overview
 
 
 def symlink(src: Path, dst: Path) -> None:
@@ -29,6 +29,8 @@ def structure_sample(
     if cells_path is not None:
         symlink(cells_path, out / "cells.parquet")
     save_sample_overview(out / "wsi.tiff", out / "transcripts.parquet", out)
+    if cells_path is not None:
+        save_points_overview(out / "wsi.tiff", out / "cells.parquet", out / "cells.png")
     logger.info(f"Structured {sample_id} → {out}")
 
 

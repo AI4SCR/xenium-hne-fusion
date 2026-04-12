@@ -75,33 +75,34 @@ def save_wsi_thumbnail(wsi_path: Path, output_path: Path, max_size: int = 2048) 
     logger.info(f"Thumbnail saved to {output_path}")
 
 
-def _get_transcript_coordinate_columns(schema_names: list[str]) -> list[str]:
+def _get_point_coordinate_columns(schema_names: list[str]) -> list[str]:
     if {"he_x", "he_y"} <= set(schema_names):
         return ["he_x", "he_y"]
-    assert "geometry" in schema_names, f"Missing transcript coordinates: {schema_names}"
+    assert "geometry" in schema_names, f"Missing point coordinates: {schema_names}"
     return ["geometry"]
 
 
-def _load_transcript_batch(batch) -> gpd.GeoDataFrame:
+def _load_point_batch(batch) -> gpd.GeoDataFrame:
     schema_names = set(batch.schema.names)
     if {"he_x", "he_y"} <= schema_names:
         chunk = batch.to_pandas()
         chunk["geometry"] = gpd.points_from_xy(chunk["he_x"], chunk["he_y"])
         return gpd.GeoDataFrame(chunk, geometry="geometry")
 
-    assert "geometry" in schema_names, f"Missing transcript coordinates: {batch.schema.names}"
+    assert "geometry" in schema_names, f"Missing point coordinates: {batch.schema.names}"
     return gpd.GeoDataFrame.from_arrow(batch)
 
 
-def save_transcript_overview(
+def save_points_overview(
     wsi_path: Path,
-    transcripts_path: Path,
+    points_path: Path,
     output_path: Path,
     n: int = 10_000,
     max_size: int = 2048,
     seed: int = 0,
+    label: str | None = None,
 ) -> None:
-    """Plot n random transcripts on the WSI thumbnail. Stream-sample from parquet to control memory."""
+    """Plot n random points on the WSI thumbnail. Stream-sample from parquet to control memory."""
     import openslide
     import pyarrow.parquet as pq
 
@@ -110,15 +111,15 @@ def save_transcript_overview(
 
     rng = np.random.default_rng(seed)
 
-    # --- stream-sample transcripts ---
-    pf = pq.ParquetFile(transcripts_path)
+    pf = pq.ParquetFile(points_path)
     total_rows = pf.metadata.num_rows
     batch_size = 65_536
     num_batches = max(1, (total_rows + batch_size - 1) // batch_size)
-    logger.info(f"Sampling {n} transcripts from {total_rows} total rows across {num_batches} batches")
+    label = label or points_path.stem
+    logger.info(f"Sampling {n} {label} from {total_rows} total rows across {num_batches} batches")
 
     n = min(n, total_rows)
-    columns = _get_transcript_coordinate_columns(pf.schema_arrow.names)
+    columns = _get_point_coordinate_columns(pf.schema_arrow.names)
     collected: list[gpd.GeoDataFrame] = []
     taken_total = 0
 
@@ -130,16 +131,16 @@ def save_transcript_overview(
         num_take = max(1, int(np.ceil(needed / batches_left)))
         size = len(batch)
         if size <= num_take:
-            collected.append(_load_transcript_batch(batch))
+            collected.append(_load_point_batch(batch))
             taken_total += size
         else:
             idx = rng.choice(size, size=num_take, replace=False)
-            collected.append(_load_transcript_batch(batch.take(idx)))
+            collected.append(_load_point_batch(batch.take(idx)))
             taken_total += num_take
 
     points = pd.concat(collected, ignore_index=True)
     points = gpd.GeoDataFrame(points, geometry="geometry")
-    logger.info(f"Collected {len(points)} transcripts for overlay")
+    logger.info(f"Collected {len(points)} {label} for overlay")
 
     slide = openslide.OpenSlide(str(wsi_path))
     try:
@@ -149,22 +150,41 @@ def save_transcript_overview(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(viz).save(output_path)
-    logger.info(f"Transcript overview saved to {output_path}")
+    logger.info(f"{label.capitalize()} overview saved to {output_path}")
+
+
+def save_transcript_overview(
+    wsi_path: Path,
+    transcripts_path: Path,
+    output_path: Path,
+    n: int = 10_000,
+    max_size: int = 2048,
+    seed: int = 0,
+) -> None:
+    save_points_overview(
+        wsi_path=wsi_path,
+        points_path=transcripts_path,
+        output_path=output_path,
+        n=n,
+        max_size=max_size,
+        seed=seed,
+        label="transcripts",
+    )
 
 
 def save_sample_overview(
     wsi_path: Path,
-    transcripts_path: Path,
+    points_path: Path,
     output_dir: Path,
     n: int = 10_000,
     max_size: int = 2048,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     save_wsi_thumbnail(wsi_path, output_dir / "wsi.png", max_size=max_size)
-    save_transcript_overview(
+    save_points_overview(
         wsi_path,
-        transcripts_path,
-        output_dir / "transcripts.png",
+        points_path,
+        output_dir / f"{points_path.stem}.png",
         n=n,
         max_size=max_size,
     )

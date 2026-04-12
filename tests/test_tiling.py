@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 import pytest
 from shapely.geometry import Point, box
 
-from xenium_hne_fusion.tiling import save_transcript_overview, tile_tissues
+from xenium_hne_fusion.tiling import save_points_overview, save_sample_overview, save_transcript_overview, tile_tissues
 
 
 def test_save_transcript_overview_streams_batches(monkeypatch, tmp_path: Path):
@@ -143,8 +143,67 @@ def test_save_transcript_overview_requires_coordinates(monkeypatch, tmp_path: Pa
 
     monkeypatch.setattr(pq, 'ParquetFile', FakeParquetFile)
 
-    with pytest.raises(AssertionError, match='Missing transcript coordinates'):
+    with pytest.raises(AssertionError, match='Missing point coordinates'):
         save_transcript_overview(tmp_path / 'wsi.tiff', tmp_path / 'transcripts.parquet', tmp_path / 'transcripts.png', n=2)
+
+
+def test_save_points_overview_supports_cells_geometry(monkeypatch, tmp_path: Path):
+    class FakeMetadata:
+        num_rows = 2
+
+    class FakeSchema:
+        names = ['geometry']
+
+    class FakeParquetFile:
+        def __init__(self, path: Path):
+            self.path = path
+            self.metadata = FakeMetadata()
+            self.schema_arrow = FakeSchema()
+
+        def iter_batches(self, batch_size: int, columns: list[str]):
+            assert columns == ['geometry']
+            yield pa.table({'geometry': [b'a', b'b']})
+
+    class FakeSlide:
+        def close(self):
+            return None
+
+    def fake_from_arrow(batch):
+        return gpd.GeoDataFrame({'geometry': [Point(1, 2), Point(3, 4)]}, geometry='geometry')
+
+    def fake_visualize_points(points, *, slide=None, image=None, **kwargs):
+        assert list(points.geometry.x) == [1.0, 3.0]
+        assert list(points.geometry.y) == [2.0, 4.0]
+        return np.zeros((20, 40, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(pq, 'ParquetFile', FakeParquetFile)
+    monkeypatch.setattr('openslide.OpenSlide', lambda _: FakeSlide())
+    monkeypatch.setattr('xenium_hne_fusion.tiling.gpd.GeoDataFrame.from_arrow', fake_from_arrow)
+    monkeypatch.setattr('ai4bmr_learn.plotting.xenium.visualize_points', fake_visualize_points)
+
+    output_path = tmp_path / 'cells.png'
+    save_points_overview(tmp_path / 'wsi.tiff', tmp_path / 'cells.parquet', output_path, n=2, label='cells')
+
+    assert output_path.exists()
+
+
+def test_save_sample_overview_uses_points_stem_for_output(monkeypatch, tmp_path: Path):
+    calls = []
+    wsi_path = tmp_path / 'wsi.tiff'
+    transcripts_path = tmp_path / 'transcripts.parquet'
+    cells_path = tmp_path / 'cells.parquet'
+
+    monkeypatch.setattr('xenium_hne_fusion.tiling.save_wsi_thumbnail', lambda *args, **kwargs: calls.append(('wsi', args)))
+    monkeypatch.setattr(
+        'xenium_hne_fusion.tiling.save_points_overview',
+        lambda wsi_path, points_path, output_path, n, max_size, label=None: calls.append((points_path, output_path)),
+    )
+
+    save_sample_overview(wsi_path, transcripts_path, tmp_path)
+    save_sample_overview(wsi_path, cells_path, tmp_path)
+
+    assert (transcripts_path, tmp_path / 'transcripts.png') in calls
+    assert (cells_path, tmp_path / 'cells.png') in calls
 
 
 def test_tile_tissues_passes_slide_mpp_override(monkeypatch, tmp_path: Path):
