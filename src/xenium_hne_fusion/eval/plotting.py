@@ -182,6 +182,7 @@ def _plot_metric(
     ]
     for output in outputs:
         board.figure.savefig(output, bbox_inches='tight', dpi=300)
+        logger.info(f'Saved plot -> {output}')
     plt.close(board.figure)
     return outputs
 
