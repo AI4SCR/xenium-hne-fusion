@@ -26,7 +26,14 @@ def main(data_cfg: DataConfig) -> None:
         sample_id = sample_dir.name
         wsi_path = sample_dir / "region.tiff"
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
-        structure_sample(sample_id, wsi_path, tx_path, cfg.paths.structured_dir)
+        cells_path = sample_dir / "cells.parquet"
+        structure_sample(
+            sample_id,
+            wsi_path,
+            tx_path,
+            cfg.paths.structured_dir,
+            cells_path=cells_path if cells_path.exists() else None,
+        )
 
 
 def cli(argv: list[str] | None = None) -> int:

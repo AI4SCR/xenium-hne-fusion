@@ -1,14 +1,29 @@
 import json
+import importlib.util
 from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
 
-from scripts.data import compute_items_stats as module
 from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig
-from xenium_hne_fusion.pipeline import compute_items_stats
+from xenium_hne_fusion.pipeline import (
+    _compute_cell_stats,
+    compute_items_stats,
+)
 from xenium_hne_fusion.utils.getters import compute_item_stats
+
+
+def _load_script(path: str, module_name: str):
+    script_path = Path(path).resolve()
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+module = _load_script("scripts/artifacts/compute_items_stats.py", "compute_items_stats_script")
 
 
 def _write_expr_tile_inputs(
@@ -33,7 +48,7 @@ def _write_expr_tile_inputs(
 
     if cell_types is not None:
         cells = gpd.GeoDataFrame(
-            {"Level3_grouped": cell_types},
+            {"Level3_grouped": pd.Categorical(cell_types)},
             geometry=[Point(i, i) for i in range(len(cell_types))],
         )
         cells.to_parquet(tile_dir / "cells.parquet")
@@ -122,14 +137,14 @@ def test_main_uses_configured_items_path(tmp_path: Path, monkeypatch):
     module.main(artifacts_cfg, overwrite=True, batch_size=2, num_workers=0)
 
     assert (output_dir / 'statistics' / 'subset.parquet').exists()
-    figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'
+    figures_dir = output_dir / 'figures' / 'items' / 'stats' / 'subset'
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
 
 
 def test_compute_items_stats_batches_transcript_targets(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'hest1k'
-    tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
+    tile_dir = output_dir / 'tiles' / 'S1' / '256_256' / '0'
 
     _write_expr_tile_inputs(
         tile_dir,
@@ -164,17 +179,139 @@ def test_compute_items_stats_batches_transcript_targets(tmp_path: Path):
     stats = pd.read_parquet(stats_path)
     assert stats.loc['S1_0', 'num_transcripts'] == 3
     assert stats.loc['S1_0', 'num_unique_transcripts'] == 2
-    assert pd.isna(stats.loc['S1_0', 'num_cells'])
-    assert pd.isna(stats.loc['S1_0', 'num_unique_cells'])
-    figures_dir = output_dir / 'figures' / 'tile_stats' / 'subset'
+    assert stats.loc['S1_0', 'num_cells'] == 3
+    assert stats.loc['S1_0', 'num_unique_cells'] == 2
+    figures_dir = output_dir / 'figures' / 'items' / 'stats' / 'subset'
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_linear.png').exists()
     assert (figures_dir / 'num_transcripts_vs_num_unique_transcripts_log.png').exists()
 
 
+def test_compute_items_stats_sets_missing_cells_counts_to_zero(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'hest1k'
+    tile_dir = output_dir / 'tiles' / 'S1' / '256_256' / '0'
+
+    _write_expr_tile_inputs(
+        tile_dir,
+        transcript_features=['A', 'A', 'B'],
+        expr=pd.DataFrame(
+            {
+                'A': [1, 1, 0],
+                'B': [0, 0, 1],
+                'C': [0, 0, 0],
+            },
+            index=pd.Index([0, 1, 2], name='token_index'),
+        ),
+        cell_types=None,
+        feature_universe=['A', 'B', 'C'],
+    )
+
+    items_path = output_dir / 'items' / 'subset.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    items_path.write_text(json.dumps([
+        {
+            'id': 'S1_0',
+            'sample_id': 'S1',
+            'tile_id': 0,
+            'tile_dir': str(tile_dir),
+        }
+    ]))
+
+    stats_path = compute_items_stats(items_path, output_dir, batch_size=2, num_workers=0)
+
+    stats = pd.read_parquet(stats_path)
+    assert stats.loc['S1_0', 'num_cells'] == 0
+    assert stats.loc['S1_0', 'num_unique_cells'] == 0
+
+
+def test_compute_cell_stats_filters_items_to_tiles_with_cells(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'hest1k'
+    with_cells = output_dir / 'tiles' / 'S1' / '256_256' / '0'
+    without_cells = output_dir / 'tiles' / 'S1' / '256_256' / '1'
+
+    _write_expr_tile_inputs(
+        with_cells,
+        transcript_features=['A'],
+        expr=pd.DataFrame({'A': [1]}, index=pd.Index([0], name='token_index')),
+        cell_types=['tumor', 'stroma', 'tumor'],
+        feature_universe=['A'],
+    )
+    _write_expr_tile_inputs(
+        without_cells,
+        transcript_features=['A'],
+        expr=pd.DataFrame({'A': [1]}, index=pd.Index([0], name='token_index')),
+        cell_types=None,
+        feature_universe=['A'],
+    )
+
+    items_path = output_dir / 'items' / 'subset.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    items_path.write_text(json.dumps([
+        {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(with_cells)},
+        {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': str(without_cells)},
+    ]))
+    stats = _compute_cell_stats(
+        items_path,
+        batch_size=2,
+        num_workers=0,
+        cell_type_col='Level3_grouped',
+    )
+
+    assert list(stats.index) == ['S1_0']
+    assert stats.loc['S1_0', 'num_cells'] == 3
+    assert stats.loc['S1_0', 'num_unique_cells'] == 2
+
+
+def test_compute_items_stats_merges_expression_and_cell_stats(tmp_path: Path):
+    output_dir = tmp_path / '03_output' / 'hest1k'
+    with_cells = output_dir / 'tiles' / 'S1' / '256_256' / '0'
+    without_cells = output_dir / 'tiles' / 'S1' / '256_256' / '1'
+
+    _write_expr_tile_inputs(
+        with_cells,
+        transcript_features=['A', 'A', 'B'],
+        expr=pd.DataFrame(
+            {'A': [1, 1, 0], 'B': [0, 0, 1], 'C': [0, 0, 0]},
+            index=pd.Index([0, 1, 2], name='token_index'),
+        ),
+        cell_types=['tumor', 'stroma', 'tumor'],
+        feature_universe=['A', 'B', 'C'],
+    )
+    _write_expr_tile_inputs(
+        without_cells,
+        transcript_features=['B', 'C'],
+        expr=pd.DataFrame(
+            {'A': [0, 0], 'B': [1, 0], 'C': [0, 1]},
+            index=pd.Index([0, 1], name='token_index'),
+        ),
+        cell_types=None,
+        feature_universe=['A', 'B', 'C'],
+    )
+
+    items_path = output_dir / 'items' / 'subset.json'
+    items_path.parent.mkdir(parents=True, exist_ok=True)
+    items_path.write_text(json.dumps([
+        {'id': 'S1_0', 'sample_id': 'S1', 'tile_id': 0, 'tile_dir': str(with_cells)},
+        {'id': 'S1_1', 'sample_id': 'S1', 'tile_id': 1, 'tile_dir': str(without_cells)},
+    ]))
+
+    stats_path = compute_items_stats(items_path, output_dir, batch_size=2, num_workers=0)
+
+    stats = pd.read_parquet(stats_path)
+    assert list(stats.columns) == ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
+    assert stats.loc['S1_0', 'num_transcripts'] == 3
+    assert stats.loc['S1_0', 'num_unique_transcripts'] == 2
+    assert stats.loc['S1_0', 'num_cells'] == 3
+    assert stats.loc['S1_0', 'num_unique_cells'] == 2
+    assert stats.loc['S1_1', 'num_transcripts'] == 2
+    assert stats.loc['S1_1', 'num_unique_transcripts'] == 2
+    assert stats.loc['S1_1', 'num_cells'] == 0
+    assert stats.loc['S1_1', 'num_unique_cells'] == 0
+
+
 def test_compute_items_stats_writes_markdown_summary(tmp_path: Path):
     output_dir = tmp_path / '03_output' / 'hest1k'
-    s1_tile_dir = tmp_path / 'tiles' / 'S1' / '256_256' / '0'
-    s2_tile_dir = tmp_path / 'tiles' / 'S2' / '256_256' / '0'
+    s1_tile_dir = output_dir / 'tiles' / 'S1' / '256_256' / '0'
+    s2_tile_dir = output_dir / 'tiles' / 'S2' / '256_256' / '0'
 
     _write_expr_tile_inputs(
         s1_tile_dir,

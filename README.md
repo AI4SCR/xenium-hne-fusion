@@ -110,9 +110,13 @@ data/
     ├── statistics/
     │   └── all.parquet
     ├── figures/
-    │   └── tile_stats/
-    │       └── <items_name>/
-    │           └── *.png
+    │   └── items/
+    │       ├── stats/
+    │       │   └── <items_name>/
+    │       │       └── *.png
+    │       └── gene_panel_overlap/
+    │           ├── <items_name>.pdf
+    │           └── <items_name>.png
     ├── splits/
     │   └── <split_name>/
     │       └── outer=0[-inner=0]-seed=<seed>.parquet
@@ -126,7 +130,8 @@ Key outputs:
 
 - `items/all.json`: complete tile set used for source-item stats
 - `items/<items_name>.json`: filtered subset
-- `figures/tile_stats/<items_name>/`: tile-stat plots
+- `figures/items/stats/<items_name>/`: tile-stat plots
+- `figures/items/gene_panel_overlap/<items_name>.{pdf,png}`: sample gene-panel overlap heatmaps
 - `splits/<split_name>/`: split parquet files
 - `panels/`: generated panel YAMLs
 
@@ -257,6 +262,22 @@ uv run scripts/artifacts/create_splits.py \
 uv run scripts/artifacts/create_panel.py \
   --config configs/artifacts/hest1k/breast.yaml
 ```
+
+#### Gene-panel overlap diagnostics
+
+Use this to inspect sample-level `feature_universe.txt` overlap for the current filtered item set.
+The plot title reports the minimum and maximum pairwise intersection sizes and the size of the
+intersection shared across all selected samples.
+
+```bash
+uv run python scripts/artifacts/report_feature_overlap.py \
+  --config configs/artifacts/hest1k/breast.yaml
+```
+
+Outputs are written under `DATA_DIR/03_output/<name>/figures/items/gene_panel_overlap/`:
+
+- `<items_name>.pdf`
+- `<items_name>.png` at 300 DPI
 
 #### All artifacts
 
@@ -555,7 +576,6 @@ for PANEL in \
   "human-5k human-5k-panel" \
   "human-immuno-oncology human-immuno-oncology-panel" \
   "human-multi-tissue human-multi-tissue-panel"; do
-  read -r ARTIFACT_NAME SPLIT_DIR <<< "${PANEL}"
   ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape/${ARTIFACT_NAME}.yaml"
 done
 ./ray/submit.sh "python scripts/artifacts/create_hescape_splits.py"
@@ -567,8 +587,8 @@ for ORGAN in breast lung pancreas bowel; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
     for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
     done
   done
 done
@@ -608,34 +628,45 @@ done
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml"
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml --items.filter.num_cells=1"
 
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml"
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml --items.filter.num_cells=1 --items.name=cells"
-
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-cells.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml"
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko.yaml" --items.filter.num_cells=1
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-hvg.yaml"
+done
+
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-cells.yaml"
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-hvg.yaml"
 done
 
 ./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat/default.yaml"
 ./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml"
 
+#MODEL=early-fusion
+#TASK=cell_types
 TASK=expression
-TASK=cell_types
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_PATH="hvg-default-default-outer=${OUTER}-seed=0.yaml"
     for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
 #      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH} --debug true"
+# NOTE: the first job was submitted twice, filter out for performance comparison
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH}"
     done
 done
 
 # concat fusion
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_PATH="hvg-default-default-outer=${OUTER}-seed=0.yaml"
     MODEL=early-fusion
 #    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --debug true"
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat"
+# HVG
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --data.panel_path ${PANEL_PATH}"
 done
 
 # gated fusion
@@ -643,7 +674,9 @@ for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     MODEL=early-fusion
 #    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --debug true"
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true"
+# HVG
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --data.panel_path ${PANEL_PATH}"
 done
 
 ```
