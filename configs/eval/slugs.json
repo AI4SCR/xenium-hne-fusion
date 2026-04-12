@@ -1,0 +1,62 @@
+{
+  "vision": {
+    "label": "Vision",
+    "order": 10,
+    "modality": "uni-modal",
+    "stage": null,
+    "strategy": null,
+    "pool": null,
+    "morph_encoder": "ViT-S",
+    "expr_encoder": null
+  },
+  "expr-token": {
+    "label": "Expression token",
+    "order": 20,
+    "modality": "uni-modal",
+    "stage": null,
+    "strategy": null,
+    "pool": "token",
+    "morph_encoder": null,
+    "expr_encoder": "MLP"
+  },
+  "expr-tile": {
+    "label": "Expression tile",
+    "order": 30,
+    "modality": "uni-modal",
+    "stage": null,
+    "strategy": null,
+    "pool": "tile",
+    "morph_encoder": null,
+    "expr_encoder": "MLP"
+  },
+  "early-fusion": {
+    "label": "Early fusion",
+    "order": 40,
+    "modality": "multi-modal",
+    "stage": "early",
+    "strategy": "add",
+    "pool": "token",
+    "morph_encoder": "ViT-S",
+    "expr_encoder": "MLP"
+  },
+  "late-fusion-token": {
+    "label": "Late fusion token",
+    "order": 50,
+    "modality": "multi-modal",
+    "stage": "late",
+    "strategy": "add",
+    "pool": "token",
+    "morph_encoder": "ViT-S",
+    "expr_encoder": "MLP"
+  },
+  "late-fusion-tile": {
+    "label": "Late fusion tile",
+    "order": 60,
+    "modality": "multi-modal",
+    "stage": "late",
+    "strategy": "add",
+    "pool": "tile",
+    "morph_encoder": "ViT-S",
+    "expr_encoder": "MLP"
+  }
+}

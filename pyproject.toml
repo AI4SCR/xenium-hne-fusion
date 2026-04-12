@@ -14,6 +14,7 @@ dependencies = [
     "lazyslide>=0.10.0",
     "lightning",
     "loguru>=0.7.3",
+    "marsilea",
     "matplotlib",
     "pandas",
     "pyarrow>=23.0.1",

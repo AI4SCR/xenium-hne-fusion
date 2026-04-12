@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+import pandas as pd
+
+
+SLUG_COLUMNS = ['stage', 'strategy', 'pool', 'morph_encoder', 'expr_encoder']
+
+
+@dataclass(frozen=True)
+class SlugSpec:
+    slug: str
+    label: str
+    order: int
+    modality: str
+    stage: str | None
+    strategy: str | None
+    pool: str | None
+    morph_encoder: str | None
+    expr_encoder: str | None
+
+
+def load_slug_specs(path: Path) -> dict[str, SlugSpec]:
+    data = json.loads(path.read_text())
+    specs = {slug: SlugSpec(slug=slug, **values) for slug, values in data.items()}
+    orders = pd.Series([spec.order for spec in specs.values()])
+    assert orders.is_unique, f'Duplicate slug orders in {path}'
+    return specs
+
+
+def add_slugs(table: pd.DataFrame, specs: Mapping[str, SlugSpec]) -> pd.DataFrame:
+    table = table.copy()
+    table['slug'] = table.apply(lambda row: canonical_slug(row, specs), axis=1)
+    missing = sorted(table.loc[table['slug'].isna(), 'run_name'].astype(str).unique())
+    assert not missing, f'Runs missing from slugs.json: {missing}'
+    return table
+
+
+def canonical_slug(row: Mapping[str, Any], specs: Mapping[str, SlugSpec]) -> str | None:
+    names = [
+        _value(row, 'run_name'),
+        _value(row, 'config.wandb.name'),
+    ]
+    for name in names:
+        if name in specs:
+            return name
+
+    slug = _slug_from_config(row)
+    return slug if slug in specs else None
+
+
+def build_annotation_table(specs: Mapping[str, SlugSpec], slugs: list[str]) -> pd.DataFrame:
+    assert slugs, 'No slugs to annotate'
+    unknown = sorted(set(slugs) - set(specs))
+    assert not unknown, f'Unknown slugs: {unknown}'
+    duplicated = pd.Series(slugs)
+    assert duplicated.is_unique, f'Duplicate plotted slugs: {duplicated[duplicated.duplicated()].tolist()}'
+
+    rows = {
+        slug: {column: getattr(specs[slug], column) for column in SLUG_COLUMNS}
+        for slug in slugs
+    }
+    return pd.DataFrame(rows).loc[SLUG_COLUMNS]
+
+
+def ordered_slugs(table: pd.DataFrame, specs: Mapping[str, SlugSpec]) -> list[str]:
+    slugs = sorted(table['slug'].dropna().unique(), key=lambda slug: specs[slug].order)
+    assert slugs, 'No allowlisted W&B runs to plot'
+    return slugs
+
+
+def ordered_labels(slugs: list[str], specs: Mapping[str, SlugSpec]) -> list[str]:
+    return [specs[slug].label for slug in slugs]
+
+
+def _slug_from_config(row: Mapping[str, Any]) -> str | None:
+    fusion_strategy = _value(row, 'config.backbone.fusion_strategy')
+    fusion_stage = _value(row, 'config.backbone.fusion_stage')
+    morph_encoder = _value(row, 'config.backbone.morph_encoder_name')
+    expr_encoder = _value(row, 'config.backbone.expr_encoder_name')
+    expr_pool = _value(row, 'config.data.expr_pool')
+    expr_token_pool = _value(row, 'config.backbone.expr_token_pool')
+
+    if fusion_strategy is not None:
+        if fusion_stage == 'early':
+            return 'early-fusion'
+        if fusion_stage == 'late':
+            pool = 'tile' if expr_pool == 'tile' or expr_token_pool is None else 'token'
+            return f'late-fusion-{pool}'
+        return None
+
+    if morph_encoder is not None and expr_encoder is None:
+        return 'vision'
+    if expr_encoder is not None and morph_encoder is None:
+        return 'expr-tile' if expr_pool == 'tile' else 'expr-token'
+    return None
+
+
+def _value(row: Mapping[str, Any], key: str) -> Any:
+    value = row.get(key)
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, dict, set)):
+        return value
+    if pd.isna(value):
+        return None
+    return value
