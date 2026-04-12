@@ -125,7 +125,7 @@ class FusionModel(nn.Module):
 
         # Learnable residual scale for "add" fusion. tanh(0) = 0, so the
         # learnable-gate path starts from the pure morph baseline.
-        self.fusion_alpha = nn.Parameter(torch.zeros(1), requires_grad=learnable_gate) if fusion_strategy == "add" else None
+        self.fusion_alpha = nn.Parameter(torch.zeros(1), requires_grad=learnable_gate)
 
         self.pos_embed_layer_name = pos_embed_layer_name
 

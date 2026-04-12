@@ -184,6 +184,7 @@ def train(cfg: Config, debug: bool | None = None):
         target_key=cfg.lit.target_key,
         lr_head=cfg.lit.lr_head,
         lr_backbone=cfg.lit.lr_backbone,
+        lr_alpha=cfg.lit.lr_alpha,
         weight_decay=cfg.lit.weight_decay,
         eta=cfg.lit.eta,
         schedule=cfg.lit.schedule,

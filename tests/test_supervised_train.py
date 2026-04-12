@@ -124,6 +124,22 @@ def test_fusion_model_uses_plain_add_when_learnable_gate_is_disabled():
     assert model.get_fusion_gate().item() == pytest.approx(1.0)
 
 
+def test_fusion_model_defines_frozen_alpha_outside_add_fusion():
+    model = FusionModel(
+        morph_encoder=nn.Identity(),
+        expr_encoder=nn.Identity(),
+        morph_encoder_dim=4,
+        expr_encoder_dim=4,
+        fusion_strategy='concat',
+        fusion_stage='late',
+        global_pool='avg',
+        learnable_gate=False,
+    )
+
+    assert model.fusion_alpha is not None
+    assert not model.fusion_alpha.requires_grad
+
+
 @pytest.mark.parametrize(
     ('fusion_strategy', 'morph_encoder', 'expr_encoder'),
     [

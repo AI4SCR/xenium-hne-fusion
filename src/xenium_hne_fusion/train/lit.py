@@ -25,6 +25,7 @@ class RegressionLit(L.LightningModule):
         target_key: str = "target",
         lr_head: float = 1e-4,
         lr_backbone: float = 1e-5,
+        lr_alpha: float = 1e-3,
         weight_decay: float = 1e-3,
         eta: float = 1e-6,
         schedule: str | None = "cosine",
@@ -54,6 +55,7 @@ class RegressionLit(L.LightningModule):
 
         self.lr_head = lr_head
         self.lr_backbone = lr_backbone
+        self.lr_alpha = lr_alpha
         self.weight_decay = weight_decay
 
         self.criterion = self.configure_loss(loss=loss)
@@ -223,11 +225,19 @@ class RegressionLit(L.LightningModule):
         return batch
 
     def configure_optimizers(self):
+        fusion_alpha = self.backbone.fusion_alpha
+        param_groups = [
+            {"params": self.head.parameters(), "lr": self.lr_head},
+            {
+                "params": [p for p in self.backbone.parameters() if p.requires_grad and p is not fusion_alpha],
+                "lr": self.lr_backbone,
+            },
+        ]
+        if fusion_alpha.requires_grad:
+            param_groups.append({"params": [fusion_alpha], "lr": self.lr_alpha, "weight_decay": 0.0})
+
         optimizer = optim.AdamW(
-            [
-                {"params": self.head.parameters(), "lr": self.lr_head},
-                {"params": filter(lambda p: p.requires_grad, self.backbone.parameters()), "lr": self.lr_backbone},
-            ],
+            param_groups,
             weight_decay=self.weight_decay,
         )
 
