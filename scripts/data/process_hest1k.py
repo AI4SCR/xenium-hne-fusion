@@ -15,12 +15,13 @@ from xenium_hne_fusion.metadata import get_structured_metadata_path
 from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
 from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
-from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL, build_pipeline_config, resolve_samples
 
 
 def main(
     data_cfg: DataConfig,
     overwrite: bool = False,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     assert data_cfg.name == "hest1k", f"Expected dataset='hest1k', got {data_cfg.name!r}"
     cfg = build_pipeline_config(data_cfg)
@@ -68,7 +69,7 @@ def main(
         )
         if cells_path.exists():
             tile_cells(tiles, cells_path, processed_dir, predicate=predicate)
-        process_cells(tiles, processed_dir, img_size=img_size)
+        process_cells(tiles, processed_dir, img_size=img_size, cell_type_col=cell_type_col)
 
 
 def cli(argv: list[str] | None = None) -> int:

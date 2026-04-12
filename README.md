@@ -629,7 +629,7 @@ done
 ./ray/submit.sh "ls /raid/ray/shared/fmx/data/processed-v0/datasets/beat/XE_1JAT_01_HNE_1JAT/"
 ./ray/submit.sh 'python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml'
 ./ray/submit.sh 'python scribble/ray_process_beat_cells.py --config configs/data/remote/beat.yaml'
-./ray/submit.sh 'python scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml --overwrite true'
+./ray/submit.sh 'python scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml'
 
 # copy default panel
 ./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
@@ -653,41 +653,54 @@ done
 
 # training
 
-TASK=cell_types
-SPLIT_NAME=cell
 TASK=expression
-SPLIT_NAME=default
+TASK=cell_types
 for OUTER in 0 1 2 3; do
-    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
-    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="default.yaml"
+#    PANEL_PATH="default.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+    
+    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    
+#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
 #    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
-#    PANEL_PATH="hvg-cells-cells-${SPLIT_NAME}"
+
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
     done
 done
 
 # concat fusion
 MODEL=early-fusion
 for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="hvg-default-default-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="hvg-cells-cells-${SPLIT_NAME}.yaml"
-    # ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --data.panel_path ${PANEL_PATH}"
-    # ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --data.panel_path ${PANEL_PATH} --debug true"
+#    PANEL_PATH="default.yaml"
+    CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+    
+    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    
+#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
+#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
 done
 
 # gated fusion
 MODEL=early-fusion
 for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="hvg-default-default-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="hvg-cells-cells-${SPLIT_NAME}.yaml"
-#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --data.panel_path ${PANEL_PATH}"
-#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --data.panel_path ${PANEL_PATH} --debug true"
+#    PANEL_PATH="default.yaml"
+    CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+    
+    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    
+#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
+#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true"
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true"
 done
 
 ```
@@ -782,6 +795,7 @@ done
 ## Evaluation Plots
 
 ```bash
-uv run python scripts/eval/plot_wandb_scores.py --dataset beat --target expression --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --dataset hest1k --target expression --organ breast --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/hvg.yaml --project xe-hne-fus-expr --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
 ```

@@ -13,6 +13,8 @@ from loguru import logger
 from shapely.geometry import box
 from wsidata import open_wsi
 
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
+
 BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES = (
     "BLANK_",
     "NegControlCodeword_",
@@ -21,6 +23,7 @@ BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES = (
     "DeprecatedCodeword_",
     "Intergenic_Region_",
 )
+NUM_CELL_TYPE_CATEGORIES = 39
 
 
 def extract_tiles(
@@ -297,6 +300,7 @@ def process_cells(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
     img_size: int,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     """Transform tile-local cell subsets and render cells.png overlays."""
     from skimage.io import imsave
@@ -317,10 +321,9 @@ def process_cells(
         cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         cells = cells.drop(columns=["tile_id", "index_right"], errors="ignore")
 
-        # TODO: replace with cell type column variable
-        col = cells["Level3_grouped"].replace({'nan': 'unknown'}).cat.remove_categories('nan')
-        del cells["Level3_grouped"]
-        cells["Level3_grouped"] = col
+        col = normalize_cell_type_categories(cells[cell_type_col])
+        del cells[cell_type_col]
+        cells[cell_type_col] = col
         cells.to_parquet(tile_dir / "cells.parquet")
 
         img = torch.load(tile_dir / "tile.pt").permute(1, 2, 0).numpy()
@@ -328,6 +331,23 @@ def process_cells(
         imsave(tile_dir / "cells.png", viz)
 
     logger.info("Cell processing done")
+
+
+def normalize_cell_type_categories(cell_types: pd.Series) -> pd.Series:
+    assert isinstance(cell_types.dtype, pd.CategoricalDtype), "cell types must be categorical"
+    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES + 1, "expected 40 cell categories"
+    assert "unknown" in cell_types.cat.categories, "missing `unknown` cell category"
+    assert "nan" in cell_types.cat.categories, "missing `nan` cell category"
+    assert cell_types.notna().all(), "missing cell type"
+
+    categories = [category for category in cell_types.cat.categories if category != "nan"]
+    dtype = pd.CategoricalDtype(categories=categories, ordered=cell_types.cat.ordered)
+    values = cell_types.astype("object").mask(cell_types == "nan", "unknown")
+    cell_types = pd.Series(pd.Categorical(values, dtype=dtype), index=cell_types.index, name=cell_types.name)
+
+    assert "nan" not in cell_types.cat.categories, "nan cell category remains"
+    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES, "expected 39 cell categories"
+    return cell_types
 
 
 def transform_points(

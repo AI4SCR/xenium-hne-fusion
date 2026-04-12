@@ -89,6 +89,7 @@ def process_sample(
     cfg: PipelineConfig,
     sample_id: str,
     overwrite: bool = False,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     logger.info(f"Processing BEAT sample {sample_id}")
     structured_dir = cfg.paths.structured_dir / sample_id
@@ -124,7 +125,7 @@ def process_sample(
     )
     if cells_path.exists():
         tile_cells(tiles, cells_path, processed_dir, predicate=predicate)
-        process_cells(tiles, processed_dir, img_size=img_size)
+        process_cells(tiles, processed_dir, img_size=img_size, cell_type_col=cell_type_col)
 
 
 def _run(
@@ -139,9 +140,9 @@ def _run(
     retained_sample_ids = sample_ids
     if stage in {"all", "samples"}:
         if executor == "serial":
-            retained_sample_ids = run_samples_serial(cfg, sample_ids, overwrite)
+            retained_sample_ids = run_samples_serial(cfg, sample_ids, overwrite, cell_type_col=cell_type_col)
         else:
-            retained_sample_ids = run_samples_ray(cfg, sample_ids, overwrite)
+            retained_sample_ids = run_samples_ray(cfg, sample_ids, overwrite, cell_type_col=cell_type_col)
 
     if stage in {"all", "finalize"}:
         finalize_dataset(
@@ -173,8 +174,9 @@ def process_sample_stage(
     cfg: PipelineConfig,
     sample_id: str,
     overwrite: bool,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
-    process_sample(cfg, sample_id, overwrite=overwrite)
+    process_sample(cfg, sample_id, overwrite=overwrite, cell_type_col=cell_type_col)
     mark_sample_processed(cfg, sample_id)
 
 
@@ -182,6 +184,7 @@ def run_sample_serial(
     cfg: PipelineConfig,
     sample_id: str,
     overwrite: bool,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> str:
     maybe_reset_sample(cfg, sample_id, overwrite)
 
@@ -193,7 +196,7 @@ def run_sample_serial(
         return sample_id
 
     detect_sample_tissues(cfg, sample_id)
-    process_sample_stage(cfg, sample_id, overwrite)
+    process_sample_stage(cfg, sample_id, overwrite, cell_type_col=cell_type_col)
     return sample_id
 
 
@@ -215,9 +218,10 @@ def build_remote_sample_functions(ray):
         cfg: PipelineConfig,
         sample_id: str,
         overwrite: bool,
+        cell_type_col: str,
     ) -> str:
         del ref
-        process_sample_stage(cfg, sample_id, overwrite)
+        process_sample_stage(cfg, sample_id, overwrite, cell_type_col=cell_type_col)
         return sample_id
 
     return structure_sample_remote, detect_tissues_remote, process_sample_remote
@@ -227,10 +231,13 @@ def run_samples_serial(
     cfg: PipelineConfig,
     sample_ids: list[str],
     overwrite: bool,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> list[str]:
     retained_sample_ids = []
     for current_sample_id in sample_ids:
-        retained_sample_ids.append(run_sample_serial(cfg, current_sample_id, overwrite))
+        retained_sample_ids.append(
+            run_sample_serial(cfg, current_sample_id, overwrite, cell_type_col=cell_type_col)
+        )
     return retained_sample_ids
 
 
@@ -238,6 +245,7 @@ def run_samples_ray(
     cfg: PipelineConfig,
     sample_ids: list[str],
     overwrite: bool,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> list[str]:
     ray = load_ray_module()
     if not ray.is_initialized():
@@ -260,7 +268,7 @@ def run_samples_ray(
             structure_ref = structure_sample_remote.remote(cfg, current_sample_id)
 
         detect_ref = detect_tissues_remote.remote(structure_ref, cfg, current_sample_id)
-        process_ref = process_sample_remote.remote(detect_ref, cfg, current_sample_id, overwrite)
+        process_ref = process_sample_remote.remote(detect_ref, cfg, current_sample_id, overwrite, cell_type_col)
         futures.append((current_sample_id, process_ref))
         retained_sample_ids.append(current_sample_id)
 

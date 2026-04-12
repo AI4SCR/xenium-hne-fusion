@@ -14,6 +14,7 @@ from xenium_hne_fusion.processing import (
     tile_cells,
     tile_transcripts,
 )
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
 
 
 def main(
@@ -28,6 +29,7 @@ def main(
     img_size: int,
     kernel_size: int = 16,
     cells_path: Optional[Path] = None,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
     extract_tiles(wsi_path, tiles, output_dir, mpp, native_mpp=native_mpp, img_size=img_size)
@@ -38,7 +40,7 @@ def main(
         logger.warning(f"cells_path not found, skipping cell processing: {cells_path}")
     elif cells_path is not None:
         tile_cells(tiles, cells_path, output_dir, predicate=predicate)
-        process_cells(tiles, output_dir, img_size)
+        process_cells(tiles, output_dir, img_size, cell_type_col=cell_type_col)
 
 
 def cli() -> int:

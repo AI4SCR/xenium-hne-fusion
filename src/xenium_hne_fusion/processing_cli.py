@@ -49,14 +49,15 @@ def parse_data_args(
     return namespace_to_data_config(ns), ns.overwrite, executor, ns.stage
 
 
-def build_artifacts_parser() -> ArgumentParser:
+def build_artifacts_parser(*, include_overwrite: bool = True) -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("--config", action="config", required=True, help="Path to a YAML config file.")
     parser.add_argument("--name", type=str, required=True)
     parser.add_class_arguments(ItemsConfig, nested_key="items")
     parser.add_class_arguments(SplitConfig, nested_key="split")
     parser.add_class_arguments(PanelConfig, nested_key="panel")
-    parser.add_argument("--overwrite", type=bool, default=False)
+    if include_overwrite:
+        parser.add_argument("--overwrite", type=bool, default=False)
     return parser
 
 
