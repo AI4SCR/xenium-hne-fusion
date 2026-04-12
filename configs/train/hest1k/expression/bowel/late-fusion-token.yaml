@@ -1,0 +1,47 @@
+task:
+  target: expression
+
+head:
+  num_hidden_layers: 0
+
+backbone:
+  morph_encoder_name: vit_small_patch16_224
+  morph_encoder_kws:
+    img_size: 224
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: add
+  fusion_stage: late
+  use_proj: true
+  learnable_gate: false
+  expr_token_pool: avg
+  morph_token_pool: token
+  global_pool: null
+
+data:
+  name: hest1k
+  num_workers: 10
+  batch_size: 256
+  expr_pool: token
+  items_path: bowel.json
+  metadata_path: bowel/outer=0-inner=0-seed=0.parquet
+  panel_path: hvg-bowel-bowel-outer=0-inner=0-seed=0.yaml
+
+lit:
+  target_key: target
+  lr_head: 1.0e-4
+  lr_backbone: 1.0e-5
+
+wandb:
+  project: xe-hne-fus-expr
+  name: late-fusion-token
+  tags: [bowel]
+
+trainer:
+  max_time: 00:01:45:00
+  max_epochs: 35
+  accumulate_grad_batches: 2
+  gradient_clip_val: 1.0
