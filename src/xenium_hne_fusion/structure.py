@@ -19,12 +19,15 @@ def structure_sample(
     wsi_path: Path,
     transcripts_path: Path,
     structured_dir: Path,
+    cells_path: Path | None = None,
 ) -> None:
-    """Create canonical sample dir with wsi.tiff + transcripts.parquet symlinks and visualizations."""
+    """Create canonical sample dir with symlinked sample artifacts and visualizations."""
     out = structured_dir / sample_id
     out.mkdir(parents=True, exist_ok=True)
     symlink(wsi_path, out / "wsi.tiff")
     symlink(transcripts_path, out / "transcripts.parquet")
+    if cells_path is not None:
+        symlink(cells_path, out / "cells.parquet")
     save_sample_overview(out / "wsi.tiff", out / "transcripts.parquet", out)
     logger.info(f"Structured {sample_id} → {out}")
 

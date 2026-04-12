@@ -109,7 +109,7 @@ def process_sample(
         kernel_size=kernel_size,
     )
     if cells_path.exists():
-        tile_cells(tiles, cells_path, processed_dir, predicate)
+        tile_cells(tiles, cells_path, processed_dir, predicate=predicate)
         process_cells(tiles, processed_dir, img_size=img_size)
 
 

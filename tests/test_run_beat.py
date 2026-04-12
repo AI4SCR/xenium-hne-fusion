@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
+from shapely.geometry import box
 
 from xenium_hne_fusion.utils.getters import ManagedPaths, load_processing_config
 from xenium_hne_fusion.config import ProcessingConfig, TilesConfig
@@ -382,3 +383,171 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
     assert ("items",) not in calls
     assert ("stats",) not in calls
     assert ("filtered",) not in calls
+
+
+def test_structure_sample_stage_links_sample_cells_parquet(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "beat"
+    sample_id = "S1"
+    sample_dir = raw_dir / sample_id
+    transcripts_dir = sample_dir / "transcripts"
+    cells_path = sample_dir / "cells.parquet"
+    config_path = tmp_path / "beat.yaml"
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
+
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    transcripts_dir.mkdir(parents=True, exist_ok=True)
+    (sample_dir / "region.tiff").write_text("wsi")
+    (transcripts_dir / "transcripts.parquet").write_text("tx")
+    cells_path.write_text("cells")
+
+    module = _load_script("scripts/data/run_beat.py", "run_beat_structure_cells_script")
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    calls = []
+
+    monkeypatch.setattr(
+        module,
+        "structure_sample",
+        lambda sample_id, wsi_path, transcripts_path, structured_dir, cells_path=None: (
+            (structured_dir / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append((sample_id, wsi_path, transcripts_path, structured_dir, cells_path)),
+        ),
+    )
+
+    module.structure_sample_stage(cfg, sample_id)
+
+    assert calls == [
+        (
+            sample_id,
+            sample_dir / "region.tiff",
+            transcripts_dir / "transcripts.parquet",
+            cfg.paths.structured_dir,
+            cells_path,
+        )
+    ]
+
+
+def test_structure_sample_stage_omits_missing_cells_parquet(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "beat"
+    sample_id = "S1"
+    sample_dir = raw_dir / sample_id
+    transcripts_dir = sample_dir / "transcripts"
+    config_path = tmp_path / "beat.yaml"
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
+
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    transcripts_dir.mkdir(parents=True, exist_ok=True)
+    (sample_dir / "region.tiff").write_text("wsi")
+    (transcripts_dir / "transcripts.parquet").write_text("tx")
+
+    module = _load_script("scripts/data/run_beat.py", "run_beat_structure_missing_cells_script")
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    calls = []
+
+    monkeypatch.setattr(
+        module,
+        "structure_sample",
+        lambda sample_id, wsi_path, transcripts_path, structured_dir, cells_path=None: (
+            (structured_dir / sample_id).mkdir(parents=True, exist_ok=True),
+            calls.append((sample_id, wsi_path, transcripts_path, structured_dir, cells_path)),
+        ),
+    )
+
+    module.structure_sample_stage(cfg, sample_id)
+
+    assert calls == [
+        (
+            sample_id,
+            sample_dir / "region.tiff",
+            transcripts_dir / "transcripts.parquet",
+            cfg.paths.structured_dir,
+            None,
+        )
+    ]
+
+
+def test_process_sample_tiles_structured_cells_parquet(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    data_dir = tmp_path / "data"
+    raw_dir = tmp_path / "raw" / "beat"
+    sample_id = "S1"
+    config_path = tmp_path / "beat.yaml"
+    config_path.write_text("name: beat\ntile_px: 512\nstride_px: 256\ntile_mpp: 0.5\nimg_size: 224\n")
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("BEAT_RAW_DIR", str(raw_dir))
+
+    module = _load_script("scripts/data/run_beat.py", "run_beat_process_cells_script")
+    cfg = module.build_pipeline_config(load_processing_config(config_path))
+    structured_dir = cfg.paths.structured_dir / sample_id
+    structured_dir.mkdir(parents=True, exist_ok=True)
+    (structured_dir / "wsi.tiff").write_text("wsi")
+    (structured_dir / "transcripts.parquet").write_text("tx")
+    cells_path = structured_dir / "cells.parquet"
+    cells_path.write_text("cells")
+    tiles_path = structured_dir / "tiles" / "512_256.parquet"
+    processed_dir = module.processed_sample_dir(cfg, sample_id)
+    calls = []
+
+    tiles = module.gpd.GeoDataFrame(
+        [{"tile_id": 0, "x_px": 0, "y_px": 0, "width_px": 512, "height_px": 512}],
+        geometry=[box(0, 0, 512, 512)],
+    )
+
+    monkeypatch.setattr(
+        module,
+        "tile_tissues",
+        lambda wsi_path, tissues_parquet, tile_px, stride_px, mpp, output_parquet: (
+            output_parquet.parent.mkdir(parents=True, exist_ok=True),
+            calls.append(("tile_tissues", output_parquet)),
+        ),
+    )
+    monkeypatch.setattr(module.gpd, "read_parquet", lambda path: tiles)
+    monkeypatch.setattr(
+        module,
+        "extract_tiles",
+        lambda wsi_path, tiles_arg, processed_dir_arg, mpp, img_size: calls.append(("extract_tiles", processed_dir_arg)),
+    )
+    monkeypatch.setattr(
+        module,
+        "tile_transcripts",
+        lambda tiles_arg, transcripts_path, processed_dir_arg, img_size, predicate: calls.append(
+            ("tile_transcripts", transcripts_path, processed_dir_arg, img_size, predicate)
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_tiles",
+        lambda tiles_arg, processed_dir_arg, img_size, kernel_size: calls.append(
+            ("process_tiles", processed_dir_arg, img_size, kernel_size)
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "tile_cells",
+        lambda tiles_arg, cells_path_arg, processed_dir_arg, predicate: calls.append(
+            ("tile_cells", cells_path_arg, processed_dir_arg, predicate)
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "process_cells",
+        lambda tiles_arg, processed_dir_arg, img_size: calls.append(("process_cells", processed_dir_arg, img_size)),
+    )
+
+    module.process_sample(cfg, sample_id)
+
+    assert ("tile_cells", cells_path, processed_dir, cfg.data.tiles.predicate) in calls
+    assert ("process_cells", processed_dir, cfg.data.tiles.img_size) in calls

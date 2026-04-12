@@ -203,21 +203,18 @@ def _resolve_feature_universe_path(tile_dir: Path) -> Path:
     return feature_universe_path
 
 
-def compute_items_stats(
+def _load_items_df(items_path: Path) -> pd.DataFrame:
+    items_df = load_items_dataframe(items_path)
+    assert not items_df.empty, f"No items found in {items_path}"
+    return items_df
+
+
+def _compute_expression_stats(
     items_path: Path,
-    output_dir: Path,
-    overwrite: bool = False,
-    batch_size: int = 32,
-    num_workers: int = 10,
-) -> Path:
-    items_path = Path(items_path)
-    output_dir = Path(output_dir)
-    stats_path = output_dir / "statistics" / f"{items_path.stem}.parquet"
-
-    if stats_path.exists() and not overwrite:
-        logger.info(f"Statistics already exist: {stats_path}")
-        return stats_path
-
+    *,
+    batch_size: int,
+    num_workers: int,
+) -> pd.DataFrame:
     bootstrap_ds = TileDataset(
         target="expression",
         source_panel=None,
@@ -229,8 +226,6 @@ def compute_items_stats(
         id_key="id",
     )
     bootstrap_ds.setup()
-    items_df = pd.DataFrame(bootstrap_ds.items)
-    assert not items_df.empty, f"No items found in {items_path}"
 
     sample_to_items: OrderedDict[str, list[dict]] = OrderedDict()
     for item in bootstrap_ds.items:
@@ -263,7 +258,6 @@ def compute_items_stats(
         num_unique_transcripts = []
         for batch in tqdm(dl, desc=f"Tiles[{sample_id}]"):
             batch_target = batch["target"]
-
             ids.append(list(batch["id"]))
             num_transcripts.append(batch_target.sum(dim=1).tolist())
             num_unique_transcripts.append((batch_target > 0).sum(dim=1).tolist())
@@ -273,18 +267,102 @@ def compute_items_stats(
         num_unique_transcripts = [unique for batch_uniques in num_unique_transcripts for unique in batch_uniques]
         assert len(ids) == len(num_transcripts) == len(num_unique_transcripts), "Mismatched batch stats"
 
-        for item_id, total, unique in zip(ids, num_transcripts, num_unique_transcripts, strict=True):
-            rows.append(
-                {
-                    "id": item_id,
-                    "num_transcripts": int(total),
-                    "num_unique_transcripts": int(unique),
-                    "num_cells": float("nan"),
-                    "num_unique_cells": float("nan"),
-                }
-            )
+        rows.extend(
+            {
+                "id": item_id,
+                "num_transcripts": int(total),
+                "num_unique_transcripts": int(unique),
+            }
+            for item_id, total, unique in zip(ids, num_transcripts, num_unique_transcripts, strict=True)
+        )
 
     stats = pd.DataFrame(rows).set_index("id")
+    assert stats.index.is_unique, "Duplicate item ids in expression stats"
+    return stats
+
+
+def _compute_cell_stats(
+    items_path: Path,
+    *,
+    batch_size: int,
+    num_workers: int,
+    cell_type_col: str,
+) -> pd.DataFrame:
+    ds = TileDataset(
+        target="cell_types",
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        metadata_path=None,
+        id_key="id",
+        cell_type_col=cell_type_col,
+    )
+    ds.setup()
+
+    ds.items = [item for item in ds.items if (Path(item["tile_dir"]) / "cells.parquet").exists()]
+    ds.item_ids = [item["id"] for item in ds.items]
+    if not ds.items:
+        return pd.DataFrame(columns=["num_cells", "num_unique_cells"], index=pd.Index([], name="id"))
+
+    dl = DataLoader(ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+
+    ids = []
+    num_cells = []
+    num_unique_cells = []
+    for batch in tqdm(dl, desc="Tiles[cells]"):
+        batch_target = batch["target"]
+        ids.append(list(batch["id"]))
+        num_cells.append(batch_target.sum(dim=1).tolist())
+        num_unique_cells.append((batch_target > 0).sum(dim=1).tolist())
+
+    ids = [item_id for batch_ids in ids for item_id in batch_ids]
+    num_cells = [total for batch_totals in num_cells for total in batch_totals]
+    num_unique_cells = [unique for batch_uniques in num_unique_cells for unique in batch_uniques]
+    assert len(ids) == len(num_cells) == len(num_unique_cells), "Mismatched cell batch stats"
+
+    stats = pd.DataFrame(
+        {
+            "id": ids,
+            "num_cells": [int(total) for total in num_cells],
+            "num_unique_cells": [int(unique) for unique in num_unique_cells],
+        }
+    ).set_index("id")
+    assert stats.index.is_unique, "Duplicate item ids in cell stats"
+    return stats
+
+
+def compute_items_stats(
+    items_path: Path,
+    output_dir: Path,
+    overwrite: bool = False,
+    batch_size: int = 32,
+    num_workers: int = 10,
+    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+) -> Path:
+    items_path = Path(items_path)
+    output_dir = Path(output_dir)
+    stats_path = output_dir / "statistics" / f"{items_path.stem}.parquet"
+
+    if stats_path.exists() and not overwrite:
+        logger.info(f"Statistics already exist: {stats_path}")
+        return stats_path
+
+    items_df = _load_items_df(items_path)
+    expression_stats = _compute_expression_stats(
+        items_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+    )
+    cell_stats = _compute_cell_stats(
+        items_path,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        cell_type_col=cell_type_col,
+    )
+
+    stats = expression_stats.join(cell_stats, how="left")
+    stats[["num_cells", "num_unique_cells"]] = stats[["num_cells", "num_unique_cells"]].fillna(0).astype(int)
+    stats = stats[STAT_COLS]
     assert list(stats.columns) == STAT_COLS, f"Unexpected stats columns: {stats.columns.tolist()}"
 
     stats_path.parent.mkdir(parents=True, exist_ok=True)
@@ -292,7 +370,7 @@ def compute_items_stats(
     logger.info(f"Saved statistics -> {stats_path}")
     _write_tile_stats_summary(items_df, stats, stats_path.with_suffix(".md"))
 
-    figures_dir = output_dir / "figures" / "tile_stats" / items_path.stem
+    figures_dir = output_dir / "figures" / "items" / "stats" / items_path.stem
     plot_items_stats(stats, figures_dir)
     return stats_path
 
@@ -367,7 +445,12 @@ def compute_all_items_stats(
     overwrite: bool = False,
 ) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
-    return compute_items_stats(items_path, cfg.paths.output_dir, overwrite=overwrite)
+    return compute_items_stats(
+        items_path,
+        cfg.paths.output_dir,
+        overwrite=overwrite,
+        cell_type_col=cell_type_col,
+    )
 
 
 def create_split_collection(

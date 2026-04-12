@@ -37,7 +37,7 @@ def main(
     if cells_path is not None and not cells_path.exists():
         logger.warning(f"cells_path not found, skipping cell processing: {cells_path}")
     elif cells_path is not None:
-        tile_cells(tiles, cells_path, output_dir, predicate)
+        tile_cells(tiles, cells_path, output_dir, predicate=predicate)
         process_cells(tiles, output_dir, img_size)
 
 

@@ -64,9 +64,16 @@ def structure_sample_stage(cfg: PipelineConfig, sample_id: str) -> None:
     raw_sample_dir = cfg.raw_dir / sample_id
     wsi_path = raw_sample_dir / "region.tiff"
     transcripts_path = raw_sample_dir / "transcripts" / "transcripts.parquet"
+    cells_path = raw_sample_dir / "cells.parquet"
     assert wsi_path.exists(), f"Missing WSI: {wsi_path}"
     assert transcripts_path.exists(), f"Missing transcripts: {transcripts_path}"
-    structure_sample(sample_id, wsi_path, transcripts_path, cfg.paths.structured_dir)
+    structure_sample(
+        sample_id,
+        wsi_path,
+        transcripts_path,
+        cfg.paths.structured_dir,
+        cells_path=cells_path if cells_path.exists() else None,
+    )
     mark_sample_structured(cfg, sample_id)
 
 
@@ -116,7 +123,7 @@ def process_sample(
         kernel_size=kernel_size,
     )
     if cells_path.exists():
-        tile_cells(tiles, cells_path, processed_dir, predicate)
+        tile_cells(tiles, cells_path, processed_dir, predicate=predicate)
         process_cells(tiles, processed_dir, img_size=img_size)
 
 
