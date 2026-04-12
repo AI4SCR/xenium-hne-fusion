@@ -13,6 +13,8 @@ class FakeSummary:
 class FakeRun:
     id = 'run-1'
     name = 'vision'
+    created_at = '2026-01-01T00:00:00Z'
+    updated_at = '2026-01-01T00:10:00Z'
     state = 'finished'
     tags = ['lung']
 
@@ -39,6 +41,7 @@ def test_load_project_runs_caches_pulled_wandb_table(monkeypatch, tmp_path: Path
     assert calls == [('project-a', 'entity-a', {'state': 'finished'})]
     assert first.equals(second)
     assert first.loc[0, 'config.data.name'] == 'beat'
+    assert first.loc[0, 'run_created_at'] == '2026-01-01T00:00:00Z'
     assert first.loc[0, 'test/pearson_mean'] == 0.4
     assert (tmp_path / 'entity-a-project-a.parquet').exists()
 

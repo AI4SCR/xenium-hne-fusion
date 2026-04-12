@@ -777,6 +777,6 @@ done
 ## Evaluation Plots
 
 ```bash
-uv run python scripts/eval/plot_wandb_scores.py --datasets '[beat,hest1k]' --organs '[breast]' --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --datasets '[beat]' --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --dataset beat --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --dataset hest1k --target expression --organ breast --refresh true
 ```

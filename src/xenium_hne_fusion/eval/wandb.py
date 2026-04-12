@@ -68,6 +68,8 @@ def run_to_row(run, *, entity: str, project: str) -> dict[str, Any]:
         'project': project,
         'run_id': run.id,
         'run_name': run.name,
+        'run_created_at': getattr(run, 'created_at', None),
+        'run_updated_at': getattr(run, 'updated_at', None),
         'state': run.state,
         'tags': _clean_value(list(getattr(run, 'tags', None) or [])),
     }

@@ -5,6 +5,7 @@ from pathlib import Path
 import marsilea as ma
 import marsilea.plotter as mp
 import pandas as pd
+from loguru import logger
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 
@@ -30,6 +31,35 @@ ANNOTATION_PALETTES = {
 }
 MODALITY_PALETTE = {'uni-modal': '#A8C8E8', 'multi-modal': '#F5C08A'}
 NA_COLOR = '#E0E0E0'
+RUN_SETTING_COLUMNS = [
+    'slug',
+    'config.data.items_path',
+    'config.data.metadata_path',
+    'config.data.panel_path',
+    'config.data.expr_pool',
+    'config.head.output_dim',
+    'config.head.hidden_dim',
+    'config.head.num_hidden_layers',
+    'config.head.dropout',
+    'config.backbone.morph_encoder_name',
+    'config.backbone.expr_encoder_name',
+    'config.backbone.fusion_strategy',
+    'config.backbone.fusion_stage',
+    'config.backbone.global_pool',
+    'config.backbone.expr_token_pool',
+    'config.backbone.morph_token_pool',
+    'config.backbone.use_proj',
+    'config.backbone.learnable_gate',
+    'config.backbone.freeze_morph_encoder',
+    'config.backbone.freeze_expr_encoder',
+    'config.lit.lr_head',
+    'config.lit.lr_backbone',
+    'config.lit.weight_decay',
+    'config.lit.schedule',
+    'config.trainer.max_epochs',
+    'config.trainer.accumulate_grad_batches',
+    'config.trainer.gradient_clip_val',
+]
 
 
 def prepare_plot_table(
@@ -42,10 +72,43 @@ def prepare_plot_table(
     assert not missing_metrics, f'Missing W&B metrics: {missing_metrics}'
 
     runs = add_slugs(runs, specs)
+    runs = keep_latest_duplicate_settings(runs)
     keep_cols = ['run_id', 'run_name', 'slug', *metrics]
     data = runs[keep_cols].dropna(subset=metrics, how='all').copy()
     assert not data.empty, 'No runs have the requested W&B metrics'
     return data
+
+
+def keep_latest_duplicate_settings(runs: pd.DataFrame) -> pd.DataFrame:
+    key_cols = [column for column in RUN_SETTING_COLUMNS if column in runs.columns]
+    assert 'slug' in key_cols, 'Missing slug in run settings'
+    if len(runs) < 2:
+        return runs
+
+    order_col = _run_order_column(runs)
+    ordered = runs.assign(_run_order=order_col).sort_values('_run_order', kind='stable', na_position='first')
+    duplicated = ordered.duplicated(key_cols, keep=False)
+    if not duplicated.any():
+        return ordered.drop(columns='_run_order')
+
+    for _, group in ordered.loc[duplicated].groupby(key_cols, dropna=False, sort=False):
+        ids = group['run_id'].astype(str).tolist()
+        kept = str(group.iloc[-1]['run_id'])
+        logger.warning(f'Duplicate W&B runs for identical eval setting; keeping latest {kept}; duplicate run_ids={ids}')
+
+    return ordered.drop_duplicates(key_cols, keep='last').drop(columns='_run_order')
+
+
+def _run_order_column(runs: pd.DataFrame) -> pd.Series:
+    if 'run_created_at' in runs.columns:
+        created_at = pd.to_datetime(runs['run_created_at'], errors='coerce', utc=True)
+        if created_at.notna().any():
+            return created_at
+    if 'run_updated_at' in runs.columns:
+        updated_at = pd.to_datetime(runs['run_updated_at'], errors='coerce', utc=True)
+        if updated_at.notna().any():
+            return updated_at
+    return pd.Series(range(len(runs)), index=runs.index)
 
 
 def plot_metrics(
