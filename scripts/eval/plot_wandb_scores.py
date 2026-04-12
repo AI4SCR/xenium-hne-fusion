@@ -20,9 +20,9 @@ def main(
     refresh: bool = False,
     cache_dir: Path | None = None,
     output_dir: Path = Path('figures/eval'),
-    slugs_path: Path = Path('configs/eval/slugs.json'),
     metrics: list[str] | None = None,
     entity: str = DEFAULT_ENTITY,
+    slugs_path: Path = Path('configs/eval/slugs.json'),
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
     task = get_eval_task(dataset=dataset, target=target)

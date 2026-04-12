@@ -586,7 +586,7 @@ TASK=expression
 for ORGAN in breast lung pancreas bowel; do
   for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}.yaml"
+    PANEL_NAME="hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
 #      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME} --debug true"
       ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_NAME}"
@@ -639,7 +639,7 @@ done
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/default.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-default-default-${SPLIT_NAME}.yaml"
+    PANEL_NAME="hvg-default-default-${SPLIT_NAME}"
     ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path default/${SPLIT_NAME}.parquet"
 done
 
@@ -647,21 +647,26 @@ done
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-cells-cells-${SPLIT_NAME}.yaml"
+    PANEL_NAME="hvg-cells-cells-${SPLIT_NAME}"
     ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells-hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path cells/${SPLIT_NAME}.parquet"
 done
 
 # training
 
-#TASK=cell_types
+TASK=cell_types
+SPLIT_NAME=cell
 TASK=expression
+SPLIT_NAME=default
 for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="hvg-default-default-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="hvg-cells-cells-${SPLIT_NAME}.yaml"
+    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
+    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_PATH="default.yaml"
+    CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+#    PANEL_PATH="hvg-cells-cells-${SPLIT_NAME}"
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH}"
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH} --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
     done
 done
 
@@ -693,7 +698,7 @@ done
 # NOTE: transfer and process cell annotations
 uv run python chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
 uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml
-uv run scribble/ray_process_beat_cells.py --config configs/data/remote/beat.yaml
+./scribble/sbatch_process_beat_cells.sh --config configs/data/remote/beat.yaml
 uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml
 
 # copy default panel

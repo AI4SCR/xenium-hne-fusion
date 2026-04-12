@@ -316,6 +316,11 @@ def process_cells(
 
         cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         cells = cells.drop(columns=["tile_id", "index_right"], errors="ignore")
+
+        # TODO: replace with cell type column variable
+        col = cells["Level3_grouped"].replace({'nan': 'unknown'}).cat.remove_categories('nan')
+        del cells["Level3_grouped"]
+        cells["Level3_grouped"] = col
         cells.to_parquet(tile_dir / "cells.parquet")
 
         img = torch.load(tile_dir / "tile.pt").permute(1, 2, 0).numpy()
