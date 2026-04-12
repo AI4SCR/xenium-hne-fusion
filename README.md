@@ -635,23 +635,19 @@ done
 ./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
 ./ray/submit.sh 'cp metadata.bak /raid/ray/shared/fmx/data/processed-v0/datasets/beat/metadata.parquet'
 
-./ray/submit.sh "python scripts/data/create_items.py --config configs/data/remote/beat.yaml"
-
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/default.yaml"
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells.yaml"
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml"
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells-hvg.yaml"
 
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml"
+    PANEL_NAME="hvg-default-default-${SPLIT_NAME}.yaml"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path default/${SPLIT_NAME}.parquet"
 done
 
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml"
+    PANEL_NAME="hvg-cells-cells-${SPLIT_NAME}.yaml"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells-hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path cells/${SPLIT_NAME}.parquet"
 done
 
 ./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat/kaiko/default.yaml"
