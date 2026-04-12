@@ -17,7 +17,7 @@ backbone:
   fusion_stage: late
   use_proj: true
   learnable_gate: false
-  expr_token_pool: null
+  expr_token_pool: avg
   morph_token_pool: token
   global_pool: null
 
@@ -25,7 +25,7 @@ data:
   name: beat
   num_workers: 10
   batch_size: 256
-  expr_pool: tile
+  expr_pool: token
   items_path: default.json
   metadata_path: default/outer=0-inner=0-seed=0.parquet
   panel_path: default.yaml
@@ -37,7 +37,7 @@ lit:
 
 wandb:
   project: xe-hne-fus-expr
-  name: late-fusion
+  name: late-fusion-token
 
 trainer:
   max_time: 00:01:45:00

@@ -22,13 +22,13 @@ backbone:
   global_pool: null
 
 data:
-  name: hest1k
+  name: beat
   num_workers: 10
   batch_size: 256
   expr_pool: tile
-  items_path: pancreas.json
-  metadata_path: pancreas/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-pancreas-pancreas-outer=0-inner=0-seed=0.yaml
+  items_path: default.json
+  metadata_path: default/outer=0-inner=0-seed=0.parquet
+  panel_path: default.yaml
 
 lit:
   target_key: target
@@ -37,8 +37,7 @@ lit:
 
 wandb:
   project: xe-hne-fus-expr
-  name: late-fusion
-  tags: [pancreas]
+  name: late-fusion-tile
 
 trainer:
   max_time: 00:01:45:00
