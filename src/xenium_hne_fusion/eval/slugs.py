@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Mapping
 
 import pandas as pd
@@ -24,19 +22,16 @@ class SlugSpec:
     expr_encoder: str | None
 
 
-def load_slug_specs(path: Path) -> dict[str, SlugSpec]:
-    data = json.loads(path.read_text())
-    specs = {slug: SlugSpec(slug=slug, **values) for slug, values in data.items()}
+def validate_slug_specs(specs: Mapping[str, SlugSpec]) -> None:
     orders = pd.Series([spec.order for spec in specs.values()])
-    assert orders.is_unique, f'Duplicate slug orders in {path}'
-    return specs
+    assert orders.is_unique, 'Duplicate slug orders'
 
 
 def add_slugs(table: pd.DataFrame, specs: Mapping[str, SlugSpec]) -> pd.DataFrame:
     table = table.copy()
     table['slug'] = table.apply(lambda row: canonical_slug(row, specs), axis=1)
     missing = sorted(table.loc[table['slug'].isna(), 'run_name'].astype(str).unique())
-    assert not missing, f'Runs missing from slugs.json: {missing}'
+    assert not missing, f'Runs missing from slug allowlist: {missing}'
     return table
 
 

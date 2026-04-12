@@ -15,12 +15,17 @@ from xenium_hne_fusion.processing import (
     extract_tiles,
     infer_feature_universe,
     make_token_tiles,
+    normalize_cell_type_categories,
     process_cells,
     process_tiles,
     set_feature_universe,
     tile_cells,
     tile_transcripts,
 )
+
+
+def _cell_type_categories() -> list[str]:
+    return ['tumor', 'stroma', 'unknown', 'nan', *[f'cell_type_{i}' for i in range(36)]]
 
 
 def test_infer_feature_universe_streams_and_caches_filtered_features(
@@ -276,7 +281,7 @@ def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: 
     cells = gpd.GeoDataFrame(
         {
             'original_cell_id': [100, 101],
-            'Level3_grouped': ['tumor', 'stroma'],
+            'Level3_grouped': pd.Categorical(['tumor', 'stroma'], categories=_cell_type_categories()),
         },
         geometry=[Point(15, 15), Point(75, 35)],
     )
@@ -310,3 +315,60 @@ def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: 
     assert stored_tx.geometry.y.between(0, 100).all()
     assert stored_cells.geometry.x.between(0, 100).all()
     assert stored_cells.geometry.y.between(0, 100).all()
+    assert len(stored_cells['Level3_grouped'].cat.categories) == 39
+    assert 'nan' not in stored_cells['Level3_grouped'].cat.categories
+
+
+def test_normalize_cell_type_categories_replaces_nan_with_unknown():
+    cell_types = pd.Series(
+        pd.Categorical(
+            ['tumor', 'nan', 'stroma'],
+            categories=_cell_type_categories(),
+        )
+    )
+
+    normalized = normalize_cell_type_categories(cell_types)
+
+    assert normalized.tolist() == ['tumor', 'unknown', 'stroma']
+    assert list(normalized.cat.categories) == [
+        'tumor',
+        'stroma',
+        'unknown',
+        *[f'cell_type_{i}' for i in range(36)],
+    ]
+
+
+def test_normalize_cell_type_categories_rejects_tiles_without_nan_category():
+    cell_types = pd.Series(
+        pd.Categorical(
+            ['tumor', 'unknown'],
+            categories=['tumor', 'stroma', 'unknown', *[f'cell_type_{i}' for i in range(36)]],
+        )
+    )
+
+    with pytest.raises(AssertionError, match='expected 40 cell categories'):
+        normalize_cell_type_categories(cell_types)
+
+
+def test_process_cells_respects_cell_type_col(tmp_path: Path):
+    tiles = gpd.GeoDataFrame(
+        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
+        geometry=[box(0, 0, 100, 100)],
+    )
+    tile_dir = tmp_path / 'processed' / '0'
+    tile_dir.mkdir(parents=True)
+    torch.save(torch.zeros((3, 100, 100), dtype=torch.uint8), tile_dir / 'tile.pt')
+    cells = gpd.GeoDataFrame(
+        {
+            'custom_cell_type': pd.Categorical(['nan'], categories=_cell_type_categories()),
+        },
+        geometry=[Point(15, 15)],
+    )
+    cells.to_parquet(tile_dir / 'cells.parquet')
+
+    process_cells(tiles, tmp_path / 'processed', img_size=100, cell_type_col='custom_cell_type')
+
+    stored = gpd.read_parquet(tile_dir / 'cells.parquet')
+    assert stored['custom_cell_type'].tolist() == ['unknown']
+    assert len(stored['custom_cell_type'].cat.categories) == 39
+    assert 'nan' not in stored['custom_cell_type'].cat.categories

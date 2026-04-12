@@ -1,128 +1,120 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
 
 import pandas as pd
+from loguru import logger
+
+from xenium_hne_fusion.config import ArtifactsConfig, PanelConfig
+
+TARGETS = {'expression', 'cell_types'}
+DATASET_LABELS = {'beat': 'BEAT', 'hest1k': 'HEST1K'}
+TARGET_LABELS = {'expression': 'expression', 'cell_types': 'cell types'}
 
 
-ORGANS = {'bowel', 'breast', 'lung', 'pancreas'}
-
-
-@dataclass(frozen=True)
-class EvalTask:
-    name: str
-    project: str
-    dataset: Literal['beat', 'hest1k']
-    target: Literal['expression', 'cell_types']
-    title: str
-    split_by_organ: bool = False
-
-
-TASKS = [
-    EvalTask(
-        name='beat-expression',
-        project='xe-hne-fus-expr',
-        dataset='beat',
-        target='expression',
-        title='BEAT expression',
-    ),
-    EvalTask(
-        name='beat-cell-types',
-        project='xe-hne-fus-cell',
-        dataset='beat',
-        target='cell_types',
-        title='BEAT cell types',
-    ),
-    EvalTask(
-        name='hest1k-expression',
-        project='xe-hne-fus-expr',
-        dataset='hest1k',
-        target='expression',
-        title='HEST1K expression',
-        split_by_organ=True,
-    ),
-]
-
-
-def get_eval_task(*, dataset: str, target: str) -> EvalTask:
-    matches = [task for task in TASKS if task.dataset == dataset and task.target == target]
-    assert len(matches) == 1, f'Unknown eval task: dataset={dataset!r}, target={target!r}'
-    return matches[0]
-
-
-def select_experiment_runs(
+def select_artifact_runs(
     runs: pd.DataFrame,
     *,
-    task: EvalTask,
-    organ: str | None,
+    artifacts_cfg: ArtifactsConfig,
+    target: str,
 ) -> tuple[pd.DataFrame, str, str]:
-    runs = select_dataset_runs(runs, task.dataset)
-    title = task.title
-    name = task.name
-    if not task.split_by_organ:
-        assert organ is None, f'Organ is only valid for organ-split tasks, got {organ!r}'
-        return runs, title, name
+    assert target in TARGETS, f'Unknown target: {target}'
+    _assert_columns(runs, ['config.data.name', 'config.data.items_path', 'config.data.metadata_path'])
 
-    assert organ in ORGANS, f'Valid organ is required for {task.name}: {sorted(ORGANS)}'
-    runs = select_organ_runs(runs, organ=organ)
-    return runs, f'{title}: {organ}', f'{name}-{organ}'
+    matching = runs.apply(lambda row: _matches_artifact_scope(row, artifacts_cfg), axis=1)
+    selected = runs.loc[matching].copy()
+    logger.info(
+        f'Selected {len(selected)}/{len(runs)} W&B runs for '
+        f'dataset={artifacts_cfg.name}, items={artifacts_cfg.items.name}, split={artifacts_cfg.split.name}'
+    )
+    assert not selected.empty, 'No W&B runs match artifact config'
 
-
-def select_dataset_runs(runs: pd.DataFrame, dataset: str) -> pd.DataFrame:
-    assert 'config.data.name' in runs.columns, 'Missing W&B config.data.name'
-    selected = runs[runs['config.data.name'] == dataset].copy()
-    assert not selected.empty, f'No {dataset} runs found in W&B table'
-    return selected
+    return selected, _plot_title(artifacts_cfg, target), _output_name(artifacts_cfg, target)
 
 
-def select_organ_runs(runs: pd.DataFrame, *, organ: str) -> pd.DataFrame:
-    runs = runs.assign(organ=runs.apply(infer_organ, axis=1))
-    missing = runs.loc[runs['organ'].isna(), 'run_name'].astype(str).tolist()
-    assert not missing, f'Could not infer HEST1K organ from W&B tags/config: {missing}'
-    selected = runs[runs['organ'] == organ].copy()
-    assert not selected.empty, f'No HEST1K expression runs found for organ: {organ}'
-    return selected
+def _matches_artifact_scope(row: pd.Series, artifacts_cfg: ArtifactsConfig) -> bool:
+    if row['config.data.name'] != artifacts_cfg.name:
+        return False
+    if not _matches_file(row['config.data.items_path'], parent='items', filename=f'{artifacts_cfg.items.name}.json'):
+        return False
+
+    split_stem = split_stem_from_metadata_path(row['config.data.metadata_path'], artifacts_cfg.split.name)
+    if split_stem is None:
+        return False
+    return _matches_panel(row, artifacts_cfg.panel, split_stem=split_stem)
 
 
-def infer_organ(row: pd.Series) -> str | None:
-    for key in ['config.wandb.tags', 'tags']:
-        organ = _organ_from_tags(row.get(key))
-        if organ is not None:
-            return organ
+def split_stem_from_metadata_path(value, split_name: str) -> str | None:
+    path = _normalize_path(value)
+    if path is None:
+        return None
 
-    for key in ['config.data.items_path', 'config.data.metadata_path', 'config.data.panel_path']:
-        value = row.get(key)
-        if _is_missing(value):
-            continue
-        for part in str(value).replace('\\', '/').replace('-', '/').split('/'):
-            if part in ORGANS:
-                return part
+    parts = [part for part in path.split('/') if part]
+    for i, part in enumerate(parts[:-2]):
+        if part == 'splits' and parts[i + 1] == split_name and i + 2 == len(parts) - 1:
+            return Path(parts[-1]).stem
+    if len(parts) == 2 and parts[0] == split_name:
+        return Path(parts[-1]).stem
     return None
 
 
-def _organ_from_tags(value) -> str | None:
-    tags = _coerce_tags(value)
-    organs = sorted(set(tags) & ORGANS)
-    assert len(organs) <= 1, f'Multiple organ tags found: {organs}'
-    return organs[0] if organs else None
+def _matches_panel(row: pd.Series, panel: PanelConfig | None, *, split_stem: str) -> bool:
+    if panel is None:
+        return True
+    if _is_generated_panel(panel):
+        prefix = _generated_panel_prefix(panel)
+        return _matches_file(row.get('config.data.panel_path'), parent='panels', filename=f'{prefix}{split_stem}.yaml')
+    assert panel.name is not None, 'panel.name is required'
+    return _matches_file(row.get('config.data.panel_path'), parent='panels', filename=f'{panel.name}.yaml')
 
 
-def _coerce_tags(value) -> list[str]:
+def _is_generated_panel(panel: PanelConfig) -> bool:
+    fields = [panel.metadata_path, panel.n_top_genes, panel.flavor]
+    assert all(value is not None for value in fields) or all(value is None for value in fields), 'Invalid panel config'
+    return any(value is not None for value in fields)
+
+
+def _generated_panel_prefix(panel: PanelConfig) -> str:
+    assert panel.name is not None, 'panel.name is required'
+    assert panel.metadata_path is not None, 'panel.metadata_path is required'
+    split_stem = Path(str(panel.metadata_path).replace('\\', '/')).stem
+    assert panel.name.endswith(split_stem), f'Panel name must end with split stem: {panel.name}'
+    return panel.name.removesuffix(split_stem)
+
+
+def _matches_file(value, *, parent: str, filename: str) -> bool:
+    path = _normalize_path(value)
+    if path is None:
+        return False
+    return path in {filename, f'{parent}/{filename}'} or path.endswith(f'/{parent}/{filename}')
+
+
+def _normalize_path(value) -> str | None:
     if _is_missing(value):
-        return []
-    if isinstance(value, str):
-        import json
+        return None
+    return str(value).replace('\\', '/')
 
-        try:
-            parsed = json.loads(value)
-        except json.JSONDecodeError:
-            return [value]
-        assert isinstance(parsed, list), f'Expected list tags, got {type(parsed)}'
-        return [str(tag) for tag in parsed]
-    if isinstance(value, (list, tuple, set)):
-        return [str(tag) for tag in value]
-    return [str(value)]
+
+def _plot_title(artifacts_cfg: ArtifactsConfig, target: str) -> str:
+    dataset = DATASET_LABELS.get(artifacts_cfg.name, artifacts_cfg.name)
+    artifact = artifacts_cfg.items.name if artifacts_cfg.items.name == artifacts_cfg.split.name else artifacts_cfg.split.name
+    return f'{dataset} {artifact} {TARGET_LABELS[target]}'
+
+
+def _output_name(artifacts_cfg: ArtifactsConfig, target: str) -> str:
+    parts = [artifacts_cfg.name, target, artifacts_cfg.items.name]
+    if artifacts_cfg.split.name != artifacts_cfg.items.name:
+        parts.append(artifacts_cfg.split.name)
+    return '-'.join(_clean_name(part) for part in parts)
+
+
+def _clean_name(value: str) -> str:
+    return value.replace('/', '-').replace(' ', '-').lower()
+
+
+def _assert_columns(runs: pd.DataFrame, columns: list[str]) -> None:
+    missing = sorted(set(columns) - set(runs.columns))
+    assert not missing, f'Missing W&B columns: {missing}'
 
 
 def _is_missing(value) -> bool:
