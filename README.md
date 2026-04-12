@@ -616,6 +616,14 @@ done
 ## BEAT Commands
 
 ```bash
+# NOTE: transfer and process cell annotations
+./ray/submit.sh "tar --exclude='._*' -xzvf /raid/ray/shared/experimental/tmp/adriano/cell_annotations.tar.gz -C /raid/ray/shared/fmx/data"
+./ray/submit.sh "ls /raid/ray/shared/fmx/data/cell_annotations"
+./ray/submit.sh "chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh"
+./ray/submit.sh "ls /raid/ray/shared/fmx/data/processed-v0/datasets/beat/XE_1JAT_01_HNE_1JAT/"
+./ray/submit.sh 'python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml'
+./ray/submit.sh 'scribble/ray_process_beat_cells.py --config configs/data/remote/beat.yaml'
+
 # copy default panel
 ./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
 ./ray/submit.sh 'cp metadata.bak /raid/ray/shared/fmx/data/processed-v0/datasets/beat/metadata.parquet'
@@ -625,6 +633,77 @@ done
 
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/default.yaml"
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/default.yaml --items.filter.num_cells=1"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml --items.filter.num_cells=1"
+
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-cells.yaml"
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-hvg.yaml"
+done
+
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-cells.yaml"
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko-hvg.yaml"
+done
+
+./ray/submit.sh "python scripts/artifacts/filter_items.py --config configs/artifacts/beat/default.yaml"
+./ray/submit.sh "python scripts/artifacts/compute_items_stats.py --config configs/artifacts/beat/default.yaml"
+
+#MODEL=early-fusion
+#TASK=cell_types
+TASK=expression
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_PATH="hvg-default-default-outer=${OUTER}-seed=0.yaml"
+    for MODEL in early-fusion late-fusion vision expr-tile expr-token; do
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH} --debug true"
+# NOTE: the first job was submitted twice, filter out for performance comparison
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH}"
+    done
+done
+
+# concat fusion
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_PATH="hvg-default-default-outer=${OUTER}-seed=0.yaml"
+    MODEL=early-fusion
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --debug true"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat"
+# HVG
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --data.panel_path ${PANEL_PATH}"
+done
+
+# gated fusion
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    MODEL=early-fusion
+#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --debug true"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true"
+# HVG
+    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --data.panel_path ${PANEL_PATH}"
+done
+
+```
+
+## BEAT Slurm Commands
+
+```bash
+# NOTE: transfer and process cell annotations
+uv run python chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
+uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml
+uv run scribble/ray_process_beat_cells.py --config configs/data/remote/beat.yaml
+uv run scripts/compute_items_stats --config configs/artifacts/beat/all.yaml
+
+# copy default panel
+uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/default.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/cells.yaml
+
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml"
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/hvg.yaml --items.filter.num_cells=1"
 
