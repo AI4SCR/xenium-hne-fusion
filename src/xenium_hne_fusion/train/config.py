@@ -62,6 +62,7 @@ class LitConfig:
     target_key: str | None = None
     lr_head: float = 1e-4
     lr_backbone: float = 1e-5
+    lr_alpha: float = 1e-3
     weight_decay: float = 1e-3
     eta: float = 1e-6
     schedule: Literal['cosine'] | None = 'cosine'

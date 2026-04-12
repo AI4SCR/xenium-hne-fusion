@@ -26,6 +26,7 @@ ANNOTATION_PALETTES = {
     'stage': {'early': '#C5E3C9', 'late': '#AACFDB'},
     'strategy': {'add': '#FAE0B3', 'concat': '#F5D2D2'},
     'pool': {'token': '#BDC3A8', 'tile': '#B7A99F'},
+    'learnable_gate': {'False': '#F0F0F0', 'True': '#F2B8A0'},
     'morph_encoder': {'ViT-S': '#ADB2D4', 'ViT-B': '#EEF1DA', 'Loki': '#C7D9DD', 'Phikon': '#D5E5D5'},
     'expr_encoder': {'MLP': '#D7BDE2', 'Geneformer': '#F2B8A0'},
 }

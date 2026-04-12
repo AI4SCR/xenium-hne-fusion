@@ -39,10 +39,61 @@ def test_add_slugs_uses_curated_allowlist_and_rejects_unknown_runs():
         add_slugs(pd.DataFrame([{'run_name': 'not-allowlisted'}]), SLUG_SPECS)
 
 
+def test_add_slugs_keeps_learnable_gate_variant_and_drops_unallowlisted_config_variants():
+    runs = pd.DataFrame(
+        [
+            {
+                'run_name': 'early-fusion',
+                'config.backbone.fusion_strategy': 'add',
+                'config.backbone.fusion_stage': 'early',
+                'config.backbone.learnable_gate': False,
+            },
+            {
+                'run_name': 'early-fusion',
+                'config.backbone.fusion_strategy': 'concat',
+                'config.backbone.fusion_stage': 'early',
+                'config.backbone.learnable_gate': False,
+            },
+            {
+                'run_name': 'early-fusion',
+                'config.backbone.fusion_strategy': 'add',
+                'config.backbone.fusion_stage': 'early',
+                'config.backbone.learnable_gate': True,
+            },
+        ]
+    )
+
+    table = add_slugs(runs, SLUG_SPECS)
+
+    assert table['slug'].tolist() == ['early-fusion', 'early-fusion-gate']
+
+
 def test_slug_specs_reject_duplicate_orders():
     specs = {
-        'a': SlugSpec(slug='a', label='A', order=1, modality='uni-modal', stage=None, strategy=None, pool=None, morph_encoder=None, expr_encoder=None),
-        'b': SlugSpec(slug='b', label='B', order=1, modality='uni-modal', stage=None, strategy=None, pool=None, morph_encoder=None, expr_encoder=None),
+        'a': SlugSpec(
+            slug='a',
+            label='A',
+            order=1,
+            modality='uni-modal',
+            stage=None,
+            strategy=None,
+            pool=None,
+            learnable_gate=None,
+            morph_encoder=None,
+            expr_encoder=None,
+        ),
+        'b': SlugSpec(
+            slug='b',
+            label='B',
+            order=1,
+            modality='uni-modal',
+            stage=None,
+            strategy=None,
+            pool=None,
+            learnable_gate=None,
+            morph_encoder=None,
+            expr_encoder=None,
+        ),
     }
 
     with pytest.raises(AssertionError, match='Duplicate slug orders'):
@@ -64,6 +115,7 @@ def test_prepare_plot_table_checks_metrics_and_annotation_order():
     assert slugs == ['vision', 'expr-token']
     assert annotations.loc['morph_encoder', 'vision'] == 'ViT-S'
     assert annotations.loc['expr_encoder', 'expr-token'] == 'MLP'
+    assert pd.isna(annotations.loc['learnable_gate', 'vision'])
 
     with pytest.raises(AssertionError, match='Missing W&B metrics'):
         prepare_plot_table(runs, specs=SLUG_SPECS, metrics=['test/spearman_mean'])
@@ -215,6 +267,36 @@ def test_select_artifact_runs_handles_static_and_missing_panel_filters():
 
     assert static_selected['run_id'].tolist() == ['static-panel']
     assert no_panel_selected['run_id'].tolist() == ['static-panel', 'hvg-panel']
+
+
+def test_select_artifact_runs_keeps_single_split_file_layout():
+    artifacts_cfg = ArtifactsConfig(
+        name='hest1k',
+        items=ItemsConfig(name='hescape-breast'),
+        split=SplitConfig(name='hescape-breast'),
+    )
+    runs = pd.DataFrame(
+        [
+            {
+                'run_id': 'single-split',
+                'config.data.name': 'hest1k',
+                'config.data.items_path': '/data/03_output/hest1k/items/hescape-breast.json',
+                'config.data.metadata_path': '/data/03_output/hest1k/splits/hescape-breast.parquet',
+                'config.data.panel_path': None,
+            },
+            {
+                'run_id': 'wrong-single-split',
+                'config.data.name': 'hest1k',
+                'config.data.items_path': '/data/03_output/hest1k/items/hescape-breast.json',
+                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast.parquet',
+                'config.data.panel_path': None,
+            },
+        ]
+    )
+
+    selected, _, _ = select_artifact_runs(runs, artifacts_cfg=artifacts_cfg, target='expression')
+
+    assert selected['run_id'].tolist() == ['single-split']
 
 
 def test_eval_plot_cli_uses_artifact_config_scope():

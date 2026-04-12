@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 import pandas as pd
+from loguru import logger
 
 
-SLUG_COLUMNS = ['stage', 'strategy', 'pool', 'morph_encoder', 'expr_encoder']
+SLUG_COLUMNS = ['stage', 'strategy', 'pool', 'learnable_gate', 'morph_encoder', 'expr_encoder']
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class SlugSpec:
     stage: str | None
     strategy: str | None
     pool: str | None
+    learnable_gate: bool | None
     morph_encoder: str | None
     expr_encoder: str | None
 
@@ -30,12 +32,22 @@ def validate_slug_specs(specs: Mapping[str, SlugSpec]) -> None:
 def add_slugs(table: pd.DataFrame, specs: Mapping[str, SlugSpec]) -> pd.DataFrame:
     table = table.copy()
     table['slug'] = table.apply(lambda row: canonical_slug(row, specs), axis=1)
-    missing = sorted(table.loc[table['slug'].isna(), 'run_name'].astype(str).unique())
+    missing_rows = table['slug'].isna()
+    missing_names = table.loc[missing_rows, 'run_name'].astype(str)
+    missing = sorted(missing_names[~missing_names.isin(specs)].unique())
     assert not missing, f'Runs missing from slug allowlist: {missing}'
+    if missing_rows.any():
+        dropped = sorted(missing_names.unique())
+        logger.warning(f'Dropping W&B runs outside curated slug config: {dropped}')
+        table = table.loc[~missing_rows].copy()
     return table
 
 
 def canonical_slug(row: Mapping[str, Any], specs: Mapping[str, SlugSpec]) -> str | None:
+    config_slug = _slug_from_config(row)
+    if _has_slug_config(row):
+        return config_slug if config_slug in specs else None
+
     names = [
         _value(row, 'run_name'),
         _value(row, 'config.wandb.name'),
@@ -44,8 +56,7 @@ def canonical_slug(row: Mapping[str, Any], specs: Mapping[str, SlugSpec]) -> str
         if name in specs:
             return name
 
-    slug = _slug_from_config(row)
-    return slug if slug in specs else None
+    return config_slug if config_slug in specs else None
 
 
 def build_annotation_table(specs: Mapping[str, SlugSpec], slugs: list[str]) -> pd.DataFrame:
@@ -79,13 +90,18 @@ def _slug_from_config(row: Mapping[str, Any]) -> str | None:
     expr_encoder = _value(row, 'config.backbone.expr_encoder_name')
     expr_pool = _value(row, 'config.data.expr_pool')
     expr_token_pool = _value(row, 'config.backbone.expr_token_pool')
+    learnable_gate = _value(row, 'config.backbone.learnable_gate')
 
     if fusion_strategy is not None:
+        if fusion_strategy != 'add':
+            return None
         if fusion_stage == 'early':
-            return 'early-fusion'
+            slug = 'early-fusion'
+            return f'{slug}-gate' if _is_true(learnable_gate) else slug
         if fusion_stage == 'late':
             pool = 'tile' if expr_pool == 'tile' or expr_token_pool is None else 'token'
-            return f'late-fusion-{pool}'
+            slug = f'late-fusion-{pool}'
+            return f'{slug}-gate' if _is_true(learnable_gate) else slug
         return None
 
     if morph_encoder is not None and expr_encoder is None:
@@ -93,6 +109,24 @@ def _slug_from_config(row: Mapping[str, Any]) -> str | None:
     if expr_encoder is not None and morph_encoder is None:
         return 'expr-tile' if expr_pool == 'tile' else 'expr-token'
     return None
+
+
+def _has_slug_config(row: Mapping[str, Any]) -> bool:
+    keys = [
+        'config.backbone.fusion_strategy',
+        'config.backbone.fusion_stage',
+        'config.backbone.morph_encoder_name',
+        'config.backbone.expr_encoder_name',
+        'config.data.expr_pool',
+        'config.backbone.expr_token_pool',
+    ]
+    return any(_value(row, key) is not None for key in keys)
+
+
+def _is_true(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.lower() == 'true'
+    return bool(value)
 
 
 def _value(row: Mapping[str, Any], key: str) -> Any:

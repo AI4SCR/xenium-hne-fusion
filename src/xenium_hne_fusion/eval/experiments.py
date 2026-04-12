@@ -35,7 +35,7 @@ def select_artifact_runs(
 def _matches_artifact_scope(row: pd.Series, artifacts_cfg: ArtifactsConfig) -> bool:
     if row['config.data.name'] != artifacts_cfg.name:
         return False
-    if not _matches_file(row['config.data.items_path'], parent='items', filename=f'{artifacts_cfg.items.name}.json'):
+    if not _matches_path_suffix(row['config.data.items_path'], f'/items/{artifacts_cfg.items.name}.json'):
         return False
 
     split_stem = split_stem_from_metadata_path(row['config.data.metadata_path'], artifacts_cfg.split.name)
@@ -48,14 +48,18 @@ def split_stem_from_metadata_path(value, split_name: str) -> str | None:
     path = _normalize_path(value)
     if path is None:
         return None
+    path = f'/{path.lstrip("/")}'
 
-    parts = [part for part in path.split('/') if part]
-    for i, part in enumerate(parts[:-2]):
-        if part == 'splits' and parts[i + 1] == split_name and i + 2 == len(parts) - 1:
-            return Path(parts[-1]).stem
-    if len(parts) == 2 and parts[0] == split_name:
-        return Path(parts[-1]).stem
-    return None
+    if path.endswith(f'/splits/{split_name}.parquet'):
+        return split_name
+
+    marker = f'/splits/{split_name}/'
+    if marker not in path:
+        return None
+
+    filename = path.split(marker, maxsplit=1)[1]
+    assert '/' not in filename and filename.endswith('.parquet'), f'Expected split parquet: {path}'
+    return Path(filename).stem
 
 
 def _matches_panel(row: pd.Series, panel: PanelConfig | None, *, split_stem: str) -> bool:
@@ -63,9 +67,9 @@ def _matches_panel(row: pd.Series, panel: PanelConfig | None, *, split_stem: str
         return True
     if _is_generated_panel(panel):
         prefix = _generated_panel_prefix(panel)
-        return _matches_file(row.get('config.data.panel_path'), parent='panels', filename=f'{prefix}{split_stem}.yaml')
+        return _matches_path_suffix(row.get('config.data.panel_path'), f'/panels/{prefix}{split_stem}.yaml')
     assert panel.name is not None, 'panel.name is required'
-    return _matches_file(row.get('config.data.panel_path'), parent='panels', filename=f'{panel.name}.yaml')
+    return _matches_path_suffix(row.get('config.data.panel_path'), f'/panels/{panel.name}.yaml')
 
 
 def _is_generated_panel(panel: PanelConfig) -> bool:
@@ -82,11 +86,9 @@ def _generated_panel_prefix(panel: PanelConfig) -> str:
     return panel.name.removesuffix(split_stem)
 
 
-def _matches_file(value, *, parent: str, filename: str) -> bool:
+def _matches_path_suffix(value, suffix: str) -> bool:
     path = _normalize_path(value)
-    if path is None:
-        return False
-    return path in {filename, f'{parent}/{filename}'} or path.endswith(f'/{parent}/{filename}')
+    return path is not None and f'/{path.lstrip("/")}'.endswith(suffix)
 
 
 def _normalize_path(value) -> str | None:

@@ -34,6 +34,7 @@ lit:
   target_key: target
   lr_head: 1.0e-4
   lr_backbone: 1.0e-5
+  lr_alpha: 1.0e-3
 
 wandb:
   project: xe-hne-fus-expr

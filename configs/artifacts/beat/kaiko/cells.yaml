@@ -25,3 +25,5 @@ split:
   include_targets: null
   group_column_name: sample_id
   random_state: 0
+panel:
+  name: default
