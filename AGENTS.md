@@ -44,9 +44,9 @@ uv run python scripts/my_script.py
 
 ### Local dependency and search scope
 
-- The editable `ai4bmr-learn` dependency lives at `/Users/adrianomartinelli/projects/ai4bmr-learn`.
+- The editable `ai4bmr-learn` dependency lives at `~/projects/ai4bmr-learn`.
 - When worktree-relative dependency resolution breaks, inspect that path directly instead of searching broadly.
-- Never search `/Users/adrianomartinelli/`.
+- Never search `$HOME`.
 - Restrict searches to the current workspace or to an explicit, known dependency path that is directly relevant to the task.
 
 ## Configuration
@@ -147,6 +147,48 @@ You are an expert coding assistant for research code in computer vision, followi
 - **No script-to-script imports**: scripts under `scripts/` are entrypoints, not reusable modules. Import only from installed packages or `src/xenium_hne_fusion/`. If multiple scripts need the same logic, move that logic into `src/` and keep the scripts as thin wrappers.
 - **No over-engineering**: this is iterative research code. No extensive error handling, no speculative abstractions, no backwards-compat shims.
 - **No trailing summaries**: do not summarize what was just done at the end of a response.
+
+## Working patterns
+
+- Keep reusable logic in `src/xenium_hne_fusion/`. Keep `scripts/` as thin entrypoints that parse config, call library functions, and return an exit code.
+- Use dataclass configs as the boundary between YAML/CLI and implementation. Add fields to the appropriate config dataclass first, then thread the typed config object through the pipeline.
+- Prefer shared parser/bridge helpers such as `processing_cli.py` over one-off script parser logic. When jsonargparse adds internal keys, strip them before constructing dataclasses.
+- Resolve managed paths through `get_managed_paths(...)`, `build_pipeline_config(...)`, `resolve_training_paths(...)`, and related getters. Do not reconstruct `DATA_DIR/01_structured`, `02_processed`, or `03_output` ad hoc in new code.
+- Treat `data.name` as the binding between configs and output roots. Training configs should keep `items_path`, `metadata_path`, `panel_path`, and `cache_dir` relative unless there is a strong local-only reason to use an absolute path.
+- Keep artifact names stable and explicit: source items are `items/all.json`; filtered items are `items/<name>.json`; split metadata lives under `splits/<split_name>/`; panels live under the managed output panels directory.
+- Use marker files such as `.structured.done` and `.processed.done` to make long data stages idempotent. If an overwrite path needs to reset work, clear the marker and the corresponding processed sample directory together.
+- When adding a pipeline stage, structure it as `prepare context -> select/validate samples -> run serial/ray sample work -> finalize dataset`. Keep sample-level functions testable without requiring the full driver.
+- Keep panel logic explicit. For expression prediction, require disjoint `source_panel` and `target_panel`; when changing HEST1K organ configs, check the sample gene universe and panel overlap before assuming a mixed-organ panel will work.
+- Prefer parquet for tables, JSON for item lists, YAML for configs/panels, and `torch.save`/`torch.load` only for tensor artifacts. Read only the columns needed from large parquet files.
+- Use streamed transcript/tile helpers for image overlays and tile-local artifacts. Avoid loading whole raw transcript tables when a tile- or stream-oriented path already exists.
+- For training, validate task invariants before building models: `task.target`, `lit.target_key`, output dimensions, required panels, modality encoders, and pooling choices should fail before Lightning starts.
+- Keep cache behavior explicit. A missing `cache_dir` means cache disabled; relative cache paths resolve under `DATA_DIR/03_output/<name>/cache/`.
+
+## Tips and tricks
+
+- Use `uv run pytest tests/<test_file>.py` for focused checks before running the full suite.
+- For CLI/config changes, add or update small parser bridge tests that import the script with `importlib.util.spec_from_file_location(...)` and assert the resulting dataclass fields.
+- For path-resolution changes, test relative and absolute path behavior separately. Most training paths should be relative in YAML and resolved in code.
+- For data filtering changes, test the item-level output and the metadata join/split behavior. Sample-level metadata must be replicated onto tile rows through `sample_id`.
+- For HEST1K panel or organ changes, use the panel-overlap workflow before training. Missing target/source genes usually mean the selected samples and panel were built from different gene universes.
+- For Ray-enabled stages, keep the serial path as the simplest reference implementation. Ray wrappers should submit the same sample-level function and collect failures into a single explicit error.
+- When debugging scripts interactively, call the script's `cli([...])` or reusable `main(...)` with explicit arguments instead of relying on global state.
+- The shell `PATH` is minimal. Use full paths for Homebrew tools and prefer repo-local commands through `uv run`.
+
+## Anti-patterns and mistakes to avoid
+
+- Do not import from one script into another script. Move shared code into `src/xenium_hne_fusion/` and import it from there.
+- Do not duplicate config parsing across scripts when an existing parser helper can be extended.
+- Do not hardcode machine paths, dataset roots, split paths, panel paths, or cache paths in versioned YAML or library code.
+- Do not broaden code to accept many alternate schemas unless the pipeline actually needs them. Assert the expected columns, dtypes, categories, shapes, and names instead.
+- Do not swallow failed samples, missing genes, missing files, empty item sets, or unknown sample IDs. Fail early with a short assertion or explicit error.
+- Do not silently mix tile and patch terminology. A tile is the WSI crop and a patch is a ViT token inside that tile.
+- Do not assume a panel that works for one organ works for mixed-organ HEST1K training. Verify intersection/union and sample-level feature universes.
+- Do not scan broad home directories to find dependencies or data. Search the workspace or the explicit editable dependency path only.
+- Do not add backward-compat shims for old config shapes unless they are already part of the repo contract or explicitly requested.
+- Do not add broad `try/except` wrappers around data processing. Let the violated assumption surface.
+- Do not use root-level `results/` or ad hoc folders for managed dataset outputs that belong under `DATA_DIR/03_output/<name>/`.
+- Do not run full, expensive data/training pipelines as verification unless requested. Prefer targeted unit tests, parser checks, and small debug/fast-dev-run paths.
 
 ## Preferred tools
 
