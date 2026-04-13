@@ -659,13 +659,13 @@ ITEMS_PATH="expr.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
+    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
       CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
-      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
+      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
     done
 done
 
@@ -675,13 +675,13 @@ ITEMS_PATH="cells.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="cells/${SPLIT_NAME}.parquet"
-    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
+    PANEL_PATH="default.yaml"
+#    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
       CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
-      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
+#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
+      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
     done
 done
 
@@ -692,8 +692,8 @@ ITEMS_PATH="expr.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
+    PANEL_PATH="default.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
 
     ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"

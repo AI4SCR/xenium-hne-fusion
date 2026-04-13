@@ -40,7 +40,7 @@ wandb:
   name: late-fusion-token
 
 trainer:
-  max_time: 00:01:45:00
+  max_time: 00:06:00:00
   max_epochs: 35
   accumulate_grad_batches: 2
   gradient_clip_val: 1.0
