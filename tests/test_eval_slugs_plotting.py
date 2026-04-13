@@ -235,7 +235,7 @@ def test_select_artifact_runs_handles_static_and_missing_panel_filters():
         name='beat',
         items=ItemsConfig(name='default'),
         split=SplitConfig(name='default'),
-        panel=PanelConfig(name='expr'),
+        panel=PanelConfig(name='default'),
     )
     no_panel_cfg = ArtifactsConfig(
         name='beat',
@@ -250,7 +250,7 @@ def test_select_artifact_runs_handles_static_and_missing_panel_filters():
                 'config.data.name': 'beat',
                 'config.data.items_path': 'items/default.json',
                 'config.data.metadata_path': 'splits/default/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'panels/expr.yaml',
+                'config.data.panel_path': 'panels/default.yaml',
             },
             {
                 'run_id': 'hvg-panel',
