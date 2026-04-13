@@ -37,7 +37,7 @@ lit:
   lr_alpha: 1.0e-3
 
 wandb:
-  project: xe-hne-fus-expr
+  project: xe-hne-fus-expr-v0
   name: late-fusion-tile
 
 trainer:

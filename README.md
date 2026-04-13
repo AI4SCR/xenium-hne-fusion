@@ -828,8 +828,8 @@ done
 ## Evaluation Plots
 
 ```bash
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr.yaml --project xe-hne-fus-expr --target expression --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr-hvg.yaml --project xe-hne-fus-expr --target expression --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr-hvg.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 ```

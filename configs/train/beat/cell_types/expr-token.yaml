@@ -34,7 +34,7 @@ lit:
   lr_backbone: 1.0e-5
 
 wandb:
-  project: xe-hne-fus-cell
+  project: xe-hne-fus-cell-v0
   name: expr-token
 
 trainer:

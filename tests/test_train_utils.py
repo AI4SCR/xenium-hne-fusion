@@ -115,6 +115,8 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
         assert cfg.head.num_hidden_layers == 0
         assert cfg.lit.target_key is not None
         assert cfg.wandb.project is not None
+        assert cfg.wandb.project.endswith('-v0')
+        assert cfg.wandb.name == path.stem
         assert cfg.trainer.max_time == '00:01:45:00'
         assert cfg.trainer.max_epochs == 35
         assert cfg.trainer.gradient_clip_val == 1.0
@@ -174,7 +176,7 @@ def test_beat_cell_type_configs_match_expression_variants():
         cfg = Config.from_yaml(path)
         assert cfg.task.target == 'cell_types'
         assert cfg.head.output_dim == 39
-        assert cfg.wandb.project == 'xe-hne-fus-cell'
+        assert cfg.wandb.project == 'xe-hne-fus-cell-v0'
         assert cfg.data.items_path == Path('default.json')
         assert cfg.data.metadata_path == Path('cells/outer=0-inner=0-seed=0.parquet')
         assert cfg.data.panel_path == Path('expr.yaml')

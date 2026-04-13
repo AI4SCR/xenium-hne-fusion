@@ -36,7 +36,7 @@ lit:
   lr_backbone: 1.0e-5
 
 wandb:
-  project: xe-hne-fus-expr
+  project: xe-hne-fus-expr-v0
   name: late-fusion-tile
   tags: [pancreas]
 
