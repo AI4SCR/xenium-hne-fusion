@@ -93,7 +93,7 @@ Dataset outputs reserve:
 
 ```bash
 DATA_DIR/03_output/<name>/items/all.json
-panels/<name>/default.yaml
+panels/<name>/expr.yaml
 ```
 
 The `items/` folder is for multiple item-set variants. The root-level `panels/` folder stores YAML files with

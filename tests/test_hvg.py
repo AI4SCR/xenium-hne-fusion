@@ -129,7 +129,7 @@ def test_create_panel_writes_target_hvgs_and_source_remainder(monkeypatch: pytes
 
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
-    output_path = tmp_path / 'panels' / 'hvg-default.yaml'
+    output_path = tmp_path / 'panels' / 'hvg-expr.yaml'
     items_path.write_text(
         json.dumps(
             [
@@ -172,7 +172,7 @@ def test_create_panel_uses_batched_tile_dataset(monkeypatch: pytest.MonkeyPatch,
 
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
-    output_path = tmp_path / 'panels' / 'hvg-default.yaml'
+    output_path = tmp_path / 'panels' / 'hvg-expr.yaml'
     items_path.write_text(
         json.dumps(
             [
@@ -223,7 +223,7 @@ def test_create_panel_rejects_when_common_genes_are_fewer_than_requested(tmp_pat
 
     items_path = tmp_path / 'items.json'
     split_path = tmp_path / 'default.parquet'
-    output_path = tmp_path / 'panels' / 'hvg-default.yaml'
+    output_path = tmp_path / 'panels' / 'hvg-expr.yaml'
     items_path.write_text(
         json.dumps(
             [
@@ -283,7 +283,7 @@ def test_create_panel_script_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         '  include_ids: null\n'
         '  exclude_ids: null\n'
         'items:\n'
-        '  name: default\n'
+        '  name: expr\n'
         'split:\n'
         '  name: default\n'
         '  random_state: 0\n'
@@ -328,7 +328,7 @@ def test_create_panel_script_accepts_predefined_panel(monkeypatch: pytest.Monkey
     config_path = tmp_path / 'hest1k.yaml'
 
     (output_dir / 'panels').mkdir(parents=True, exist_ok=True)
-    panel_path = output_dir / 'panels' / 'default.yaml'
+    panel_path = output_dir / 'panels' / 'expr.yaml'
     panel_path.write_text(__import__('yaml').safe_dump({'source_panel': ['A'], 'target_panel': ['B']}, sort_keys=False))
     config_path.write_text(
         'name: hest1k\n'
@@ -354,7 +354,7 @@ def test_create_panel_script_accepts_predefined_panel(monkeypatch: pytest.Monkey
         name='hest1k',
         items=ItemsConfig(name='default'),
         split=SplitConfig(name='default'),
-        panel=PanelConfig(name='default'),
+        panel=PanelConfig(name='expr'),
     )
     module.main(artifacts_cfg=artifacts_cfg, overwrite=False)
 

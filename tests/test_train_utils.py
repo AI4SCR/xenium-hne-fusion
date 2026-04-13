@@ -53,14 +53,14 @@ def test_resolve_training_paths_resolves_relative_paths_under_dataset_output_roo
     cfg.data.name = 'beat'
     cfg.data.items_path = Path('train.json')
     cfg.data.metadata_path = Path('default/outer=0-seed=0.parquet')
-    cfg.data.panel_path = Path('default.yaml')
+    cfg.data.panel_path = Path('expr.yaml')
     cfg.data.cache_dir = Path('run-a')
 
     cfg, output_dir = resolve_training_paths(cfg)
 
     assert cfg.data.items_path == output_dir / 'items/train.json'
     assert cfg.data.metadata_path == output_dir / 'splits' / 'default/outer=0-seed=0.parquet'
-    assert cfg.data.panel_path == get_panels_dir('beat') / 'default.yaml'
+    assert cfg.data.panel_path == get_panels_dir('beat') / 'expr.yaml'
     assert cfg.data.cache_dir == output_dir / 'cache/run-a'
 
 
@@ -130,7 +130,7 @@ def test_train_configs_use_expected_panel_defaults():
         cfg = Config.from_yaml(path)
         assert cfg.data.items_path == Path('default.json')
         assert cfg.data.metadata_path == Path('default/outer=0-inner=0-seed=0.parquet')
-        assert cfg.data.panel_path == Path('default.yaml')
+        assert cfg.data.panel_path == Path('expr.yaml')
 
     for path in hest1k_paths:
         cfg = Config.from_yaml(path)
@@ -176,5 +176,5 @@ def test_beat_cell_type_configs_match_expression_variants():
         assert cfg.head.output_dim == 39
         assert cfg.wandb.project == 'xe-hne-fus-cell'
         assert cfg.data.items_path == Path('default.json')
-        assert cfg.data.metadata_path == Path('default/outer=0-inner=0-seed=0.parquet')
-        assert cfg.data.panel_path == Path('default.yaml')
+        assert cfg.data.metadata_path == Path('cells/outer=0-inner=0-seed=0.parquet')
+        assert cfg.data.panel_path == Path('expr.yaml')

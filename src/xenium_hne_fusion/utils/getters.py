@@ -151,6 +151,7 @@ def load_artifacts_config(path: Path) -> ArtifactsConfig:
         ),
         panel=None if panel_data is None else PanelConfig(
             name=panel_data.get('name'),
+            metadata_path=Path(panel_data['metadata_path']) if panel_data.get('metadata_path') is not None else None,
             n_top_genes=panel_data.get('n_top_genes'),
             flavor=panel_data.get('flavor'),
         ),
@@ -168,7 +169,7 @@ def get_data_config_path(dataset: str, config_root: Path | None = None) -> Path:
 
 def get_artifacts_config_path(dataset: str, config_root: Path | None = None) -> Path:
     root = config_root or Path('configs/artifacts')
-    return root / dataset / 'default.yaml'
+    return root / dataset / 'expr.yaml'
 
 
 load_processing_config = load_data_config

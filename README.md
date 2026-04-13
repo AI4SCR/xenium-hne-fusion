@@ -177,11 +177,11 @@ split:
 
 Examples:
 
-- [configs/artifacts/hest1k/default.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/default.yaml)
+- [configs/artifacts/hest1k/expr.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/expr.yaml)
 - [configs/artifacts/hest1k/breast.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/breast.yaml)
 - [configs/artifacts/hest1k/lung.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/lung.yaml)
 - [configs/artifacts/hest1k/pancreas.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/hest1k/pancreas.yaml)
-- [configs/artifacts/beat/unil/default.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/beat/unil/default.yaml)
+- [configs/artifacts/beat/unil/expr.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/artifacts/beat/unil/expr.yaml)
 
 `scripts/data/run_hest1k.py`, `scripts/data/run_beat.py`, `scripts/artifacts/filter_items.py`, and `scripts/artifacts/create_splits.py` all use this schema. `filter.include_ids` and `filter.exclude_ids` are mutually exclusive:
 
@@ -239,7 +239,7 @@ Intended to compute summary stats for `items/<items.name>.json` using the artifa
 
 ```bash
 uv run scripts/artifacts/compute_items_stats.py \
-  --config configs/artifacts/hest1k/default.yaml
+  --config configs/artifacts/hest1k/expr.yaml
 ```
 
 #### Filtered items
@@ -510,7 +510,7 @@ workflow:
 ```bash
 ./ray/submit.sh 'python scripts/data/process_metadata.py --config "configs/data/remote/hest1k.yaml"'
 ./ray/submit.sh 'python scripts/data/create_items.py --config "configs/data/remote/hest1k.yaml"'
-./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k/default.yaml"'
+./ray/submit.sh 'python scripts/artifacts/compute_items_stats.py --config "configs/artifacts/hest1k/expr.yaml"'
 
 ./ray/submit.sh 'python scripts/artifacts/create_artifacts.py --config "configs/artifacts/hest1k/breast.yaml"'
 ./ray/submit.sh --entrypoint-num-gpus 1 'python scripts/train/supervised.py --config configs/train/hest1k/expression/breast/early-fusion.yaml'
@@ -632,11 +632,11 @@ done
 ./ray/submit.sh 'python scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml'
 
 # copy default panel
-./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"'
+./ray/submit.sh 'mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/expr.yaml "${DATA_DIR}/03_output/beat/panels/"'
 ./ray/submit.sh 'cp metadata.bak /raid/ray/shared/fmx/data/processed-v0/datasets/beat/metadata.parquet'
 
 # expression artifacts
-./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/default.yaml"
+./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/expr.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     PANEL_NAME="hvg-default-default-${SPLIT_NAME}"
@@ -656,7 +656,7 @@ done
 TASK=expression
 TASK=cell_types
 for OUTER in 0 1 2 3; do
-#    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
@@ -674,7 +674,7 @@ done
 # concat fusion
 MODEL=early-fusion
 for OUTER in 0 1 2 3; do
-#    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
@@ -690,7 +690,7 @@ done
 # gated fusion
 MODEL=early-fusion
 for OUTER in 0 1 2 3; do
-#    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
@@ -715,9 +715,9 @@ uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.y
 uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml
 
 # copy default panel
-uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/expr.yaml "${DATA_DIR}/03_output/beat/panels/"
 
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/default.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
 for OUTER in 0 1 2 3; do
@@ -741,7 +741,7 @@ done
 TASK=expression
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="default.yaml"
+    PANEL_PATH="expr.yaml"
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
 #      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --debug true"
 #      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml"
@@ -795,7 +795,7 @@ done
 ## Evaluation Plots
 
 ```bash
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/default.yaml --project xe-hne-fus-expr --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr.yaml --project xe-hne-fus-expr --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/hvg.yaml --project xe-hne-fus-expr --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr --target expression --refresh true

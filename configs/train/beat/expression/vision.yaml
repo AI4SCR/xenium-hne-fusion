@@ -25,7 +25,7 @@ data:
   expr_pool: tile
   items_path: default.json
   metadata_path: default/outer=0-inner=0-seed=0.parquet
-  panel_path: default.yaml
+  panel_path: expr.yaml
 
 lit:
   target_key: target

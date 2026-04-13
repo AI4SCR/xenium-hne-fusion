@@ -132,7 +132,7 @@ def test_prepare_plot_table_warns_and_keeps_latest_duplicate_run(monkeypatch: py
                 'run_created_at': '2026-01-01T00:00:00Z',
                 'config.data.items_path': 'default.json',
                 'config.data.metadata_path': 'default/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'default.yaml',
+                'config.data.panel_path': 'expr.yaml',
                 'test/pearson_mean': 0.1,
             },
             {
@@ -141,7 +141,7 @@ def test_prepare_plot_table_warns_and_keeps_latest_duplicate_run(monkeypatch: py
                 'run_created_at': '2026-01-02T00:00:00Z',
                 'config.data.items_path': 'default.json',
                 'config.data.metadata_path': 'default/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'default.yaml',
+                'config.data.panel_path': 'expr.yaml',
                 'test/pearson_mean': 0.2,
             },
             {
@@ -150,7 +150,7 @@ def test_prepare_plot_table_warns_and_keeps_latest_duplicate_run(monkeypatch: py
                 'run_created_at': '2026-01-03T00:00:00Z',
                 'config.data.items_path': 'default.json',
                 'config.data.metadata_path': 'default/outer=1-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'default.yaml',
+                'config.data.panel_path': 'expr.yaml',
                 'test/pearson_mean': 0.3,
             },
         ]
@@ -235,7 +235,7 @@ def test_select_artifact_runs_handles_static_and_missing_panel_filters():
         name='beat',
         items=ItemsConfig(name='default'),
         split=SplitConfig(name='default'),
-        panel=PanelConfig(name='default'),
+        panel=PanelConfig(name='expr'),
     )
     no_panel_cfg = ArtifactsConfig(
         name='beat',
@@ -250,7 +250,7 @@ def test_select_artifact_runs_handles_static_and_missing_panel_filters():
                 'config.data.name': 'beat',
                 'config.data.items_path': 'items/default.json',
                 'config.data.metadata_path': 'splits/default/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'panels/default.yaml',
+                'config.data.panel_path': 'panels/expr.yaml',
             },
             {
                 'run_id': 'hvg-panel',
