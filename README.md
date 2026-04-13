@@ -680,39 +680,41 @@ for OUTER in 0 1 2 3; do
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
       CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
-      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
+      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
+#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
     done
 done
 
 # expression concat fusion
 TASK=expression
-MODEL=early-fusion
 ITEMS_PATH="expr.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-#    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
     PANEL_PATH="default.yaml"
-    CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
 
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
-#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+#        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
+        ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
+    done
 done
 
 # cell type concat fusion
 TASK=cell_types
-MODEL=early-fusion
 ITEMS_PATH="cells.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="cells/${SPLIT_NAME}.parquet"
-    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
-    CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+    PANEL_PATH="default.yaml"
+#    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
 
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
-#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
+#        ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
+    done
 done
 
 # expression learnable gate
@@ -722,12 +724,12 @@ ITEMS_PATH="expr.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
+    PANEL_PATH="default.yaml"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
 
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true"
-#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true"
+#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true"
+    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true"
 done
 
 # cell type learnable gate
@@ -737,8 +739,8 @@ ITEMS_PATH="cells.json"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="cells/${SPLIT_NAME}.parquet"
-    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
-#    PANEL_PATH="default.yaml"
+    PANEL_PATH="default.yaml"
+#    PANEL_PATH="cells-hvg-${SPLIT_NAME}.yaml"
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
 
     ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true"
@@ -825,21 +827,21 @@ for OUTER in 0 1 2 3; do
     # METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
     # PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
 
-    MODEL=early-fusion
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
 
-    uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
-
-    sbatch \
-        --cpus-per-task=12 \
-        --mem=32G \
-        --gres=gpu:1 \
-        --output=~/logs/%j.out \
-        --job-name=${TASK}-${MODEL}-${OUTER} \            
-        --wrap="uv run python scripts/train/supervised.py \
-            --config configs/train/beat/${TASK}/${MODEL}.yaml \
-            --data.metadata_path ${METADATA_PATH} \
-            --data.panel_path ${PANEL_PATH} \
-            --backbone.fusion_strategy concat"
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=32G \
+            --gres=gpu:1 \
+            --output=~/logs/%j.out \
+            --job-name=${TASK}-${MODEL}-${OUTER} \            
+            --wrap="uv run python scripts/train/supervised.py \
+                --config configs/train/beat/${TASK}/${MODEL}.yaml \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --backbone.fusion_strategy concat"
+    done
 done
 
 # learnable gate
