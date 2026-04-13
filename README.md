@@ -715,21 +715,31 @@ uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.y
 uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml
 
 # copy default panel
-uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/expr.yaml "${DATA_DIR}/03_output/beat/panels/"
+uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
 
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
 for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-default-default-${SPLIT_NAME}"
-    uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/hvg.yaml --panel.metadata_path "default/${SPLIT_NAME}.parquet" --panel.name "${PANEL_NAME}"
+    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_NAME="expr-hvg-outer=${OUTER}-inner=0-seed=0"
+
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --output=~/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-hvg.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
 done
 
 for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-cells-cells-${SPLIT_NAME}"
-    uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/hvg.yaml --panel.metadata_path "cells/${SPLIT_NAME}.parquet" --panel.name "${PANEL_NAME}"
+    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
+    PANEL_NAME="cells-hvg-outer=${OUTER}-inner=0-seed=0"
+
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --output=~/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells-hvg.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
 done
 
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
@@ -738,49 +748,72 @@ for OUTER in 0 1 2 3; do
     uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/hvg.yaml
 done
 
-TASK=expression
-for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="expr.yaml"
-    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml"
-    done
-done
-
-#MODEL=early-fusion
 #TASK=cell_types
 TASK=expression
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="hvg-default-default-${SPLIT_NAME}.yaml"
+    PANEL_PATH="default"
+
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH} --debug true"
-#      ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet"
-      "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --data.panel_path ${PANEL_PATH}"
+
+        uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.split_name ${SPLIT_NAME} --data.panel_path ${PANEL_PATH}
+
+        # Main run (GPU)
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=32G \
+            --gres=gpu:1 \
+            --output=~/logs/%j.out \
+            --job-name=${TASK}-${MODEL}-${OUTER} \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config configs/train/beat/${TASK}/${MODEL}.yaml \
+                --data.split_name ${SPLIT_NAME} \
+                --data.panel_path ${PANEL_PATH}"
     done
 done
 
-# concat fusion
+# concat
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_PATH="hvg-default-default-outer=${OUTER}-inner=0-seed=0.yaml"
+    PANEL_PATH="default"
+
     MODEL=early-fusion
-#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --debug true"
-#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat"
-# HVG
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.fusion_strategy concat --data.panel_path ${PANEL_PATH}"
+
+    uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.split_name ${SPLIT_NAME} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
+
+    sbatch \
+        --cpus-per-task=12 \
+        --mem=32G \
+        --gres=gpu:1 \
+        --output=~/logs/%j.out \
+        --job-name=${TASK}-${MODEL}-${OUTER} \            
+        --wrap="uv run python scripts/train/supervised.py \
+            --config configs/train/beat/${TASK}/${MODEL}.yaml \
+            --data.split_name ${SPLIT_NAME} \
+            --data.panel_path ${PANEL_PATH} \
+            --backbone.fusion_strategy concat"
 done
 
-# gated fusion
+# learnable gate
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    PANEL_PATH="default"
+
     MODEL=early-fusion
-#    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --debug true"
-#    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true"
-# HVG
-    ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path default/${SPLIT_NAME}.parquet --backbone.learnable_gate true --data.panel_path ${PANEL_PATH}"
+
+    uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.split_name ${SPLIT_NAME} --data.panel_path ${PANEL_PATH} ---backbone.learnable_gate true --debug true
+
+    sbatch \
+        --cpus-per-task=12 \
+        --mem=32G \
+        --gres=gpu:1 \
+        --output=~/logs/%j.out \
+        --job-name=${TASK}-${MODEL}-${OUTER} \                    
+        --wrap="uv run python scripts/train/supervised.py \
+            --config configs/train/beat/${TASK}/${MODEL}.yaml \
+            --data.split_name ${SPLIT_NAME} \
+            --data.panel_path ${PANEL_PATH} \
+            ---backbone.learnable_gate true"
 done
 
 ```
