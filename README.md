@@ -1,6 +1,6 @@
 Code for the paper [Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer](https://openreview.net/forum?id=h2GcySraTP).
 
-# xenium-hne-fusion
+# Xenium x HnE Fusion
 
 Research codebase for fusing Xenium spatial transcriptomics with H&E whole-slide images.
 Supports two dataset families:
