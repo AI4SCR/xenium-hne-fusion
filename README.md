@@ -885,3 +885,18 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 ```
+
+## Tasks
+
+- [x] task: cell_types fusion_strategy: add panel: default learnable_gate: false
+- [x] task: cell_types fusion_strategy: concat panel: default learnable_gate: false
+- [x] task: cell_types fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: cell_types fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: cell_types fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: cell_types fusion_strategy: add panel: hvg learnable_gate: true
+- [ ] task: expression fusion_strategy: add panel: default learnable_gate: false
+- [ ] task: expression fusion_strategy: concat panel: default learnable_gate: false
+- [ ] task: expression fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: expression fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: expression fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: expression fusion_strategy: add panel: hvg learnable_gate: true
