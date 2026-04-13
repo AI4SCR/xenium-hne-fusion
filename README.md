@@ -639,15 +639,15 @@ done
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/expr.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-default-default-${SPLIT_NAME}"
-    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path default/${SPLIT_NAME}.parquet"
+    PANEL_NAME="expr-hvg-${SPLIT_NAME}"
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/expr-hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path expr/${SPLIT_NAME}.parquet"
 done
 
 # cell type artifacts
 ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells.yaml"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    PANEL_NAME="hvg-cells-cells-${SPLIT_NAME}"
+    PANEL_NAME="cells-hvg-${SPLIT_NAME}"
     ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/kaiko/cells-hvg.yaml --panel.name ${PANEL_NAME} --panel.metadata_path cells/${SPLIT_NAME}.parquet"
 done
 
@@ -660,10 +660,10 @@ for OUTER in 0 1 2 3; do
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
     
-#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
-#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+#    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
       ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
@@ -678,10 +678,10 @@ for OUTER in 0 1 2 3; do
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
     
-#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
-#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+#    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}"
 
     ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat"
 #    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true"
@@ -694,10 +694,10 @@ for OUTER in 0 1 2 3; do
     CONFIG="configs/train/beat/${TASK}/${MODEL}.yaml"
     
     METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="hvg-cells-cells-outer=${OUTER}-inner=0-seed=0.yaml"
+    PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
     
-#    METADATA_PATH="default/outer=${OUTER}-inner=0-seed=0.parquet"
-#    PANEL_PATH="hvg-default-default-${SPLIT_NAME}"
+#    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
+#    PANEL_PATH="expr-hvg-${SPLIT_NAME}"
 
     ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true"
 #    ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true"
@@ -829,7 +829,7 @@ done
 
 ```bash
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr.yaml --project xe-hne-fus-expr --target expression --refresh true
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/hvg.yaml --project xe-hne-fus-expr --target expression --refresh true
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr-hvg.yaml --project xe-hne-fus-expr --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr --target expression --refresh true
 ```
