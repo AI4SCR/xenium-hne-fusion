@@ -25,9 +25,9 @@ data:
   num_workers: 10
   batch_size: 256
   expr_pool: token
-  items_path: default.json
+  items_path: cells.json
   metadata_path: cells/outer=0-inner=0-seed=0.parquet
-  panel_path: expr.yaml
+  panel_path: default.yaml
 
 lit:
   target_key: target

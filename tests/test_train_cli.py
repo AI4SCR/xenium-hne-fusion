@@ -32,9 +32,9 @@ def test_supervised_parser_reads_yaml_config_into_namespace():
     assert data["debug"] is False
     assert data["task"]["target"] == "expression"
     assert data["backbone"]["morph_encoder_name"] == "vit_small_patch16_224"
-    assert data["data"]["items_path"] == Path("default.json")
-    assert data["data"]["metadata_path"] == Path("default/outer=0-inner=0-seed=0.parquet")
-    assert data["data"]["panel_path"] == Path("expr.yaml")
+    assert data["data"]["items_path"] == Path("expr.json")
+    assert data["data"]["metadata_path"] == Path("expr/outer=0-inner=0-seed=0.parquet")
+    assert data["data"]["panel_path"] == Path("default.yaml")
 
 
 def test_supervised_namespace_bridge_returns_concrete_training_config():
@@ -53,6 +53,6 @@ def test_supervised_namespace_bridge_returns_concrete_training_config():
     assert isinstance(cfg.trainer, TrainerConfig)
     assert isinstance(cfg.wandb, WandbConfig)
     assert cfg.task.target == "expression"
-    assert cfg.data.items_path == Path("default.json")
-    assert cfg.data.metadata_path == Path("default/outer=0-inner=0-seed=0.parquet")
-    assert cfg.data.panel_path == Path("expr.yaml")
+    assert cfg.data.items_path == Path("expr.json")
+    assert cfg.data.metadata_path == Path("expr/outer=0-inner=0-seed=0.parquet")
+    assert cfg.data.panel_path == Path("default.yaml")

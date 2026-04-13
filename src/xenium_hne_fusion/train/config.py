@@ -51,7 +51,8 @@ class DataLoaderConfig:
     target_panel: list[str] | None = None
     # Relative items/metadata/panel paths resolve under DATA_DIR/03_output/<name>/
     # within the items/, splits/, and panels/ subfolders respectively.
-    # Relative cache paths resolve under DATA_DIR/03_output/<name>/cache/.
+    # Cache is disabled when unset. Relative cache paths resolve under
+    # DATA_DIR/03_output/<name>/cache/.
     items_path: Path | None = None
     metadata_path: Path | None = None
     cache_dir: Path | None = None

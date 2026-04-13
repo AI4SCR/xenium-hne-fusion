@@ -22,7 +22,7 @@ def test_resolve_training_paths_requires_explicit_training_data_references(
         resolve_training_paths(cfg)
 
 
-def test_resolve_training_paths_still_defaults_cache_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_resolve_training_paths_keeps_unset_cache_dir_disabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     data_dir = tmp_path / 'data'
     metadata_path = tmp_path / 'metadata.parquet'
     monkeypatch.setenv('DATA_DIR', str(data_dir))
@@ -37,7 +37,7 @@ def test_resolve_training_paths_still_defaults_cache_dir(monkeypatch: pytest.Mon
 
     assert output_dir == (data_dir / '03_output' / 'hest1k').resolve()
     assert cfg.data.items_path == output_dir / 'items/all.json'
-    assert cfg.data.cache_dir == output_dir / 'cache'
+    assert cfg.data.cache_dir is None
     assert cfg.data.metadata_path == metadata_path
     assert cfg.data.panel_path == output_dir / 'panels/hvg-default-default-outer=0-seed=0.yaml'
 
@@ -112,6 +112,7 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
         assert isinstance(cfg.data.items_path, Path)
         assert isinstance(cfg.data.metadata_path, Path)
         assert isinstance(cfg.data.panel_path, Path)
+        assert cfg.data.cache_dir is None
         assert cfg.head.num_hidden_layers == 0
         assert cfg.lit.target_key is not None
         assert cfg.wandb.project is not None
@@ -130,9 +131,9 @@ def test_train_configs_use_expected_panel_defaults():
 
     for path in beat_paths:
         cfg = Config.from_yaml(path)
-        assert cfg.data.items_path == Path('default.json')
-        assert cfg.data.metadata_path == Path('default/outer=0-inner=0-seed=0.parquet')
-        assert cfg.data.panel_path == Path('expr.yaml')
+        assert cfg.data.items_path == Path('expr.json')
+        assert cfg.data.metadata_path == Path('expr/outer=0-inner=0-seed=0.parquet')
+        assert cfg.data.panel_path == Path('default.yaml')
 
     for path in hest1k_paths:
         cfg = Config.from_yaml(path)
@@ -177,6 +178,6 @@ def test_beat_cell_type_configs_match_expression_variants():
         assert cfg.task.target == 'cell_types'
         assert cfg.head.output_dim == 39
         assert cfg.wandb.project == 'xe-hne-fus-cell-v0'
-        assert cfg.data.items_path == Path('default.json')
+        assert cfg.data.items_path == Path('cells.json')
         assert cfg.data.metadata_path == Path('cells/outer=0-inner=0-seed=0.parquet')
-        assert cfg.data.panel_path == Path('expr.yaml')
+        assert cfg.data.panel_path == Path('default.yaml')

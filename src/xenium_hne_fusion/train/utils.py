@@ -28,9 +28,7 @@ def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
     cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir / 'items')
     cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir / 'splits')
     cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=get_panels_dir(name))
-    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir / 'cache', default=output_dir / 'cache')
-
-    assert cfg.data.cache_dir is not None, 'cfg.data.cache_dir must be set'
+    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir / 'cache')
     return cfg, output_dir
 
 

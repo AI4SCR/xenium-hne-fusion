@@ -213,6 +213,7 @@ def train(cfg: Config, debug: bool | None = None):
         image_transform=image_transform,
         expr_transform=expr_transform,
         expr_pool=cfg.data.expr_pool,
+        cache_dir=cfg.data.cache_dir,
         drop_nan_columns=True,
         id_key="id",
     )
