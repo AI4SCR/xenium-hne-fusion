@@ -656,6 +656,7 @@ for ORGAN in bowel breast lung pancreas; do
 done
 
 # training
+PARTITION=gpu-l40
 TASK=expression
 for ORGAN in bowel breast lung pancreas; do
     for OUTER in 0 1 2 3; do
@@ -672,7 +673,7 @@ for ORGAN in bowel breast lung pancreas; do
                 --cpus-per-task=12 \
                 --mem=128G \
                 --gres=gpu:1 \
-                --partition=gpu-l40 \
+                --partition${PARTITION} \
                 --output=$HOME/logs/%j.out \
                 --job-name=${ORGAN}-${TASK}-${MODEL}-${OUTER} \
                 --wrap="uv run python scripts/train/supervised.py \
@@ -699,7 +700,7 @@ for ORGAN in bowel breast lung pancreas; do
                 --cpus-per-task=12 \
                 --mem=128G \
                 --gres=gpu:1 \
-                --partition=gpu-l40 \
+                --partition${PARTITION} \
                 --output=$HOME/logs/%j.out \
                 --job-name=${ORGAN}-${TASK}-${MODEL}-concat-${OUTER} \
                 --wrap="uv run python scripts/train/supervised.py \
@@ -726,7 +727,7 @@ for ORGAN in bowel breast lung pancreas; do
             --cpus-per-task=12 \
             --mem=128G \
             --gres=gpu:1 \
-            --partition=gpu-l40 \
+            --partition${PARTITION} \
             --output=$HOME/logs/%j.out \
             --job-name=${ORGAN}-${TASK}-${MODEL}-gate-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
