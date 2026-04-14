@@ -366,6 +366,9 @@ def test_compute_items_stats_writes_markdown_summary(tmp_path: Path):
     summary = summary_path.read_text()
     assert 'num_samples' in summary
     assert 'num_transcripts' in summary
+    assert 'num_transcripts_min' in summary
+    assert 'num_transcripts_median' in summary
+    assert 'num_transcripts_max' in summary
     assert 'num_cells' in summary
     assert 'num_unique_cells_min' in summary
     assert 'num_unique_cells_median' in summary
@@ -375,6 +378,9 @@ def test_compute_items_stats_writes_markdown_summary(tmp_path: Path):
     assert 'gene_panel_intersection' in summary
     assert 'gene_panel_union' in summary
     assert '- `num_cells`: 6' in summary
+    assert '- `num_transcripts_min`: 3' in summary
+    assert '- `num_transcripts_median`: 3.0' in summary
+    assert '- `num_transcripts_max`: 3' in summary
     assert '- `num_unique_cells_min`: 2' in summary
     assert '- `num_unique_cells_median`: 2.0' in summary
     assert '- `num_unique_cells_max`: 2' in summary

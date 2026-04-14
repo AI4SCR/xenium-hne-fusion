@@ -81,13 +81,6 @@ def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool
     return items_path
 
 
-def _format_axis_ticks(ax, axis: str = "x") -> None:
-    the_axis = ax.xaxis if axis == "x" else ax.yaxis
-    lim = ax.get_xlim() if axis == "x" else ax.get_ylim()
-    if max(abs(lim[0]), abs(lim[1])) >= 1000:
-        the_axis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v / 1000:.0f}k"))
-
-
 def _plot_transcript_scatter(stats: pd.DataFrame, output_dir: Path, *, log_axes: bool) -> None:
     scatter = stats[["num_transcripts", "num_unique_transcripts"]].dropna()
     if log_axes:
@@ -114,8 +107,6 @@ def _plot_transcript_scatter(stats: pd.DataFrame, output_dir: Path, *, log_axes:
         ax.set_xscale("log")
         ax.set_yscale("log")
 
-    _format_axis_ticks(ax, "x")
-    _format_axis_ticks(ax, "y")
     fig.tight_layout()
     output_path = output_dir / f"num_transcripts_vs_num_unique_transcripts_{suffix}.png"
     fig.savefig(output_path, dpi=150)
@@ -139,7 +130,6 @@ def plot_items_stats(stats: pd.DataFrame, output_dir: Path) -> None:
         axes[0].set_xlabel(col)
         axes[0].set_ylabel("count")
         axes[0].set_title("histogram")
-        _format_axis_ticks(axes[0], "x")
 
         sorted_vals = np.sort(values)
         axes[1].plot(sorted_vals, np.linspace(0, 1, len(sorted_vals)))
@@ -150,7 +140,6 @@ def plot_items_stats(stats: pd.DataFrame, output_dir: Path) -> None:
         axes[1].set_xlabel(col)
         axes[1].set_ylabel("cumulative fraction")
         axes[1].set_title("ECDF")
-        _format_axis_ticks(axes[1], "x")
 
         fig.tight_layout()
         fig.savefig(output_dir / f"{col}.png", dpi=150)
@@ -177,12 +166,16 @@ def _write_tile_stats_summary(items_df: pd.DataFrame, stats: pd.DataFrame, outpu
     panel_intersection = len(set.intersection(*sample_panels))
     panel_union = len(set.union(*sample_panels))
 
+    num_transcripts = stats["num_transcripts"].dropna()
     num_unique_transcripts = stats["num_unique_transcripts"].dropna()
     num_unique_cells = stats["num_unique_cells"].dropna()
     summary = {
         "num_tiles": len(items_df),
         "num_samples": items_df["sample_id"].nunique(),
         "num_transcripts": int(stats["num_transcripts"].sum()),
+        "num_transcripts_min": int(num_transcripts.min()),
+        "num_transcripts_median": float(num_transcripts.median()),
+        "num_transcripts_max": int(num_transcripts.max()),
         "num_unique_transcripts_min": int(num_unique_transcripts.min()),
         "num_unique_transcripts_median": float(num_unique_transcripts.median()),
         "num_unique_transcripts_max": int(num_unique_transcripts.max()),
