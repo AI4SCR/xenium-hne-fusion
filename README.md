@@ -599,14 +599,20 @@ done
 ## HEST1k Slurm Commands
 
 ```bash
+uv run python scripts/data/create_items.py --config configs/data/remote/hest1k.yaml
+uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/hest1k.yaml
+
 for ORGAN in bowel breast lung pancreas; do
     sbatch \
-    --cpus-per-task=4 \
-    --mem=32G \
-    --time=04:00:00 \
-    --output=~/logs/%j.out \
-    --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+        --cpus-per-task=4 \
+        --mem=32G \
+        --time=04:00:00 \
+        --output=~/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+done
 
+# Run after the artifact jobs have finished.
+for ORGAN in bowel breast lung pancreas; do
     for OUTER in 0 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${ORGAN}/${SPLIT_NAME}.parquet"
@@ -614,11 +620,11 @@ for ORGAN in bowel breast lung pancreas; do
         echo "Creating panel ${PANEL_NAME} from split ${METADATA_PATH}"
 
         sbatch \
-        --cpus-per-task=4 \
-        --mem=32G \
-        --time=04:00:00 \
-        --output=~/logs/%j.out \
-        --wrap="uv run python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k/${ORGAN}.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
+            --cpus-per-task=4 \
+            --mem=32G \
+            --time=04:00:00 \
+            --output=~/logs/%j.out \
+            --wrap="uv run python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k/${ORGAN}.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
     done
 done
 ```
