@@ -254,7 +254,7 @@ def train(cfg: Config, debug: bool | None = None):
         ModelCheckpoint(monitor=monitor, mode=mode, filename="best-{epoch}-{step}", save_last=False),
         ModelCheckpoint(monitor=None, save_last="link"),
         LearningRateMonitor(logging_interval="epoch"),
-        EarlyStopping(monitor=monitor, mode=mode, patience=10),
+        EarlyStopping(monitor=monitor, mode=mode, patience=5),
         TestCache(exclude_keys=["modalities", "loss", "z"]),
     ]
 

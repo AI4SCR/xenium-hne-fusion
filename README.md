@@ -897,6 +897,8 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hesca
 
 ## Tasks
 
+BEAT:
+
 - [x] task: cell_types fusion_strategy: add panel: default learnable_gate: false
 - [x] task: cell_types fusion_strategy: concat panel: default learnable_gate: false
 - [x] task: cell_types fusion_strategy: add panel: default learnable_gate: true
@@ -909,3 +911,30 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hesca
 - [ ] task: expression fusion_strategy: add panel: hvg learnable_gate: false
 - [ ] task: expression fusion_strategy: concat panel: hvg learnable_gate: false
 - [ ] task: expression fusion_strategy: add panel: hvg learnable_gate: true
+
+HEST1k:
+
+- [ ] task: expression organ: breast fusion_strategy: add panel: default learnable_gate: false
+- [ ] task: expression organ: breast fusion_strategy: concat panel: default learnable_gate: false
+- [ ] task: expression organ: breast fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: expression organ: breast fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: expression organ: breast fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: expression organ: breast fusion_strategy: add panel: hvg learnable_gate: true
+- [ ] task: expression organ: lung fusion_strategy: add panel: default learnable_gate: false
+- [ ] task: expression organ: lung fusion_strategy: concat panel: default learnable_gate: false
+- [ ] task: expression organ: lung fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: expression organ: lung fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: expression organ: lung fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: expression organ: lung fusion_strategy: add panel: hvg learnable_gate: true
+- [ ] task: expression organ: pancreas fusion_strategy: add panel: default learnable_gate: false
+- [ ] task: expression organ: pancreas fusion_strategy: concat panel: default learnable_gate: false
+- [ ] task: expression organ: pancreas fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: expression organ: pancreas fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: expression organ: pancreas fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: expression organ: pancreas fusion_strategy: add panel: hvg learnable_gate: true
+- [ ] task: expression organ: bowel fusion_strategy: add panel: default learnable_gate: false
+- [ ] task: expression organ: bowel fusion_strategy: concat panel: default learnable_gate: false
+- [ ] task: expression organ: bowel fusion_strategy: add panel: default learnable_gate: true
+- [ ] task: expression organ: bowel fusion_strategy: add panel: hvg learnable_gate: false
+- [ ] task: expression organ: bowel fusion_strategy: concat panel: hvg learnable_gate: false
+- [ ] task: expression organ: bowel fusion_strategy: add panel: hvg learnable_gate: true
