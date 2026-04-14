@@ -35,10 +35,10 @@ lit:
 wandb:
   project: xe-hne-fus-expr-v0
   name: expr-tile
-  tags: [pancreas]
+  tags: [hest1k, pancreas]
 
 trainer:
-  max_time: 00:01:45:00
+  max_time: 00:03:45:00
   max_epochs: 35
   accumulate_grad_batches: 2
   gradient_clip_val: 1.0
