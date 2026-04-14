@@ -350,10 +350,10 @@ data:
   name: hest1k
   items_path: breast.json
   metadata_path: breast/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-breast-breast-outer=0-inner=0-seed=0.yaml
+  panel_path: breast-hvg-outer=0-inner=0-seed=0.yaml
 
 panel:
-  name: hvg-breast-breast-outer=0-inner=0-seed=0
+  name: breast-hvg-outer=0-inner=0-seed=0
   n_top_genes: 16
   flavor: seurat_v3
 ```
@@ -562,7 +562,7 @@ for ORGAN in breast lung pancreas bowel; do
         cmd="python scripts/artifacts/create_panel.py \
             --config configs/artifacts/hest1k/${ORGAN}.yaml \
             --panel.metadata_path ${ORGAN}/${SPLIT_NAME}.parquet \
-            --panel.name hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
+            --panel.name ${ORGAN}-hvg-${SPLIT_NAME}"
 
         echo "Running: ${cmd}"
         ./ray/submit.sh "${cmd}"
@@ -586,7 +586,7 @@ TASK=expression
 for ORGAN in breast lung pancreas bowel; do
   for OUTER in 0 1 2 3; do
     METADATA_PATH="${ORGAN}/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="hvg-${ORGAN}-${ORGAN}-outer=${OUTER}-inner=0-seed=0.yaml"
+    PANEL_PATH="${ORGAN}-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
 #      ./ray/submit.sh --entrypoint-num-gpus 0 --entrypoint-num-cpus 2 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true"
       ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 "python scripts/train/supervised.py --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}"
@@ -599,31 +599,27 @@ done
 ## HEST1k Slurm Commands
 
 ```bash
-uv run python scripts/
 for ORGAN in bowel breast lung pancreas; do
     sbatch \
     --cpus-per-task=4 \
     --mem=32G \
     --time=04:00:00 \
     --output=~/logs/%j.out \
-    --wrap=uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
-done
- 
-for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_NAME="expr-hvg-${ORGAN}-${SPLIT_NAME}"
-    echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+    --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
 
-    sbatch \
-    --cpus-per-task=4 \
-    --mem=32G \
-    --time=04:00:00 \
-    --output=~/logs/%j.out \
-    --wrap=uv run python scripts/artifacts/create_panel.py \
-        --config "configs/artifacts/hest1k/${ORGAN}.yaml" \
-        --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
-        --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
+    for OUTER in 0 1 2 3; do
+        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+        METADATA_PATH="${ORGAN}/${SPLIT_NAME}.parquet"
+        PANEL_NAME="${ORGAN}-hvg-${SPLIT_NAME}"
+        echo "Creating panel ${PANEL_NAME} from split ${METADATA_PATH}"
+
+        sbatch \
+        --cpus-per-task=4 \
+        --mem=32G \
+        --time=04:00:00 \
+        --output=~/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_panel.py --config configs/artifacts/hest1k/${ORGAN}.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
+    done
 done
 ```
 

@@ -28,7 +28,7 @@ data:
   expr_pool: tile
   items_path: bowel.json
   metadata_path: bowel/outer=0-inner=0-seed=0.parquet
-  panel_path: hvg-bowel-bowel-outer=0-inner=0-seed=0.yaml
+  panel_path: bowel-hvg-outer=0-inner=0-seed=0.yaml
 
 lit:
   target_key: target

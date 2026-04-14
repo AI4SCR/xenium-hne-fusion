@@ -23,7 +23,7 @@ split:
   group_column_name: null
   random_state: 0
 panel:
-  name: hvg-pancreas-outer=0-inner=0-seed=0
+  name: pancreas-hvg-outer=0-inner=0-seed=0
   metadata_path: pancreas/outer=0-inner=0-seed=0.parquet
   n_top_genes: 18
   flavor: seurat_v3
