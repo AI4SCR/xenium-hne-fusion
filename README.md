@@ -672,7 +672,7 @@ for OUTER in 0 1 2 3; do
         # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
-            --mem=64G \
+            --mem=128G \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
@@ -700,7 +700,7 @@ for OUTER in 0 1 2 3; do
 
         sbatch \
             --cpus-per-task=12 \
-            --mem=64G \
+            --mem=128G \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
@@ -729,7 +729,7 @@ for OUTER in 0 1 2 3; do
 
         sbatch \
             --cpus-per-task=12 \
-            --mem=64G \
+            --mem=128G \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
