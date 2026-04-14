@@ -896,80 +896,62 @@ uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.y
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
-for OUTER in 0 1 2 3; do
-    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_NAME="expr-hvg-outer=${OUTER}-inner=0-seed=0"
-
-    sbatch \
-        --cpus-per-task=10 \
-        --mem=32G \
-        --time=04:00:00 \
-        --output=~/logs/%j.out \
-        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-hvg.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
-done
-
-for OUTER in 0 1 2 3; do
-    METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_NAME="cells-hvg-outer=${OUTER}-inner=0-seed=0"
-
-    sbatch \
-        --cpus-per-task=10 \
-        --mem=32G \
-        --time=04:00:00 \
-        --output=~/logs/%j.out \
-        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells-hvg.yaml --panel.metadata_path ${METADATA_PATH} --panel.name ${PANEL_NAME}"
-done
-
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
+# TASK=cell_types
+TASK=expression
+PARTITION=gpu-l40
+TIME=04:00:00
+MEMORY=128G
+PANEL_PATH=default.yaml
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/hvg.yaml
-done
-
-#TASK=cell_types
-TASK=expression
-for OUTER in 0 1 2 3; do
-    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-    # METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    # PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-        uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH}
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true
 
         # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
-            --mem=32G \
+            --mem=${MEMORY} \
             --gres=gpu:1 \
-            --output=~/logs/%j.out \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
             --job-name=${TASK}-${MODEL}-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
-                --config configs/train/beat/${TASK}/${MODEL}.yaml \
+                --config ${CONFIG} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH}"
     done
 done
 
 # concat
+TASK=expression
+PARTITION=gpu-l40
+TIME=04:00:00
+MEMORY=128G
+PANEL_PATH=default.yaml
 for OUTER in 0 1 2 3; do
-    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-    # METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    # PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
-#        uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
+        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
+
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
 
         sbatch \
             --cpus-per-task=12 \
-            --mem=32G \
+            --mem=${MEMORY} \
             --gres=gpu:1 \
-            --output=~/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-${OUTER} \            
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=${TASK}-${MODEL}-concat-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
-                --config configs/train/beat/${TASK}/${MODEL}.yaml \
+                --config ${CONFIG} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --backbone.fusion_strategy concat"
@@ -977,24 +959,29 @@ for OUTER in 0 1 2 3; do
 done
 
 # learnable gate
+TASK=expression
+PARTITION=gpu-l40
+TIME=04:00:00
+MEMORY=128G
+PANEL_PATH=default.yaml
 for OUTER in 0 1 2 3; do
-    METADATA_PATH="expr/outer=${OUTER}-inner=0-seed=0.parquet"
-    PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-    # METADATA_PATH="cells/outer=${OUTER}-inner=0-seed=0.parquet"
-    # PANEL_PATH="cells-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
     MODEL=early-fusion
+    CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-    uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true
+#    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true
 
     sbatch \
         --cpus-per-task=12 \
-        --mem=32G \
+        --mem=${MEMORY} \
         --gres=gpu:1 \
-        --output=~/logs/%j.out \
-        --job-name=${TASK}-${MODEL}-${OUTER} \                    
+        --partition=${PARTITION} \
+        --time=${TIME} \
+        --output=$HOME/logs/%j.out \
+        --job-name=${TASK}-${MODEL}-gate-${OUTER} \
         --wrap="uv run python scripts/train/supervised.py \
-            --config configs/train/beat/${TASK}/${MODEL}.yaml \
+            --config ${CONFIG} \
             --data.metadata_path ${METADATA_PATH} \
             --data.panel_path ${PANEL_PATH} \
             --backbone.learnable_gate true"
