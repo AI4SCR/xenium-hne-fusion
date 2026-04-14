@@ -613,6 +613,15 @@ done
 
 for ORGAN in bowel breast lung pancreas; do
     sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --time=01:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/compute_items_stats.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+done
+
+for ORGAN in bowel breast lung pancreas; do
+    sbatch \
         --cpus-per-task=4 \
         --mem=32G \
         --time=04:00:00 \
@@ -622,23 +631,23 @@ done
 
 for ORGAN in bowel breast lung pancreas; do
     sbatch \
-        --cpus-per-task=4 \
+        --cpus-per-task=10 \
         --mem=32G \
         --time=04:00:00 \
-        --output=~/logs/%j.out \
+        --output=$HOME/logs/%j.out \
         --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
 done
 
 # Run after the artifact jobs have finished.
 for ORGAN in bowel breast lung pancreas; do
-    for OUTER in 0 1 2 3; do
+    for OUTER in 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${ORGAN}/${SPLIT_NAME}.parquet"
         PANEL_NAME="${ORGAN}-hvg-${SPLIT_NAME}"
         echo "Creating panel ${PANEL_NAME} from split ${METADATA_PATH}"
 
         sbatch \
-            --cpus-per-task=4 \
+            --cpus-per-task=10 \
             --mem=32G \
             --time=04:00:00 \
             --output=~/logs/%j.out \
