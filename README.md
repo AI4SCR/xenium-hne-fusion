@@ -657,6 +657,7 @@ done
 
 # training
 PARTITION=gpu-l40
+TIME=04:00:00
 TASK=expression
 for OUTER in 0 1 2 3; do
   for ORGAN in bowel breast lung pancreas; do
@@ -674,6 +675,7 @@ for OUTER in 0 1 2 3; do
 #                --mem=64G \
 #                --gres=gpu:1 \
 #                --partition${PARTITION} \
+#                --time=${TIME} \
 #                --output=$HOME/logs/%j.out \
 #                --job-name=${ORGAN}-${TASK}-${MODEL}-${OUTER} \
 #                --wrap="uv run python scripts/train/supervised.py \
@@ -701,6 +703,7 @@ for OUTER in 0 1 2 3; do
             --mem=64G \
             --gres=gpu:1 \
             --partition${PARTITION} \
+            --time=${TIME} \
             --output=$HOME/logs/%j.out \
             --job-name=${ORGAN}-${TASK}-${MODEL}-concat-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
@@ -729,6 +732,7 @@ for OUTER in 0 1 2 3; do
             --mem=64G \
             --gres=gpu:1 \
             --partition${PARTITION} \
+            --time=${TIME} \
             --output=$HOME/logs/%j.out \
             --job-name=${ORGAN}-${TASK}-${MODEL}-gate-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
