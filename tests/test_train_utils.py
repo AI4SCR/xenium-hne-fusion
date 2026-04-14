@@ -118,7 +118,8 @@ def test_train_configs_load_explicit_data_head_wandb_and_trainer_fields(
         assert cfg.wandb.project is not None
         assert cfg.wandb.project.endswith('-v0')
         assert cfg.wandb.name == path.stem
-        assert cfg.trainer.max_time == '00:01:45:00'
+        expected_max_time = '00:03:45:00' if cfg.data.name == 'hest1k' else '00:06:00:00'
+        assert cfg.trainer.max_time == expected_max_time
         assert cfg.trainer.max_epochs == 35
         assert cfg.trainer.gradient_clip_val == 1.0
 
@@ -140,7 +141,7 @@ def test_train_configs_use_expected_panel_defaults():
         organ = path.parent.name
         assert cfg.data.items_path == Path(f'{organ}.json')
         assert cfg.data.metadata_path == Path(f'{organ}/outer=0-inner=0-seed=0.parquet')
-        assert cfg.data.panel_path == Path(f'hvg-{organ}-{organ}-outer=0-inner=0-seed=0.yaml')
+        assert cfg.data.panel_path == Path(f'{organ}-hvg-outer=0-inner=0-seed=0.yaml')
 
 
 def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
@@ -154,8 +155,8 @@ def test_hest1k_organ_expression_configs_match_expected_variants_and_paths():
             cfg = Config.from_yaml(path)
             assert cfg.data.items_path == Path(f'{organ}.json')
             assert cfg.data.metadata_path == Path(f'{organ}/outer=0-inner=0-seed=0.parquet')
-            assert cfg.data.panel_path == Path(f'hvg-{organ}-{organ}-outer=0-inner=0-seed=0.yaml')
-            assert cfg.wandb.tags == [organ]
+            assert cfg.data.panel_path == Path(f'{organ}-hvg-outer=0-inner=0-seed=0.yaml')
+            assert cfg.wandb.tags == ['hest1k', organ]
 
 
 def test_train_configs_explicitly_set_learnable_gate_false():
