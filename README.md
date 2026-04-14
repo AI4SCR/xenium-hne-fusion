@@ -599,18 +599,31 @@ done
 ## HEST1k Slurm Commands
 
 ```bash
-for ORGAN in breast lung pancreas colon; do
-    uv run scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml
-    
-    for OUTER in 0 1 2 3; do
-        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
+uv run python scripts/
+for ORGAN in bowel breast lung pancreas; do
+    sbatch \
+    --cpus-per-task=4 \
+    --mem=32G \
+    --time=04:00:00 \
+    --output=~/logs/%j.out \
+    --wrap=uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+done
+ 
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
+    PANEL_NAME="expr-hvg-${ORGAN}-${SPLIT_NAME}"
+    echo "Creating panel for ${ORGAN} and ${SPLIT_NAME}"
 
-        uv run python scripts/artifacts/create_panel.py \
-            --config "configs/artifacts/hest1k/${ORGAN}.yaml" \
-            --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
-            --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
-    done
+    sbatch \
+    --cpus-per-task=4 \
+    --mem=32G \
+    --time=04:00:00 \
+    --output=~/logs/%j.out \
+    --wrap=uv run python scripts/artifacts/create_panel.py \
+        --config "configs/artifacts/hest1k/${ORGAN}.yaml" \
+        --panel.metadata_path "${ORGAN}/${SPLIT_NAME}.parquet" \
+        --panel.name "hvg-${ORGAN}-${ORGAN}-${SPLIT_NAME}"
 done
 ```
 
