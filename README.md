@@ -658,6 +658,7 @@ done
 # training
 PARTITION=gpu-l40
 TIME=04:00:00
+MEMORY=128G
 TASK=expression
 for OUTER in 0 1 2 3; do
   for ORGAN in bowel breast lung pancreas; do
@@ -672,7 +673,7 @@ for OUTER in 0 1 2 3; do
         # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
-            --mem=128G \
+            --mem=${MEMORY} \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
@@ -700,7 +701,7 @@ for OUTER in 0 1 2 3; do
 
         sbatch \
             --cpus-per-task=12 \
-            --mem=128G \
+            --mem=${MEMORY} \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
@@ -729,7 +730,7 @@ for OUTER in 0 1 2 3; do
 
         sbatch \
             --cpus-per-task=12 \
-            --mem=128G \
+            --mem=${MEMORY} \
             --gres=gpu:1 \
             --partition=${PARTITION} \
             --time=${TIME} \
