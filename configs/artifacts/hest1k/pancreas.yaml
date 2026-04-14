@@ -25,5 +25,5 @@ split:
 panel:
   name: pancreas-hvg-outer=0-inner=0-seed=0
   metadata_path: pancreas/outer=0-inner=0-seed=0.parquet
-  n_top_genes: 18
+  n_top_genes: 20
   flavor: seurat_v3

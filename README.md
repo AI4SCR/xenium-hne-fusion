@@ -606,6 +606,24 @@ for ORGAN in bowel breast lung pancreas; do
     sbatch \
         --cpus-per-task=4 \
         --mem=32G \
+        --time=01:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/filter_items.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+done
+
+for ORGAN in bowel breast lung pancreas; do
+    sbatch \
+        --cpus-per-task=4 \
+        --mem=32G \
+        --time=04:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/report_feature_overlap.py --config configs/artifacts/hest1k/${ORGAN}.yaml"
+done
+
+for ORGAN in bowel breast lung pancreas; do
+    sbatch \
+        --cpus-per-task=4 \
+        --mem=32G \
         --time=04:00:00 \
         --output=~/logs/%j.out \
         --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hest1k/${ORGAN}.yaml"

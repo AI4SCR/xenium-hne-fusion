@@ -25,5 +25,5 @@ split:
 panel:
   name: breast-hvg-outer=0-inner=0-seed=0
   metadata_path: breast/outer=0-inner=0-seed=0.parquet
-  n_top_genes: 16
+  n_top_genes: 18
   flavor: seurat_v3
