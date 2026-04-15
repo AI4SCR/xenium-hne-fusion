@@ -1,5 +1,4 @@
 import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
@@ -21,6 +20,7 @@ load_dotenv(override=True)
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
 # fast_dev_run = debug = True
+# from pathlib import Path
 # cfg = Config.from_yaml(Path("configs/train/beat/expression/early-fusion.yaml"))
 # cfg = Config.from_yaml(Path("configs/train/beat/expression/late-fusion.yaml"))
 # cfg = Config.from_yaml(Path("configs/train/beat/expression/vision.yaml"))
