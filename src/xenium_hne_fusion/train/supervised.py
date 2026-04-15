@@ -99,7 +99,7 @@ def infer_head_input_dim(
     return embed_dim
 
 
-def train(cfg: Config, debug: bool | None = None):
+def train(cfg: Config, debug: bool | None = None, config_path: str | None = None):
     debug = debug if debug is not None else cfg.debug
     if debug or cfg.trainer.fast_dev_run:
         cfg = set_fast_dev_run_settings(cfg)
@@ -246,6 +246,7 @@ def train(cfg: Config, debug: bool | None = None):
             "num_outputs": num_outputs,
             "num_source_genes": num_source_genes,
             "slurm_job_id": os.getenv("SLURM_JOB_ID"),
+            "config_path": config_path,
             **asdict(cfg),
         },
     )
@@ -294,5 +295,5 @@ def train(cfg: Config, debug: bool | None = None):
     }
 
 
-def main(cfg: Config, debug: bool | None = None) -> None:
-    train(cfg, debug=debug)
+def main(cfg: Config, debug: bool | None = None, config_path: str | None = None) -> None:
+    train(cfg, debug=debug, config_path=config_path)
