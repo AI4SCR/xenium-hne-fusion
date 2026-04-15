@@ -26,6 +26,7 @@ data:
   items_path: lung.json
   metadata_path: lung/outer=0-inner=0-seed=0.parquet
   panel_path: lung-hvg-outer=0-inner=0-seed=0.yaml
+  cache_dir: $TMPDIR/cache
 
 lit:
   target_key: target

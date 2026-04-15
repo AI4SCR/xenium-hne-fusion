@@ -29,6 +29,7 @@ data:
   items_path: bowel.json
   metadata_path: bowel/outer=0-inner=0-seed=0.parquet
   panel_path: bowel-hvg-outer=0-inner=0-seed=0.yaml
+  cache_dir: $TMPDIR/cache
 
 lit:
   target_key: target

@@ -26,6 +26,7 @@ data:
   items_path: breast.json
   metadata_path: breast/outer=0-inner=0-seed=0.parquet
   panel_path: breast-hvg-outer=0-inner=0-seed=0.yaml
+  cache_dir: $TMPDIR/cache
 
 lit:
   target_key: target
