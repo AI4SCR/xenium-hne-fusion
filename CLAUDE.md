@@ -25,6 +25,7 @@ xenium-hne-fusion/
 ## Environment
 
 Managed with [uv](https://github.com/astral-sh/uv).
+To run python commands use `uv run python`.
 
 ### Bash tool PATH
 The Bash tool runs with a minimal `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`). Homebrew tools
@@ -174,6 +175,7 @@ You are an expert coding assistant for research code in computer vision, followi
 - For Ray-enabled stages, keep the serial path as the simplest reference implementation. Ray wrappers should submit the same sample-level function and collect failures into a single explicit error.
 - When debugging scripts interactively, call the script's `cli([...])` or reusable `main(...)` with explicit arguments instead of relying on global state.
 - The shell `PATH` is minimal. Use full paths for Homebrew tools and prefer repo-local commands through `uv run`.
+- `cache_dir` (and all training paths) support shell env-var interpolation: set `cache_dir: $TMPDIR/cache` in a YAML config and `_resolve_path` will expand it at runtime via `os.path.expandvars`. Useful for Slurm jobs where `$TMPDIR` is only known at job start.
 
 ## Anti-patterns and mistakes to avoid
 
