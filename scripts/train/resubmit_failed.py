@@ -16,7 +16,7 @@ Usage:
         --out resubmit.sh
 
     # Preview without writing:
-    uv run python scripts/train/resubmit_failed.py --project xe-hne-fus-expr-v0 --dry_run true
+    uv run python scripts/train/resubmit_failed.py --project xe-hne-fus-expr-v0 --dry true
 """
 
 import sys
@@ -41,7 +41,7 @@ def parse_args(argv=None):
     parser.add_argument("--memory", type=str, default="64G")
     parser.add_argument("--time", type=str, default="04:00:00")
     parser.add_argument("--out", type=Path, default=Path("resubmit.sh"), help="Output bash script path.")
-    parser.add_argument("--dry_run", type=bool, default=False, help="Print sbatch commands without writing the script.")
+    parser.add_argument("--dry", type=bool, default=False, help="Print sbatch commands without writing the script.")
     return parser.parse_args(argv)
 
 
@@ -190,7 +190,7 @@ def main(argv=None):
 
     script = "\n".join(lines)
 
-    if args.dry_run:
+    if args.dry:
         print("\n--- dry run: sbatch commands ---\n")
         print(script)
         return 0
