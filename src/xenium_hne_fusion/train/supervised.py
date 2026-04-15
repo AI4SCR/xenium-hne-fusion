@@ -295,5 +295,5 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     }
 
 
-def main(cfg: Config, debug: bool | None = None, config_path: str | None = None) -> None:
-    train(cfg, debug=debug, config_path=config_path)
+def main(cfg: Config, debug: bool | None = None) -> None:
+    train(cfg, debug=debug)
