@@ -30,6 +30,7 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "torchinfo" },
+    { name = "torchvision" },
     { name = "tqdm" },
 ]
 
@@ -52,6 +53,7 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "torch" },
     { name = "torchinfo" },
+    { name = "torchvision" },
     { name = "tqdm" },
 ]
 provides-extras = ["dev"]
