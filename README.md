@@ -658,8 +658,11 @@ done
 # training
 PARTITION=gpu-l40
 TIME=04:00:00
-MEMORY=128G
+MEMORY=64G
 TASK=expression
+OUTER=0
+ORGAN=bowel
+MODEL=expr-token
 for OUTER in 0 1 2 3; do
   for ORGAN in bowel breast lung pancreas; do
     METADATA_PATH="${ORGAN}/outer=${OUTER}-inner=0-seed=0.parquet"
