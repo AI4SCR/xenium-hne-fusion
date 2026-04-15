@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from xenium_hne_fusion.train.config import Config
@@ -35,6 +36,7 @@ def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
 def _resolve_path(path: Path | None, *, root: Path | None = None, default: Path | None = None) -> Path | None:
     if path is None:
         return default
+    path = Path(os.path.expandvars(path))  # expand $TMPDIR etc. at runtime
     if path.is_absolute():
         return path
     if root is not None:
