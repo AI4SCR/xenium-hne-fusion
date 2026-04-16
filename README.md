@@ -661,7 +661,7 @@ TIME=04:00:00
 MEMORY=64G
 TASK=expression
 OUTER=0
-ORGAN=bowel
+ORGAN=lung
 MODEL=expr-token
 for OUTER in 0 1 2 3; do
   for ORGAN in bowel breast lung pancreas; do
@@ -671,7 +671,7 @@ for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         CONFIG=configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml
         
-#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true
+        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true
 
         # Main run (GPU)
         sbatch \
