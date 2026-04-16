@@ -227,7 +227,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
 
     if cfg.data.cache_dir is not None:
         # warmup cache
-        ds_all = TileDataset(**{**dataset_kws, 'metadata_path': None})
+        ds_all = TileDataset(**{**dataset_kws})
         ds_all.setup()
 
     ds_fit = TileDataset(**dataset_kws, split="fit")
