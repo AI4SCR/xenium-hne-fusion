@@ -30,6 +30,13 @@ from xenium_hne_fusion.train.utils import resolve_training_paths, set_fast_dev_r
 TaskTarget = Literal["expression", "cell_types"]
 
 mp.set_sharing_strategy("file_system")
+
+# Fixes 'cudaErrorInitializationError' by ensuring DataLoader workers start with a clean
+# CUDA state. Critical for stability when using multiprocessing on Linux with GPUs.
+mp.set_start_method('spawn', force=True)
+# Alternatively, clearing cache between train and test can help as well
+# torch.cuda.empty_cache()
+
 L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
@@ -282,6 +289,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
 
     trainer.fit(model=lit, train_dataloaders=dl_fit, val_dataloaders=dl_val)
     if not cfg.trainer.fast_dev_run:
+        torch.cuda.empty_cache()
         trainer.test(ckpt_path="best", dataloaders=dl_test)
     wandb.finish()
 
