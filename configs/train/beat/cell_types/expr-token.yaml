@@ -36,6 +36,7 @@ lit:
 wandb:
   project: xe-hne-fus-cell-v0
   name: expr-token
+  tags: [beat]
 
 trainer:
   max_time: 00:06:00:00

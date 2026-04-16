@@ -902,8 +902,8 @@ uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/b
 # TASK=cell_types
 TASK=expression
 PARTITION=gpu-l40
-TIME=04:00:00
-MEMORY=128G
+TIME=04:30:00
+MEMORY=64G
 PANEL_PATH=default.yaml
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
@@ -1070,7 +1070,7 @@ TASK=expression
 PARTITION=gpu-l40
 TIME=04:00:00
 MEMORY=64G
-MAX_EPOCHS=50
+MAX_EPOCHS=150
 
 # base models
 for ORGAN in breast bowel lung-healthy; do

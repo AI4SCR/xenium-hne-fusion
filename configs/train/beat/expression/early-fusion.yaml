@@ -27,6 +27,7 @@ data:
   items_path: expr.json
   metadata_path: expr/outer=0-inner=0-seed=0.parquet
   panel_path: default.yaml
+  cache_dir: $TMPDIR/cache
 
 lit:
   target_key: target
@@ -36,9 +37,10 @@ lit:
 wandb:
   project: xe-hne-fus-expr-v0
   name: early-fusion
+  tags: [beat]
 
 trainer:
-  max_time: 00:06:00:00
+  max_time: 00:04:00:00
   max_epochs: 35
   accumulate_grad_batches: 2
   gradient_clip_val: 1.0
