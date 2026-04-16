@@ -992,6 +992,240 @@ done
 
 ```
 
+## HESCAPE Runs
+
+HESCAPE uses fixed (non-cross-validated) train/val/test splits drawn from HEST1K samples.
+There is one split per organ group; no outer-fold loop is needed.
+
+Organ groups and their training config counterparts:
+
+| HESCAPE panel | Split path | Training config dir |
+|---|---|---|
+| breast | `hescape/breast/hescape.parquet` | `configs/train/hest1k/expression/breast/` |
+| bowel | `hescape/bowel/hescape.parquet` | `configs/train/hest1k/expression/bowel/` |
+| lung-healthy | `hescape/lung-healthy/hescape.parquet` | `configs/train/hest1k/expression/lung/` |
+| human-immuno-oncology | `hescape/human-immuno-oncology/hescape.parquet` | — |
+| human-multi-tissue | `hescape/human-multi-tissue/hescape.parquet` | — |
+
+Splits are written to `DATA_DIR/03_output/hest1k/splits/hescape/<name>/hescape.parquet`.
+Panels are pre-defined in `panels/hescape/` and copied to `DATA_DIR/03_output/hest1k/panels/hescape/<name>.yaml`.
+
+### Fixed sample assignments
+
+**hescape-breast**
+
+| split | sample_id |
+|---|---|
+| fit | TENX99, TENX95, TENX94 |
+| val | NCBI785 |
+| test | NCBI783 |
+
+**hescape-bowel**
+
+| split | sample_id |
+|---|---|
+| fit | TENX149, TENX148, TENX147 |
+| val | TENX114 |
+| test | TENX111 |
+
+**hescape-lung-healthy**
+
+| split | sample_id |
+|---|---|
+| fit | NCBI880, NCBI879, NCBI876, NCBI875, NCBI873, NCBI870, NCBI867, NCBI865, NCBI864, NCBI860, NCBI859, NCBI856 |
+| val | NCBI884, NCBI882, NCBI866, NCBI858 |
+| test | NCBI883, NCBI881, NCBI861, NCBI857 |
+
+**hescape-human-immuno-oncology**
+
+| split | sample_id |
+|---|---|
+| fit | TENX142, TENX139, TENX138 |
+| val | TENX141 |
+| test | TENX140 |
+
+**hescape-human-multi-tissue**
+
+| split | sample_id |
+|---|---|
+| fit | TENX134, TENX133, TENX132, TENX126, TENX123, TENX121, TENX119, TENX118, TENX105 |
+| val | TENX125, TENX120, TENX106 |
+| test | TENX124, TENX122, TENX116 |
+
+### 1. Create artifacts
+
+```bash
+for ORGAN in breast bowel lung-healthy; do
+    uv run python scripts/artifacts/create_artifacts.py \
+        --config configs/artifacts/hescape/${ORGAN}.yaml
+done
+```
+
+### 2. Create splits
+
+Covers all HESCAPE organ groups in one command:
+
+```bash
+uv run python scripts/artifacts/create_hescape_splits.py
+```
+
+### 3. Create panels
+
+```bash
+for ORGAN in breast bowel lung-healthy; do
+    SPLIT_NAME="hescape-${ORGAN}"
+    uv run python scripts/artifacts/create_panel.py \
+        --config configs/artifacts/hescape/${ORGAN}.yaml \
+        --panel.metadata_path hescape/${SPLIT_NAME}.parquet \
+        --panel.name ${SPLIT_NAME}-hvg
+done
+```
+
+### HESCAPE Ray Commands
+
+```bash
+# artifacts
+for ORGAN in breast bowel lung-healthy; do
+    ./ray/submit.sh "python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape/${ORGAN}.yaml"
+done
+
+# splits (all organs in one call)
+./ray/submit.sh "python scripts/artifacts/create_hescape_splits.py"
+
+# panels
+for ORGAN in breast bowel lung-healthy; do
+    SPLIT_NAME="hescape-${ORGAN}"
+    ./ray/submit.sh "python scripts/artifacts/create_panel.py \
+        --config configs/artifacts/hescape/${ORGAN}.yaml \
+        --panel.metadata_path hescape/${SPLIT_NAME}.parquet \
+        --panel.name ${SPLIT_NAME}-hvg"
+done
+
+# training — base models
+TASK=expression
+declare -A ORGAN_MAP=([breast]=breast [bowel]=bowel [lung-healthy]=lung)
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
+            "python scripts/train/supervised.py \
+                --config configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH}"
+    done
+done
+
+# concat fusion
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
+            "python scripts/train/supervised.py \
+                --config configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --backbone.fusion_strategy concat"
+    done
+done
+
+# learnable gate
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
+            "python scripts/train/supervised.py \
+                --config configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --backbone.learnable_gate true"
+    done
+done
+```
+
+### HESCAPE Slurm Commands
+
+```bash
+PARTITION=gpu-l40
+TIME=04:00:00
+MEMORY=64G
+TASK=expression
+declare -A ORGAN_MAP=([breast]=breast [bowel]=bowel [lung-healthy]=lung)
+
+# base models
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+        CONFIG=configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=${MEMORY} \
+            --gres=gpu:1 \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=hescape-${ORGAN}-${MODEL} \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH}"
+    done
+done
+
+# concat fusion
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        CONFIG=configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=${MEMORY} \
+            --gres=gpu:1 \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=hescape-${ORGAN}-${MODEL}-concat \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --backbone.fusion_strategy concat"
+    done
+done
+
+# learnable gate
+for ORGAN in breast bowel lung-healthy; do
+    TRAIN_ORGAN=${ORGAN_MAP[$ORGAN]}
+    METADATA_PATH="hescape/hescape-${ORGAN}.parquet"
+    PANEL_PATH="hescape-${ORGAN}-hvg.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+        CONFIG=configs/train/hest1k/${TASK}/${TRAIN_ORGAN}/${MODEL}.yaml
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=${MEMORY} \
+            --gres=gpu:1 \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=hescape-${ORGAN}-${MODEL}-gate \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --backbone.learnable_gate true"
+    done
+done
+```
+
 ## Data Processing Commands
 
 ```bash

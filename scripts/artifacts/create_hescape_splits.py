@@ -12,7 +12,7 @@ from xenium_hne_fusion.metadata import join_items_with_metadata
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
 PANEL_TO_SPLITS = {
-    # 'hescape-human-5k': {
+    # 'human-5k': {
     #     'fit': {
     #         4: 'Xenium_Prime_Human_Lung_Cancer_FFPE',
     #         2: 'Xenium_Prime_Breast_Cancer_FFPE',
@@ -27,7 +27,7 @@ PANEL_TO_SPLITS = {
     #         0: 'TENX157',
     #     },
     # },
-    'hescape-breast': {
+    'breast': {
         'fit': {
             8: 'TENX99',
             4: 'TENX95',
@@ -40,7 +40,7 @@ PANEL_TO_SPLITS = {
             0: 'NCBI783',
         },
     },
-    'hescape-bowel': {
+    'bowel': {
         'fit': {
             4: 'TENX149',
             3: 'TENX148',
@@ -53,7 +53,7 @@ PANEL_TO_SPLITS = {
             0: 'TENX111',
         },
     },
-    'hescape-human-immuno-oncology': {
+    'human-immuno-oncology': {
         'fit': {
             4: 'TENX142',
             1: 'TENX139',
@@ -66,7 +66,7 @@ PANEL_TO_SPLITS = {
             2: 'TENX140',
         },
     },
-    'hescape-lung-healthy': {
+    'lung-healthy': {
         'fit': {
             15: 'NCBI880',
             14: 'NCBI879',
@@ -94,7 +94,7 @@ PANEL_TO_SPLITS = {
             1: 'NCBI857',
         },
     },
-    'hescape-human-multi-tissue': {
+    'human-multi-tissue': {
         'fit': {
             14: 'TENX134',
             13: 'TENX133',
@@ -127,7 +127,7 @@ def _create_single_hescape_split(
     output_dir: Path,
     overwrite: bool,
 ) -> Path:
-    output_path = output_dir / 'splits' / 'hescape' / f'{name}.parquet'
+    output_path = output_dir / 'splits' / 'hescape' / name / 'hescape.parquet'
     if output_path.exists():
         assert overwrite, f'Split already exists: {output_path}'
 
