@@ -664,7 +664,7 @@ OUTER=0
 ORGAN=lung
 MODEL=expr-token
 for OUTER in 0 1 2 3; do
-  for ORGAN in bowel breast lung pancreas; do
+#  for ORGAN in bowel breast lung pancreas human-immuno-oncology human-multi-tissue; do
     METADATA_PATH="${ORGAN}/outer=${OUTER}-inner=0-seed=0.parquet"
     PANEL_PATH="${ORGAN}-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
 
@@ -905,69 +905,59 @@ PARTITION=gpu-l40
 TIME=04:30:00
 MEMORY=64G
 PANEL_PATH=default.yaml
-for OUTER in 0 1 2 3; do
+for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+  for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
 
-    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
+    CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true
+#    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
 
-        # Main run (GPU)
-        sbatch \
-            --cpus-per-task=12 \
-            --mem=${MEMORY} \
-            --gres=gpu:1 \
-            --partition=${PARTITION} \
-            --time=${TIME} \
-            --output=$HOME/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-${OUTER} \
-            --wrap="uv run python scripts/train/supervised.py \
-                --config ${CONFIG} \
-                --data.metadata_path ${METADATA_PATH} \
-                --data.panel_path ${PANEL_PATH}"
-    done
+    # Main run (GPU)
+    sbatch \
+        --cpus-per-task=12 \
+        --mem=${MEMORY} \
+        --gres=gpu:1 \
+        --partition=${PARTITION} \
+        --time=${TIME} \
+        --output=$HOME/logs/%j.out \
+        --job-name=${TASK}-${MODEL}-${OUTER} \
+        --wrap="uv run python scripts/train/supervised.py \
+            --config ${CONFIG} \
+            --data.metadata_path ${METADATA_PATH} \
+            --data.panel_path ${PANEL_PATH}"
+  done
 done
 
 # concat
-TASK=expression
-PARTITION=gpu-l40
-TIME=04:00:00
-MEMORY=128G
-PANEL_PATH=default.yaml
-for OUTER in 0 1 2 3; do
+for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+  for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
+    CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
+#    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
 
-#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
-
-        sbatch \
-            --cpus-per-task=12 \
-            --mem=${MEMORY} \
-            --gres=gpu:1 \
-            --partition=${PARTITION} \
-            --time=${TIME} \
-            --output=$HOME/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-concat-${OUTER} \
-            --wrap="uv run python scripts/train/supervised.py \
-                --config ${CONFIG} \
-                --data.metadata_path ${METADATA_PATH} \
-                --data.panel_path ${PANEL_PATH} \
-                --backbone.fusion_strategy concat"
-    done
+    sbatch \
+        --cpus-per-task=12 \
+        --mem=${MEMORY} \
+        --gres=gpu:1 \
+        --partition=${PARTITION} \
+        --time=${TIME} \
+        --output=$HOME/logs/%j.out \
+        --job-name=${TASK}-${MODEL}-concat-${OUTER} \
+        --wrap="uv run python scripts/train/supervised.py \
+            --config ${CONFIG} \
+            --data.metadata_path ${METADATA_PATH} \
+            --data.panel_path ${PANEL_PATH} \
+            --backbone.fusion_strategy concat"
+  done
 done
 
 # learnable gate
-TASK=expression
-PARTITION=gpu-l40
-TIME=04:00:00
-MEMORY=128G
-PANEL_PATH=default.yaml
-for OUTER in 0 1 2 3; do
+for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+  for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
     MODEL=early-fusion
@@ -988,6 +978,7 @@ for OUTER in 0 1 2 3; do
             --data.metadata_path ${METADATA_PATH} \
             --data.panel_path ${PANEL_PATH} \
             --backbone.learnable_gate true"
+  done
 done
 
 ```
@@ -1142,6 +1133,19 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/beat/kaiko/expr-hvg.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1k/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
+```
+
+Use `--run-filters` to filter runs by any W&B column substring before plotting.
+For HEST1K, filter by organ via the `tags` column (each run is tagged with its organ):
+
+```bash
+for organ in breast lung pancreas bowel; do
+  uv run python scripts/eval/plot_wandb_scores.py \
+    --config configs/artifacts/hest1k/${organ}.yaml \
+    --project xe-hne-fus-expr-v0 \
+    --target expression \
+    --run-filters "{\"tags\": [\"hest1k\", \"${organ}\"]}"
+done
 ```
 
 ## Tasks
