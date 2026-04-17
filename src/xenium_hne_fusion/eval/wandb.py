@@ -80,6 +80,21 @@ def run_to_row(run, *, entity: str, project: str) -> dict[str, Any]:
     return row
 
 
+def restrict_to_wandb_filter(
+    table: pd.DataFrame,
+    project: str,
+    *,
+    entity: str = DEFAULT_ENTITY,
+    filters: dict[str, Any],
+) -> pd.DataFrame:
+    runs = fetch_runs(project, entity=entity, filters=filters)
+    matching_ids = {run.id for run in runs}
+    restricted = table.loc[table['run_id'].isin(matching_ids)]
+    assert not restricted.empty, f'No cached runs match W&B filters: {filters}'
+    logger.info(f'Restricted to {len(restricted)}/{len(table)} cached runs matching W&B filters')
+    return restricted
+
+
 def _flatten_dict(data: dict[str, Any]) -> dict[str, Any]:
     return pd.json_normalize(data).iloc[0].to_dict()
 
