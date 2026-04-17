@@ -1054,6 +1054,17 @@ for ORGAN in "${ORGANS[@]}"; do
                 --backbone.learnable_gate true"
     done
 done
+
+# freeze morph
+FREEZE_MORPH=true
+for ORGAN in "${ORGANS[@]}"; do
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
+            "python scripts/train/supervised.py \
+                --config configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml \
+                --backbone.freeze_morph ${FREEZE_MORPH}"
+    done
+done
 ```
 
 ### HESCAPE Slurm Commands
@@ -1063,8 +1074,10 @@ TASK=expression
 PARTITION=gpu-l40
 TIME=04:00:00
 MEMORY=64G
-MAX_EPOCHS=150
+MAX_EPOCHS=50
+FREEZE_MORPH=true
 ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+ORGANS=(human-immuno-oncology human-multi-tissue)
 
 # base models
 for ORGAN in "${ORGANS[@]}"; do
@@ -1120,6 +1133,25 @@ for ORGAN in "${ORGANS[@]}"; do
                 --trainer.max_epochs ${MAX_EPOCHS}"
     done
 done
+
+# freeze morph
+for ORGAN in "${ORGANS[@]}"; do
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
+        CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=${MEMORY} \
+            --gres=gpu:1 \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=hescape-${ORGAN}-${MODEL}-freeze-morph \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --backbone.freeze_morph ${FREEZE_MORPH} \
+                --trainer.max_epochs ${MAX_EPOCHS}"
+    done
+done
 ```
 
 ## Data Processing Commands
@@ -1138,8 +1170,9 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hest1
 uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/breast.yaml --project xe-hne-fus-expr-v0 --target expression --refresh true
 ```
 
-Use `--run-filters` to filter runs by any W&B column substring before plotting.
-For HEST1K, filter by organ via the `tags` column (each run is tagged with its organ):
+Use `--wandb-filters` to pass a MongoDB-style filter dict to the W&B API.
+Matching run IDs are intersected with the project cache before artifact selection.
+For HEST1K, filter by organ and dataset tag simultaneously:
 
 ```bash
 for organ in breast lung pancreas bowel; do
@@ -1147,7 +1180,7 @@ for organ in breast lung pancreas bowel; do
     --config configs/artifacts/hest1k/${organ}.yaml \
     --project xe-hne-fus-expr-v0 \
     --target expression \
-    --run-filters "{\"tags\": [\"hest1k\", \"${organ}\"]}"
+    --wandb-filters "{\"$and\": [{\"tags\": \"hest1k\"}, {\"tags\": \"${organ}\"}]}"
 done
 ```
 
