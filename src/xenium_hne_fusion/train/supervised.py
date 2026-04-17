@@ -226,8 +226,9 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     )
 
     if cfg.data.cache_dir is not None:
-        # warmup cache
-        ds_all = TileDataset(**{**dataset_kws})
+        # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
+        kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
+        ds_all = TileDataset(**kws)
         ds_all.setup()
 
     ds_fit = TileDataset(**dataset_kws, split="fit")

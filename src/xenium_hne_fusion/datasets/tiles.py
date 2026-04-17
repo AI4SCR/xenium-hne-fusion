@@ -101,19 +101,20 @@ class TileDataset(Items):
                 assert not missing, f'missing source genes: {missing[:8]}'
                 source = expr[self.source_panel]
                 source = torch.tensor(source.values, dtype=torch.float32)
-                if self.expr_pool == 'tile':
-                    source = source.mean(dim=0)
                 modalities['expr_tokens'] = source
 
             item['modalities'] = modalities
 
+        if self.include_expr and self.expr_pool == 'tile':
+            item['modalities']['expr_tokens'] = item['modalities']['expr_tokens'].mean(dim=0)
+
         if self.target_transform is not None:
             item['target'] = self.target_transform(item['target'])
 
-        if self.image_transform is not None and 'image' in item.get('modalities', {}):
+        if self.include_image and self.image_transform is not None:
             item['modalities']['image'] = self.image_transform(item['modalities']['image'])
 
-        if self.expr_transform is not None and 'expr_tokens' in item.get('modalities', {}):
+        if self.include_expr and self.expr_transform is not None:
             item['modalities']['expr_tokens'] = self.expr_transform(item['modalities']['expr_tokens'])
 
         if self.metadata is not None:
