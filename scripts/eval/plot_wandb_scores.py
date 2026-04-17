@@ -9,7 +9,7 @@ from xenium_hne_fusion.config import ArtifactsConfig
 from xenium_hne_fusion.eval.experiments import select_artifact_runs
 from xenium_hne_fusion.eval.plotting import METRIC_LABELS, plot_metrics
 from xenium_hne_fusion.eval.slugs import SlugSpec, validate_slug_specs
-from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs
+from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs, restrict_to_wandb_filter
 from xenium_hne_fusion.processing_cli import build_artifacts_parser, namespace_to_artifacts_config
 
 
@@ -137,12 +137,14 @@ def main(
     output_dir: Path = Path('figures/eval'),
     metrics: list[str] | None = None,
     entity: str = DEFAULT_ENTITY,
-    run_filters: dict[str, str | list[str]] | None = None,
+    wandb_filters: dict | None = None,
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
     cache_dir = cache_dir or default_cache_dir()
 
     table = load_project_runs(project, entity=entity, cache_dir=cache_dir, refresh=refresh)
+    if wandb_filters:
+        table = restrict_to_wandb_filter(table, project, entity=entity, filters=wandb_filters)
     runs, title, name = select_artifact_runs(table, artifacts_cfg=artifacts_cfg, target=target)
     plot_metrics(
         runs,
@@ -150,7 +152,6 @@ def main(
         metrics=metrics,
         title=title,
         output_prefix=output_dir / name,
-        run_filters=run_filters,
     )
 
 
@@ -163,7 +164,7 @@ def _build_parser() -> ArgumentParser:
     parser.add_argument('--output-dir', type=Path, default=Path('figures/eval'))
     parser.add_argument('--metrics', type=list[str], default=None)
     parser.add_argument('--entity', type=str, default=DEFAULT_ENTITY)
-    parser.add_argument('--run-filters', type=dict[str, str], default=None)
+    parser.add_argument('--wandb-filters', type=dict, default=None)
     return parser
 
 
@@ -179,7 +180,7 @@ def cli(argv: list[str] | None = None) -> int:
         output_dir=args['output_dir'],
         metrics=args['metrics'],
         entity=args['entity'],
-        run_filters=args['run_filters'],
+        wandb_filters=args['wandb_filters'],
     )
     return 0
 

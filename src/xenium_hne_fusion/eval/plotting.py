@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import marsilea as ma
 import marsilea.plotter as mp
@@ -113,19 +112,6 @@ def _run_order_column(runs: pd.DataFrame) -> pd.Series:
     return pd.Series(range(len(runs)), index=runs.index)
 
 
-def filter_runs(runs: pd.DataFrame, filters: dict[str, str | list[str]]) -> pd.DataFrame:
-    mask = pd.Series(True, index=runs.index)
-    for col, value in filters.items():
-        assert col in runs.columns, f'Filter column not found in runs: {col}'
-        col_series = runs[col].astype(str)
-        for substring in [value] if isinstance(value, str) else value:
-            mask &= col_series.str.contains(str(substring), regex=False)
-    filtered = runs.loc[mask]
-    assert not filtered.empty, f'No runs remain after applying filters: {filters}'
-    logger.info(f'Filtered runs: {mask.sum()}/{len(runs)} match {filters}')
-    return filtered
-
-
 def plot_metrics(
     runs: pd.DataFrame,
     *,
@@ -133,10 +119,7 @@ def plot_metrics(
     metrics: list[str],
     title: str,
     output_prefix: Path,
-    run_filters: dict[str, Any] | None = None,
 ) -> list[Path]:
-    if run_filters:
-        runs = filter_runs(runs, run_filters)
     data = prepare_plot_table(runs, specs=specs, metrics=metrics)
     outputs = []
     for metric in metrics:
