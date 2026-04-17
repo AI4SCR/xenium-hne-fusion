@@ -137,6 +137,7 @@ def main(
     output_dir: Path = Path('figures/eval'),
     metrics: list[str] | None = None,
     entity: str = DEFAULT_ENTITY,
+    run_filters: dict[str, str | list[str]] | None = None,
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
     cache_dir = cache_dir or default_cache_dir()
@@ -149,6 +150,7 @@ def main(
         metrics=metrics,
         title=title,
         output_prefix=output_dir / name,
+        run_filters=run_filters,
     )
 
 
@@ -161,6 +163,7 @@ def _build_parser() -> ArgumentParser:
     parser.add_argument('--output-dir', type=Path, default=Path('figures/eval'))
     parser.add_argument('--metrics', type=list[str], default=None)
     parser.add_argument('--entity', type=str, default=DEFAULT_ENTITY)
+    parser.add_argument('--run-filters', type=dict[str, str], default=None)
     return parser
 
 
@@ -176,6 +179,7 @@ def cli(argv: list[str] | None = None) -> int:
         output_dir=args['output_dir'],
         metrics=args['metrics'],
         entity=args['entity'],
+        run_filters=args['run_filters'],
     )
     return 0
 
