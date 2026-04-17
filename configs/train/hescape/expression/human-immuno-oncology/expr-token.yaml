@@ -1,0 +1,45 @@
+task:
+  target: expression
+
+head:
+  num_hidden_layers: 0
+
+backbone:
+  morph_encoder_name: null
+  morph_encoder_kws: null
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: null
+  fusion_stage: null
+  use_proj: false
+  learnable_gate: false
+  global_pool: avg
+
+data:
+  name: hest1k
+  num_workers: 10
+  batch_size: 256
+  expr_pool: token
+  items_path: all.json
+  metadata_path: hescape/human-immuno-oncology/hescape.parquet
+  panel_path: hescape/human-immuno-oncology.yaml
+  cache_dir: $TMPDIR/cache
+
+lit:
+  target_key: target
+  lr_head: 1.0e-4
+  lr_backbone: 1.0e-5
+
+wandb:
+  project: xe-hne-fus-expr-v0
+  name: expr-token
+  tags: [hescape, human-immuno-oncology]
+
+trainer:
+  max_time: 00:03:45:00
+  max_epochs: 35
+  accumulate_grad_batches: 2
+  gradient_clip_val: 1.0
