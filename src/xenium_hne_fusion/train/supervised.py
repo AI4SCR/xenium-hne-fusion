@@ -8,7 +8,6 @@ import lightning as L
 import torch
 import torch.multiprocessing as mp
 import wandb
-import yaml
 from ai4bmr_learn.callbacks.cache import TestCache
 from ai4bmr_learn.callbacks.log_model_checkpoint_paths import LogCheckpointPathsCallback
 from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
@@ -25,7 +24,15 @@ from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.lit import RegressionLit
-from xenium_hne_fusion.train.utils import resolve_training_paths, set_fast_dev_run_settings
+from xenium_hne_fusion.train.utils import (
+    infer_head_input_dim,
+    load_panel_config,
+    resolve_num_outputs,
+    resolve_num_source_genes,
+    resolve_training_paths,
+    set_fast_dev_run_settings,
+    validate_task_config,
+)
 
 TaskTarget = Literal["expression", "cell_types"]
 
@@ -39,71 +46,6 @@ mp.set_start_method('spawn', force=True)
 
 L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
-
-
-def load_panel_config(cfg: Config) -> Config:
-    if cfg.data.panel_path is None:
-        return cfg
-
-    panel_path = cfg.data.panel_path
-    assert panel_path.exists(), f"Panel file not found: {panel_path}"
-    panel = yaml.safe_load(panel_path.read_text()) or {}
-    if cfg.data.source_panel is None:
-        cfg.data.source_panel = panel.get("source_panel")
-    if cfg.data.target_panel is None:
-        cfg.data.target_panel = panel.get("target_panel")
-    return cfg
-
-
-def resolve_num_source_genes(cfg: Config) -> int | None:
-    if cfg.backbone.expr_encoder_name is None:
-        return None
-    assert cfg.data.source_panel is not None, "cfg.data.source_panel must be set when using an expression encoder"
-    return len(cfg.data.source_panel)
-
-
-def validate_task_config(cfg: Config) -> None:
-    assert cfg.task.target is not None, "cfg.task.target"
-    assert cfg.lit.target_key is not None, "cfg.lit.target_key must be set explicitly"
-
-    if cfg.task.target == "expression":
-        assert cfg.head.output_dim is None, "cfg.head.output_dim"
-        assert cfg.lit.target_key == "target", "cfg.lit.target_key"
-        assert cfg.data.target_panel is not None, "cfg.data.target_panel"
-        if cfg.data.source_panel is not None:
-            assert set(cfg.data.source_panel).isdisjoint(set(cfg.data.target_panel))
-        return
-
-    if cfg.task.target == "cell_types":
-        assert cfg.head.output_dim is not None, "cfg.head.output_dim"
-        assert cfg.lit.target_key == "target", "cfg.lit.target_key"
-        return
-
-    raise ValueError(f"Unknown task target: {cfg.task.target}")
-
-
-def resolve_num_outputs(cfg: Config) -> int:
-    validate_task_config(cfg)
-    if cfg.task.target == "expression":
-        assert cfg.data.target_panel is not None
-        return len(cfg.data.target_panel)
-    assert cfg.head.output_dim is not None
-    return cfg.head.output_dim
-
-
-def infer_head_input_dim(
-    *,
-    fusion_stage: str | None,
-    fusion_strategy: str | None,
-    morph_encoder_dim: int | None,
-    expr_encoder_dim: int | None,
-) -> int:
-    if fusion_stage == "late" and fusion_strategy == "concat":
-        assert morph_encoder_dim is not None, "morph_encoder_dim must be set for late concat fusion"
-        return morph_encoder_dim * 2
-    embed_dim = morph_encoder_dim or expr_encoder_dim
-    assert embed_dim is not None, "Could not infer head input dim"
-    return embed_dim
 
 
 def train(cfg: Config, debug: bool | None = None, config_path: str | None = None):
