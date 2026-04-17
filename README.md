@@ -995,8 +995,8 @@ Organ groups and their training config counterparts:
 | breast | `hescape/breast/hescape.parquet` | `configs/train/hescape/expression/breast/` |
 | bowel | `hescape/bowel/hescape.parquet` | `configs/train/hescape/expression/bowel/` |
 | lung-healthy | `hescape/lung-healthy/hescape.parquet` | `configs/train/hescape/expression/lung-healthy/` |
-| human-immuno-oncology | `hescape/human-immuno-oncology/hescape.parquet` | — |
-| human-multi-tissue | `hescape/human-multi-tissue/hescape.parquet` | — |
+| human-immuno-oncology | `hescape/human-immuno-oncology/hescape.parquet` | `configs/train/hescape/expression/human-immuno-oncology/` |
+| human-multi-tissue | `hescape/human-multi-tissue/hescape.parquet` | `configs/train/hescape/expression/human-multi-tissue/` |
 
 Splits: `DATA_DIR/03_output/hest1k/splits/hescape/<name>/hescape.parquet`.
 Panels: pre-defined in `panels/hescape/<name>.yaml`, copied to `DATA_DIR/03_output/hest1k/panels/hescape/<name>.yaml`.
@@ -1025,7 +1025,9 @@ uv run python scripts/artifacts/validate_hescape_panels.py
 
 # training — base models
 TASK=expression
-for ORGAN in breast bowel lung-healthy; do
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+
+for ORGAN in "${ORGANS[@]}"; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
             "python scripts/train/supervised.py \
@@ -1034,7 +1036,7 @@ for ORGAN in breast bowel lung-healthy; do
 done
 
 # concat fusion
-for ORGAN in breast bowel lung-healthy; do
+for ORGAN in "${ORGANS[@]}"; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
             "python scripts/train/supervised.py \
@@ -1044,7 +1046,7 @@ for ORGAN in breast bowel lung-healthy; do
 done
 
 # learnable gate
-for ORGAN in breast bowel lung-healthy; do
+for ORGAN in "${ORGANS[@]}"; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
             "python scripts/train/supervised.py \
@@ -1062,9 +1064,10 @@ PARTITION=gpu-l40
 TIME=04:00:00
 MEMORY=64G
 MAX_EPOCHS=150
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
 
 # base models
-for ORGAN in breast bowel lung-healthy; do
+for ORGAN in "${ORGANS[@]}"; do
   for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
 #        uv run python scripts/train/supervised.py --config ${CONFIG} --debug=true --data.cache_dir=null
@@ -1081,7 +1084,7 @@ for ORGAN in breast bowel lung-healthy; do
 done
 
 # concat fusion
-for ORGAN in breast bowel lung-healthy; do
+for ORGAN in "${ORGANS[@]}"; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
         sbatch \
@@ -1100,7 +1103,7 @@ for ORGAN in breast bowel lung-healthy; do
 done
 
 # learnable gate
-for ORGAN in breast bowel lung-healthy; do
+for ORGAN in "${ORGANS[@]}"; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
         sbatch \
