@@ -1,6 +1,6 @@
 name: hest1k
 items:
-  name: hescape-breast
+  name: hescape/breast
   filter:
     organs:
       - Breast
@@ -16,7 +16,7 @@ items:
     num_cells: null
     num_unique_cells: null
 split:
-  name: hescape-breast
+  name: hescape/breast
   test_size: 0.25
   val_size: 0.25
   stratify: false

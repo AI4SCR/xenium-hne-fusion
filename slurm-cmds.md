@@ -266,6 +266,45 @@ done
 ## HESCAPE
 
 ```bash
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+
+# artifacts (filter items + cross-validated splits + compute stats)
+for ORGAN in "${ORGANS[@]}"; do
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --time=01:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/hescape/${ORGAN}.yaml"
+done
+
+# fixed hescape splits (all organs in one call)
+sbatch \
+    --cpus-per-task=4 \
+    --mem=32G \
+    --time=01:00:00 \
+    --output=$HOME/logs/%j.out \
+    --wrap="uv run python scripts/artifacts/create_hescape_splits.py"
+
+# panel creation per organ per outer fold (run after artifact jobs)
+for ORGAN in "${ORGANS[@]}"; do
+    for OUTER in 0 1 2 3; do
+        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+        METADATA_PATH="hescape/${ORGAN}/${SPLIT_NAME}.parquet"
+        PANEL_NAME="hescape/${ORGAN}-hvg-${SPLIT_NAME}"
+        sbatch \
+            --cpus-per-task=10 \
+            --mem=32G \
+            --time=04:00:00 \
+            --output=$HOME/logs/%j.out \
+            --wrap="uv run python scripts/artifacts/create_panel.py \
+                --config configs/artifacts/hescape/${ORGAN}.yaml \
+                --panel.metadata_path ${METADATA_PATH} \
+                --panel.name ${PANEL_NAME}"
+    done
+done
+
+# training
 TASK=expression
 PARTITION=gpu-l40
 #PARTITION=gpu-gh

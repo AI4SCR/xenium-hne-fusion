@@ -1,6 +1,6 @@
 name: hest1k
 items:
-  name: hescape-human-immuno-oncology
+  name: hescape/human-immuno-oncology
   filter:
     organs: null
     include_ids:
@@ -15,7 +15,7 @@ items:
     num_cells: null
     num_unique_cells: null
 split:
-  name: hescape-human-immuno-oncology
+  name: hescape/human-immuno-oncology
   test_size: 0.25
   val_size: 0.25
   stratify: false
