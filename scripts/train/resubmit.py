@@ -166,6 +166,7 @@ def make_group_key(params: dict) -> tuple[str, str]:
         "organ": params["organ"],
         "task": params["task"],
         "model": params["model"],
+        "panel_path": params["panel_path"],
         "outer": params["outer"],
         "fusion_stage": params["fusion_stage"],
         "fusion_strategy": params["fusion_strategy"],
