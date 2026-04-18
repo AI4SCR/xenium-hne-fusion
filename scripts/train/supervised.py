@@ -60,7 +60,8 @@ def _namespace_to_config(ns) -> Config:
 def cli(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     namespace = parser.parse_args(argv)
-    main(_namespace_to_config(namespace))
+    config_path = namespace.as_dict().get("config")
+    main(_namespace_to_config(namespace), config_path=config_path)
     return 0
 
 
