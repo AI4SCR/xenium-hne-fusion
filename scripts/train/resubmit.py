@@ -124,10 +124,12 @@ def extract_run_config(run) -> dict | None:
             outer = part.split("=")[1]
             break
 
-    config_path = (
-        cfg.get("wandb", {}).get("config_path")
-        or f"configs/train/{dataset_name}/{task}/{organ}/{model}.yaml"
-    )
+    config_path = cfg.get("wandb", {}).get("config_path")
+    if config_path is None:
+        if dataset_name in {"hest1k", "hescape"}:
+            config_path = f"configs/train/{dataset_name}/{task}/{organ}/{model}.yaml"
+        else:
+            config_path = f"configs/train/{dataset_name}/{task}/{model}.yaml"
 
     return {
         "config": config_path,
