@@ -68,6 +68,10 @@ class TileDataset(Items):
 
         if self.cache_dir is not None and self.has_cache(iid=iid):
             item = torch.load(self.get_cache_path(iid), weights_only=False)
+            if not self.include_image:
+                item['modalities'].pop('image', None)
+            if not self.include_expr:
+                item['modalities'].pop('expr_tokens', None)
         else:
 
             if self.include_expr or self.target == 'expression':

@@ -660,11 +660,11 @@ PARTITION=gpu-l40
 TIME=04:00:00
 MEMORY=64G
 TASK=expression
-OUTER=0
-ORGAN=lung
-MODEL=expr-token
+#OUTER=0
+#ORGAN=lung
+#MODEL=expr-token
 for OUTER in 0 1 2 3; do
-#  for ORGAN in bowel breast lung pancreas human-immuno-oncology human-multi-tissue; do
+  for ORGAN in bowel breast lung pancreas human-immuno-oncology human-multi-tissue; do
     METADATA_PATH="${ORGAN}/outer=${OUTER}-inner=0-seed=0.parquet"
     PANEL_PATH="${ORGAN}-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
 
@@ -911,7 +911,7 @@ for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile ex
     METADATA_PATH="expr/${SPLIT_NAME}.parquet"
 
     CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
-
+    
 #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
 
     # Main run (GPU)
@@ -979,6 +979,17 @@ for MODEL in early-fusion late-fusion-tile late-fusion-token; do
             --data.panel_path ${PANEL_PATH} \
             --backbone.learnable_gate true"
   done
+done
+
+# freeze morph
+FREEZE_MORPH=true
+for ORGAN in "${ORGANS[@]}"; do
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
+        ./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
+            "python scripts/train/supervised.py \
+                --config configs/train/hest1k/${TASK}/${ORGAN}/${MODEL}.yaml \
+                --backbone.freeze_morph ${FREEZE_MORPH}"
+    done
 done
 
 ```
@@ -1072,12 +1083,13 @@ done
 ```bash
 TASK=expression
 PARTITION=gpu-l40
+#PARTITION=gpu-gh
 TIME=04:00:00
 MEMORY=64G
 MAX_EPOCHS=50
 FREEZE_MORPH=true
 ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
-ORGANS=(human-immuno-oncology human-multi-tissue)
+# ORGANS=(human-immuno-oncology human-multi-tissue)
 
 # base models
 for ORGAN in "${ORGANS[@]}"; do
