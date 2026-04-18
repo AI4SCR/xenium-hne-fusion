@@ -101,9 +101,13 @@ def extract_run_config(run) -> dict | None:
     fusion_strategy = cfg.get("backbone", {}).get("fusion_strategy")
     fusion_stage = cfg.get("backbone", {}).get("fusion_stage")
     learnable_gate = cfg.get("backbone", {}).get("learnable_gate")
+    freeze_morph_encoder = cfg.get("backbone", {}).get("freeze_morph_encoder")
+    freeze_expr_encoder = cfg.get("backbone", {}).get("freeze_expr_encoder")
 
     tags = run.tags or []
     organ = next((t for t in tags if t not in DATASET_TAGS and t in KNOWN_ORGANS), None)
+    if organ is None and dataset_name == "beat":
+        organ = "lung"
 
     required = {
         "data.metadata_path": metadata_path,
@@ -111,9 +115,8 @@ def extract_run_config(run) -> dict | None:
         "data.name": dataset_name,
         "task.target": task,
         "wandb.name": model,
+        "organ tag": organ,
     }
-    if dataset_name not in {"beat"}:
-        required["organ tag"] = organ
     missing = [k for k, v in required.items() if v is None]
 
     if missing:
@@ -145,6 +148,8 @@ def extract_run_config(run) -> dict | None:
         "fusion_stage": fusion_stage,
         "fusion_strategy": fusion_strategy,
         "learnable_gate": learnable_gate,
+        "freeze_morph_encoder": freeze_morph_encoder,
+        "freeze_expr_encoder": freeze_expr_encoder,
     }
 
 
@@ -165,6 +170,8 @@ def make_group_key(params: dict) -> tuple[str, str]:
         "fusion_stage": params["fusion_stage"],
         "fusion_strategy": params["fusion_strategy"],
         "learnable_gate": params["learnable_gate"],
+        "freeze_morph_encoder": params["freeze_morph_encoder"],
+        "freeze_expr_encoder": params["freeze_expr_encoder"],
     }
     key = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     key_hash = hashlib.md5(key.encode("utf-8")).hexdigest()[:10]
