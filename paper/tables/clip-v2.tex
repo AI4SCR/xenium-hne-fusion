@@ -1,0 +1,15 @@
+\begin{table}
+\centering
+\caption{\textbf{CLIP pretraining retrieval performance.} Image--transcript retrieval results (recall@1 and recall@5; mean$\pm$std across runs) for different core-transcript aggregation strategies. Random baselines correspond to chance performance at batch size 256.}
+\label{tab:p-fus:clip-results}
+\begin{tabular}{lllll}
+\toprule
+expr\_encoder & morph\_encoder & pool & recall@1 & recall@5 \\
+\midrule
+mlp & vit\_s & token & 0.062±0.004 & 0.202±0.009 \\
+mlp & vit\_s & tile  & 0.041±0.003 & 0.151±0.011 \\
+\midrule
+random & -- & -- & 0.004 & 0.020 \\
+\bottomrule
+\end{tabular}
+\end{table}

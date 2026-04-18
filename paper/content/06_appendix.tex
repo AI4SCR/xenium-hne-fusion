@@ -1,0 +1,105 @@
+\FloatBarrier
+\section{Appendix}
+\label{sec:appendix}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.75\textwidth]{papers/Fusion/figures/cell-pcc-low-high-boxplot-marsilea.pdf}
+  \caption{\textbf{High- vs.\ low-capacity model comparison for cell type prediction.} Pearson correlation for low-capacity (ViT-S, single-layer MLP) and high-capacity (ViT-B, two-layer MLP) configurations across all fusion strategies. Increasing model capacity consistently benefits multimodal and expression-only models but provides no gain for morphology-only baselines.}
+  \label{fig:p-fus:high-low-capacity}
+\end{figure}
+
+\input{papers/Fusion/tables/gene-table}
+\input{papers/Fusion/tables/cell-table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{papers/Fusion/figures/num_uniq_vs_num_genes_in_tiles_log.png}
+  \caption{\textbf{Unique transcripts vs.\ detected genes per tile.} Relationship between the number of unique transcript molecules and the number of genes detected per tile (log scale). The strong positive correlation demonstrates that tiles with more transcripts also tend to capture more diverse gene expression, justifying our quality filtering threshold of 1,000 transcripts per tile. Points represent individual tiles across all samples.}
+  \label{fig:p-fus:num-genes-tiles}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{papers/Fusion/figures/min_mae_predictor-scatterplot.png}
+  \caption{\textbf{Comparison to Min-MAE baseline.} Spearman correlation coefficient (SCC) compared to the Min-MAE baseline for one representative split across all target genes, annotated by gene program. Both early and late fusion models substantially outperform this simple transcript-only baseline.}
+  \label{fig:p-fus:main-results-minmae}
+\end{figure}
+
+%\subsection*{Model Complexity and Dataset Statistics}
+%\label{sec:model-complexity-and-dataset-statistics}
+%\input{papers/Fusion/tables/model-complexity}
+% \input{papers/Fusion/tables/cell_type_counts_per_sample}
+
+\subsubsection{Cell Phenotyping}
+\label{sec:p-fus:app-cell-phenotyping}
+
+Cell types were annotated by transferring labels from matched snRNA-seq data
+(generated from adjacent FFPE sections, processed with CellRanger and Seurat
+\cite{bilous_transcriptscellsdissecting_2025}) to Xenium profiles using RCTD
+\cite{cable_robustdecompositioncell_2022} in doublet mode. This accounts for
+mixed transcriptional signals arising from segmentation errors or transcript
+diffusion. Cells with fewer than 10 transcripts or 5 detected genes were
+excluded; annotation was performed per sample, with malignant cell references
+restricted to donor-matched profiles where available.
+
+Cell type annotations were assigned using a reference-based deconvolution approach that leverages matched single-nucleus RNA-seq (snRNA-seq) data to accurately identify cell types. Matched snRNA-seq data were generated from FFPE tissue sections adjacent to those used for Xenium profiling. Single-nucleus sequencing was performed using the 10x Genomics Chromium platform. Raw sequencing data were processed using CellRanger, and filtered barcode counts were analyzed using the Seurat package~\cite{bilous_transcriptscellsdissecting_2025}. Cells with at least 200 detected genes and fewer than 20\% of reads mapping to mitochondrial genes were retained. Dimensionality reduction was performed using principal component analysis (PCA), and cells were clustered using Seurat's shared nearest neighbor. Clusters were annotated based on differentially expressed genes and canonical marker expression, resulting in a hierarchical cell type taxonomy. This annotated reference dataset served as the foundation for transferring cell type labels to Xenium data using Robust Cell Type Decomposition (RCTD)~\cite{cable_robustdecompositioncell_2022} in doublet mode. RCTD was originally developed for deconvolving cell type mixtures in spatial transcriptomics data and has been demonstrated to be highly effective for annotating Xenium datasets~\cite{bilous_transcriptscellsdissecting_2025}.
+
+\input{papers/Fusion/tables/cohort}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[height=0.8\textheight,keepaspectratio]{papers/Fusion/figures/target-source-correlation-heatmap.png}
+  \caption{\textbf{Source--target gene correlation matrix.} Correlation between source genes (rows) and target genes (columns), highlighting targets that are strongly correlated with the source panel (high redundancy) versus targets that are less recoverable from correlated proxies. Darker colors indicate stronger correlations, revealing patterns of gene co-expression across the core and add-on panels.}
+  \label{fig:p-fus:src-tgt-corr}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{papers/Fusion/figures/avg_src_corr_vs_performance-scatterplot.png}
+  \caption{\textbf{Predictability vs.\ redundancy with the source panel.} Per-target prediction performance as a function of \texttt{avg\_src\_corr}, the average correlation of a target gene to all genes in the source (core) panel. Higher \texttt{avg\_src\_corr} indicates stronger redundancy with the source panel and is associated with improved predictability. Points are colored by gene program annotations, demonstrating that prediction difficulty varies systematically across functional modules.}
+  \label{fig:p-fus:avg-src-corr}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{papers/Fusion/figures/XE_1H49.04_HNE_1H49-04.png}
+  \caption{\textbf{Tile-level predictions on one example sample.} Predicted versus true expression values per tile for the late fusion model. Three representative genes are shown to span the within-sample performance distribution: CALB2 (lowest correlation), PDGFRB (median correlation), and NR3C1 (highest correlation). Each point represents a single tile, with the diagonal indicating perfect prediction. The late fusion model captures expression patterns well across the dynamic range, with performance varying by gene as expected from their source panel correlations.}
+  \label{fig:p-fus:true-vs-predicted}
+\end{figure}
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{papers/Fusion/figures/appendix/num_tiles_vs_avg_num_cells_per_tile.png}
+  \caption{\textbf{Cell density is independent of whole-slide image size.} Relationship between the number of tiles per sample (a proxy for WSI size) and the average number of cells per tile (cell density). The lack of correlation indicates that cell density is a tissue-intrinsic property rather than an artifact of tissue section size or processing, supporting the validity of cross-sample comparisons. Each point represents one patient sample.}
+  \label{fig:p-fus:tiles-vs-density}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{papers/Fusion/figures/appendix/num_uniq_cell_types_vs_num_cells_in_tiles-hue=sample_id.png}
+  \caption{\textbf{Cell type diversity increases with cell count per tile.} Relationship between the number of cells in a tile and the number of unique cell types detected, colored by sample ID. Tiles with more cells tend to capture greater cell type diversity, reflecting the increased likelihood of sampling rare cell types in regions with higher cellularity. The consistent trend across samples (different colors) demonstrates that this relationship is robust across the cohort.}
+  \label{fig:p-fus:cell-types-count}
+\end{figure}
+
+%\begin{figure}[t]
+%  \centering
+%  \includegraphics[height=0.8\textheight]{papers/Fusion/figures/num_transcripts_in_tiles_boxplot.png}
+%  \caption{\textbf{Number of transcripts per tile for each sample.}
+%  Distribution of transcript counts per tile, shown separately for each patient sample.
+%  The substantial inter-sample variability in transcript density motivates the tile-level quality filter
+%  requiring at least 1{,}000 transcripts, ensuring sufficient transcriptomic signal for downstream modeling.}
+%  \label{fig:p-fus:num-transcripts-in-tiles}
+%\end{figure}
+
+\begin{figure}
+    \centering
+        \includegraphics[height=0.8\textheight]{papers/Fusion/figures/fusion-early-add-mfreeze-0-fusion-sample-level-performance-pearson.pdf}
+    \caption{\textbf{Sample-level Pearson correlation for the early-add model.}
+    Pearson correlation heatmap for the early-add model on the first data split.
+    Rows represent samples ordered by the number of tiles; columns represent cell types ordered by decreasing overall abundance.
+    Performance is high and consistent across the majority of abundant cell types (left side), with a gradual decline toward rarer populations (right side), indicating that cell type abundance is the primary driver of per-cell-type predictability.
+    No systematic dependence on sample size (number of tiles) is observed.}
+    \label{fig:p-fus:sample-level-pearson-2}
+\end{figure}

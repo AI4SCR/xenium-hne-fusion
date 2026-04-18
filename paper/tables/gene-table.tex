@@ -1,0 +1,48 @@
+% $\downarrow$
+% $\uparrow$
+\begin{sidewaystable}
+  \centering
+  \scriptsize
+\caption{Hyperparameter settings for all evaluated models on the gene prediction task. Entries marked with \{*\} indicate runs that did not converge.}
+\label{tab:p-fus:gene-table}
+\begin{tabular}{lllrlrllll}
+\toprule
+stage & strategy & morph\_encoder & freeze\_morph & expr\_encoder & freeze\_expr & pool & spearman $\uparrow$ & pearson $\uparrow$ & mse $\downarrow$\\
+\midrule
+early & add & vit\_small\_patch16\_224 & False & mlp & False & token & 0.811±0.017 & 0.820±0.013 & 0.705±0.030 \\
+early & add & vit\_small\_patch16\_224 & True & mlp & False & token & 0.771±0.014 & 0.777±0.011 & 0.862±0.018 \\
+early & concat & vit\_small\_patch16\_224 & False & mlp & False & token & 0.809±0.017 & 0.818±0.013 & 0.768±0.058 \\
+late & add & conch & True & geneformer & True & tile & 0.727±0.017 & 0.747±0.012 & 0.979±0.014 \\
+late & add & conch & True & mlp & False & tile & 0.752±0.012 & 0.763±0.008 & 0.942±0.028 \\
+late & add & loki & True & geneformer & True & tile & 0.696±0.021 & 0.718±0.013 & 1.107±0.027 \\
+late & add & loki & True & mlp & False & tile & 0.769±0.036 & 0.776±0.033 & 0.873±0.090 \\
+late & add & phikon & True & geneformer & True & tile & 0.738±0.019 & 0.754±0.014 & 0.966±0.012 \\
+late & add & phikon & True & mlp & False & tile & 0.787±0.013 & 0.796±0.011 & 0.799±0.011 \\
+late & add & vit\_small\_patch16\_224 & False & geneformer & True & tile & 0.684±0.023 & 0.700±0.017 & 1.177±0.018 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & False & tile & 0.728±0.018 & 0.741±0.015 & 1.057±0.040 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & False & token & 0.773±0.016 & 0.778±0.014 & 0.887±0.029 \\
+late & add & vit\_small\_patch16\_224 & True & geneformer & True & tile & 0.715±0.019 & 0.735±0.012 & 1.030±0.022 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & False & tile & 0.797±0.012 & 0.805±0.009 & 0.767±0.007 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & False & token & 0.813±0.010 & 0.819±0.007 & 0.706±0.008 \\
+late & concat & conch & True & geneformer & True & tile & 0.738±0.018 & 0.756±0.013 & 0.950±0.011 \\
+late & concat & conch & True & mlp & False & tile & 0.778±0.026 & 0.788±0.023 & 0.834±0.076 \\
+late & concat & loki & True & geneformer & True & tile & 0.707±0.022 & 0.728±0.015 & 1.075±0.030 \\
+late & concat & loki & True & mlp & False & tile & 0.781±0.020 & 0.788±0.018 & 0.825±0.034 \\
+late & concat & phikon & True & geneformer & True & tile & 0.742±0.019 & 0.758±0.014 & 0.953±0.012 \\
+late & concat & phikon & True & mlp & False & tile & 0.784±0.013 & 0.793±0.010 & 0.813±0.009 \\
+late & concat & vit\_small\_patch16\_224 & False & geneformer & True & tile & 0.694±0.032 & 0.712±0.026 & 1.141±0.036 \\
+late & concat & vit\_small\_patch16\_224 & False & mlp & False & tile & 0.740±0.019 & 0.752±0.016 & 1.011±0.031 \\
+late & concat & vit\_small\_patch16\_224 & False & mlp & False & token & 0.786±0.016 & 0.791±0.013 & 0.829±0.021 \\
+late & concat & vit\_small\_patch16\_224 & True & geneformer & True & tile & 0.722±0.018 & 0.742±0.012 & 1.007±0.019 \\
+late & concat & vit\_small\_patch16\_224 & True & mlp & False & tile & 0.798±0.013 & 0.806±0.010 & 0.761±0.006 \\
+late & concat & vit\_small\_patch16\_224 & True & mlp & False & token & 0.820±0.010 & 0.826±0.008 & 0.673±0.010 \\
+- & - & conch & True & - & False & token & 0.626±0.017 & 0.631±0.018 & 1.359±0.026 \\
+- & - & loki & True & - & False & token & 0.354±0.036 & 0.374±0.032 & 6.679±0.279 \\
+- & - & phikon & True & - & False & token & 0.633±0.024 & 0.637±0.022 & 1.367±0.031 \\
+- & - & vit\_small\_patch16\_224 & False & - & False & token & 0.648±0.028 & 0.654±0.026 & 1.332±0.037 \\
+- & - & vit\_small\_patch16\_224 & True & - & False & token & 0.587±0.020 & 0.592±0.017 & 1.495±0.036 \\
+- & - & - & False & geneformer & True & tile & 0.622±0.044 & 0.662±0.029 & 1.314±0.128 \\
+- & - & - & False & mlp & False & token & 0.722±0.017 & 0.722±0.013 & 1.055±0.026 \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}

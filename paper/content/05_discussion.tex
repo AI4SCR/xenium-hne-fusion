@@ -1,0 +1,36 @@
+\section{Discussion}
+\label{sec:discussion}
+
+We demonstrate that jointly modeling histopathology and spatial transcriptomics through multimodal transformers yields more effective morpho-molecular representations than existing contrastive approaches. By fusing subcellular Xenium transcript readouts directly into the ViT token stream, \textit{early-fusion-add} captures fine-grained spatial dependencies between tissue morphology and gene expression without requiring cell segmentation. Across a comprehensive benchmark spanning gene expression and cell type composition prediction on three datasets (BEAT, HEST1k, HESCAPE), multimodal fusion consistently outperforms unimodal baselines, with particularly strong gains on the more challenging task of predicting cellular heterogeneity.
+
+Recent large-scale efforts have established cross-modal representation learning as a robust approach for linking histology and transcriptomics, largely through late fusion and contrastive pretraining~\cite{gindra_largescalebenchmarkcrossmodal_2025, chen_visualomicsfoundation_2025}. Our results complement these findings by showing that the granularity of transcript representations (token-level versus tile-level) can qualitatively change conclusions about fusion strategies. When targets require capturing fine-grained heterogeneity, as in cell type composition prediction, jointly processing morphology and transcript tokens throughout the transformer yields substantial improvements. The systematic comparison between \textit{late-fusion-tile} and \textit{late-fusion-token} variants isolates this effect: spatial granularity in the transcript encoder, independent of fusion timing, is a critical driver of performance. This may help interpret the heterogeneous results reported across datasets and tasks in prior benchmarks~\cite{gindra_largescalebenchmarkcrossmodal_2025}.
+
+By framing gene and cell type prediction as supervised tasks on targeted spatial transcriptomics panels, our approach provides a biologically grounded path toward multimodal foundation models. Unlike contrastive objectives that maximize global image--transcript agreement, our supervised formulation explicitly tests whether models can leverage morphology to predict fine-grained molecular phenotypes, a capability directly relevant to biomarker discovery and treatment response prediction. Critically, our models are truly multimodal at inference time, jointly processing both morphological and molecular inputs rather than relying on a single modality once deployed.
+
+The observation that model capacity selectively benefits multimodal and expression-only models but not vision-only models has an important implication: the expressive capacity added by larger backbones is only utilized when there is richer input to exploit. This motivates future work on larger multimodal architectures and, conversely, suggests that vision-only scaling may have diminishing returns for spatial transcriptomics prediction tasks.
+
+Our per-cell-type analysis reveals that different cell types benefit from different modalities: plasmacytoid dendritic cells are near-perfectly predictable from morphology alone but poorly captured by core panel transcriptomics, while regulatory T cells require joint modeling to achieve accurate prediction. These failure modes provide mechanistic insight into what each modality encodes and motivate targeted panel design strategies.
+
+\subsection*{Limitations and Future Directions}
+\label{sec:limitations-and-future-directions}
+
+\paragraph{Dataset and generalization.}
+While our primary results are on BEAT, an internal cancer cohort, we extend evaluation to HEST1k and HESCAPE to assess cross-dataset generalization. Generalization across tissue types, staining protocols, and acquisition settings remains a central challenge in computational pathology~\cite{jaume_hest1kdatasetspatial_2024, chen_visualomicsfoundation_2025}.
+
+\paragraph{Architecture and fusion mechanisms.}
+We deliberately restrict ourselves to lightweight fusion mechanisms to isolate the effects of fusion timing and representation granularity. More expressive alternatives, such as Flamingo-style gated cross-attention~\cite{alayrac_flamingovisuallanguage_2022}, could offer finer control over how transcriptomic information modulates visual features. Our capacity ablations suggest that larger models better exploit multimodal inputs, motivating future exploration of more expressive fusion architectures and fine-tuning of pretrained H\&E foundation models.
+
+\paragraph{Toward cell-level and sub-tile prediction.}
+Our current formulation aggregates predictions over all cells within a $512 \times 512\,\mu\text{m}$ tile. A natural extension is prediction at the token level, where each ViT patch token independently predicts local molecular profiles, producing spatially explicit maps of gene expression and cell type identity within a tile. The finding that token-level transcript representations already improve tile-level predictions suggests that fine-grained supervision could be particularly beneficial.
+
+\paragraph{Understanding cell-type-specific failure modes.}
+Our per-cell-type analysis reveals characteristic failure modes for unimodal models, most notably the collapse of \textit{expr-tile} on NK cells. The biological and technical mechanisms driving these failures --- including panel coverage, cell type rarity, and the degree to which morphology versus molecular state defines a given cell type --- warrant further investigation.
+
+\paragraph{Panel design and target selection.}
+Redundancy between core and add-on panels can dominate prediction performance and obscure architectural differences, as evidenced by the competitive performance of the Min-MAE baseline. Reducing core--add-on correlation while emphasizing targets that require morphological context would provide a sharper stress test for multimodal fusion strategies. Deliberate panel design may also be practically relevant when planning spatial transcriptomics experiments.
+
+\paragraph{Clinical translation via MIL.}
+Ongoing MIL experiments on histology classification and survival prediction will establish whether richer morpho-molecular representations translate to improved clinical endpoint prediction, and will clarify whether multimodal fusion is beneficial even when the target label is not directly transcriptomics-derived.
+
+\paragraph{Transfer learning and pretraining.}
+Ongoing transfer learning experiments with CLIP-pretrained ViT-S backbones indicate that token-level CLIP embeddings outperform tile-level pooled embeddings for gene prediction, further supporting the importance of spatial granularity in multimodal pretraining.
