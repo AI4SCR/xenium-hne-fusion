@@ -390,7 +390,7 @@ def main(argv=None):
         failed_runs = [r for r in records if r["is_bad_state"]]
         short_runs = [r for r in records if r["is_short"]]
 
-        label = f"{example['organ']}/{example['task']}/{example['model']}/outer={example['outer']}"
+        label = f"{example['dataset_name']}/{example['organ']}/{example['task']}/{example['model']}/outer={example['outer']}"
 
         group_row = {
             "group_hash": example["group_hash"],
