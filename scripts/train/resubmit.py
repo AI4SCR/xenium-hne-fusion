@@ -105,14 +105,16 @@ def extract_run_config(run) -> dict | None:
     tags = run.tags or []
     organ = next((t for t in tags if t not in DATASET_TAGS and t in KNOWN_ORGANS), None)
 
-    missing = [k for k, v in [
-        ("data.metadata_path", metadata_path),
-        ("data.panel_path", panel_path),
-        ("data.name", dataset_name),
-        ("task.target", task),
-        ("wandb.name", model),
-        ("organ tag", organ),
-    ] if v is None]
+    required = {
+        "data.metadata_path": metadata_path,
+        "data.panel_path": panel_path,
+        "data.name": dataset_name,
+        "task.target": task,
+        "wandb.name": model,
+    }
+    if dataset_name not in {"beat"}:
+        required["organ tag"] = organ
+    missing = [k for k, v in required.items() if v is None]
 
     if missing:
         print(f"  WARNING: run {run.name} ({run.id}) missing fields: {missing} — skipped", file=sys.stderr)

@@ -39,7 +39,7 @@ lit:
 wandb:
   project: xe-hne-fus-expr-v0
   name: late-fusion-token
-  tags: [beat]
+  tags: [beat, lung]
 
 trainer:
   max_time: 00:04:00:00
