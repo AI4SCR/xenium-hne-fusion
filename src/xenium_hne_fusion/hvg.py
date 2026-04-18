@@ -86,6 +86,7 @@ def select_highly_variable_genes(adata: AnnData, *, n_top_genes: int, flavor: st
         adata,
         n_top_genes=n_top_genes,
         flavor=flavor,
+        batch_key='sample_id',
         inplace=True,
     )
     hvg_mask = adata.var['highly_variable'].fillna(False).astype(bool)
