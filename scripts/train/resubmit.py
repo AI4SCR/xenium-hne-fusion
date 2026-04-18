@@ -52,7 +52,7 @@ ENTITY = "chuv"
 BAD_STATES = {"failed", "crashed"}
 EXCLUDE_STATES = {"running"}
 DATASET_TAGS = {"hest1k", "hescape", "beat"}
-KNOWN_ORGANS = {"lung", "lung-healthy", "breast", "bowel", "pancreas"}
+KNOWN_ORGANS = {"lung", "lung-healthy", "breast", "bowel", "pancreas", "human-immuno-oncology", "human-multi-tissue"}
 
 
 def parse_args(argv=None):
