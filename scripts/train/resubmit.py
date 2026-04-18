@@ -51,6 +51,8 @@ load_dotenv(override=True)
 ENTITY = "chuv"
 BAD_STATES = {"failed", "crashed"}
 EXCLUDE_STATES = {"running"}
+DATASET_TAGS = {"hest1k", "hescape", "beat"}
+KNOWN_ORGANS = {"lung", "lung-healthy", "breast", "bowel", "pancreas"}
 
 
 def parse_args(argv=None):
@@ -95,16 +97,18 @@ def extract_run_config(run) -> dict | None:
     panel_path = cfg.get("data", {}).get("panel_path")
     task = cfg.get("task", {}).get("target")
     model = cfg.get("wandb", {}).get("name")
+    dataset_name = cfg.get("data", {}).get("name")
     fusion_strategy = cfg.get("backbone", {}).get("fusion_strategy")
     fusion_stage = cfg.get("backbone", {}).get("fusion_stage")
     learnable_gate = cfg.get("backbone", {}).get("learnable_gate")
 
     tags = run.tags or []
-    organ = next((t for t in tags if t != "hest1k"), None)
+    organ = next((t for t in tags if t not in DATASET_TAGS and t in KNOWN_ORGANS), None)
 
     missing = [k for k, v in [
         ("data.metadata_path", metadata_path),
         ("data.panel_path", panel_path),
+        ("data.name", dataset_name),
         ("task.target", task),
         ("wandb.name", model),
         ("organ tag", organ),
@@ -122,13 +126,14 @@ def extract_run_config(run) -> dict | None:
 
     config_path = (
         cfg.get("wandb", {}).get("config_path")
-        or f"configs/train/hest1k/{task}/{organ}/{model}.yaml"
+        or f"configs/train/{dataset_name}/{task}/{organ}/{model}.yaml"
     )
 
     return {
         "config": config_path,
         "metadata_path": metadata_path,
         "panel_path": panel_path,
+        "dataset_name": dataset_name,
         "organ": organ,
         "task": task,
         "model": model,
@@ -148,6 +153,7 @@ def make_group_key(params: dict) -> tuple[str, str]:
     learnable gate. All are extracted from the W&B run config/tags.
     """
     payload = {
+        "dataset_name": params["dataset_name"],
         "organ": params["organ"],
         "task": params["task"],
         "model": params["model"],
@@ -377,6 +383,7 @@ def main(argv=None):
 
         group_row = {
             "group_hash": example["group_hash"],
+            "dataset_name": example["dataset_name"],
             "organ": example["organ"],
             "task": example["task"],
             "model": example["model"],
