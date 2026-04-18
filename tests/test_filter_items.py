@@ -135,6 +135,7 @@ def test_filter_items_derives_stats_from_items_stem(tmp_path: Path):
     output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
+        stats_path=output_dir / 'statistics' / 'subset.parquet',
         items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
@@ -173,6 +174,7 @@ def test_filter_items_supports_sample_exclude_ids(tmp_path: Path):
     output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
+        stats_path=output_dir / 'statistics' / 'all.parquet',
         items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(exclude_ids=['S2'], num_transcripts=200)),
         overwrite=True,
     )
@@ -211,6 +213,7 @@ def test_filter_items_drops_items_with_missing_threshold_stats(tmp_path: Path):
     output_path, n_kept = filter_items(
         items_path=items_path,
         output_path=output_path,
+        stats_path=output_dir / 'statistics' / 'all.parquet',
         items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
@@ -252,6 +255,7 @@ def test_filter_items_logs_stage_counts(tmp_path: Path):
         output_path, n_kept = filter_items(
             items_path=items_path,
             output_path=output_path,
+            stats_path=output_dir / 'statistics' / 'all.parquet',
             items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
             overwrite=True,
         )

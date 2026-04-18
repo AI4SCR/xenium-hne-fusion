@@ -376,19 +376,19 @@ def compute_items_stats(
 def filter_items(
     items_path: Path,
     output_path: Path,
+    stats_path: Path,
     items_cfg: ItemsConfig,
     metadata_path: Path | None = None,
     overwrite: bool = False,
 ) -> tuple[Path, int]:
     items_path = Path(items_path)
     output_path = Path(output_path)
+    stats_path = Path(stats_path)
 
     if output_path.exists() and not overwrite:
         logger.info(f"Filtered items already exist: {output_path}")
         return output_path, len(load_items_dataframe(output_path))
 
-    output_dir = output_path.parent.parent
-    stats_path = output_dir / "statistics" / f"{items_path.stem}.parquet"
     assert items_path.exists(), f"Source items not found: {items_path}"
     assert stats_path.exists(), f"Statistics not found: {stats_path}"
 
