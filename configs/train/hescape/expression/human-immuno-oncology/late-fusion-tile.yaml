@@ -27,7 +27,7 @@ data:
   batch_size: 256
   expr_pool: tile
   items_path: all.json
-  metadata_path: hescape/human-immuno-oncology/hescape.parquet
+  metadata_path: hescape/human-immuno-oncology/outer=0-seed=0.parquet
   panel_path: hescape/human-immuno-oncology.yaml
   cache_dir: $TMPDIR/cache
 

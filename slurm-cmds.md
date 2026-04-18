@@ -168,6 +168,22 @@ uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.y
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
+# hvg panels (run after artifact jobs)
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
+    PANEL_NAME="expr-hvg-${SPLIT_NAME}"
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --time=04:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scripts/artifacts/create_panel.py \
+            --config configs/artifacts/beat/unil/expr-hvg.yaml \
+            --panel.metadata_path ${METADATA_PATH} \
+            --panel.name ${PANEL_NAME}"
+done
+
 # TASK=cell_types
 TASK=expression
 PARTITION=gpu-l40
@@ -279,30 +295,10 @@ for ORGAN in "${ORGANS[@]}"; do
 done
 
 # fixed hescape splits (all organs in one call)
-sbatch \
-    --cpus-per-task=4 \
-    --mem=32G \
-    --time=01:00:00 \
-    --output=$HOME/logs/%j.out \
-    --wrap="uv run python scripts/artifacts/create_hescape_splits.py"
+uv run python scripts/artifacts/create_hescape_splits.py
 
-# panel creation per organ per outer fold (run after artifact jobs)
-for ORGAN in "${ORGANS[@]}"; do
-    for OUTER in 0 1 2 3; do
-        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        METADATA_PATH="hescape/${ORGAN}/${SPLIT_NAME}.parquet"
-        PANEL_NAME="hescape/${ORGAN}-hvg-${SPLIT_NAME}"
-        sbatch \
-            --cpus-per-task=10 \
-            --mem=32G \
-            --time=04:00:00 \
-            --output=$HOME/logs/%j.out \
-            --wrap="uv run python scripts/artifacts/create_panel.py \
-                --config configs/artifacts/hescape/${ORGAN}.yaml \
-                --panel.metadata_path ${METADATA_PATH} \
-                --panel.name ${PANEL_NAME}"
-    done
-done
+# hvg panels (run after hescape splits are created)
+uv run python scripts/artifacts/create_hescape_panels.py
 
 # training
 TASK=expression
@@ -312,8 +308,6 @@ TIME=04:00:00
 MEMORY=64G
 MAX_EPOCHS=50
 FREEZE_MORPH=true
-ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
-# ORGANS=(human-immuno-oncology human-multi-tissue)
 
 # base models
 for ORGAN in "${ORGANS[@]}"; do
