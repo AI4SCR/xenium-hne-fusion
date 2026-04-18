@@ -22,7 +22,7 @@ def create_hescape_panels(overwrite: bool = False) -> list[Path]:
 
     for panel_yaml in sorted(PANELS_DIR.glob('*.yaml')):
         name = panel_yaml.stem
-        split_path = managed_paths.output_dir / 'splits' / 'hescape' / name / 'hescape.parquet'
+        split_path = managed_paths.output_dir / 'splits' / 'hescape' / name / 'outer=0-inner=0-seed=0.parquet'
         assert split_path.exists(), f'Split not found: {split_path}'
 
         target_panel = yaml.safe_load(panel_yaml.read_text())['target_panel']
@@ -49,7 +49,7 @@ def create_hescape_panels(overwrite: bool = False) -> list[Path]:
             f'{len(sample_ids)} samples'
         )
 
-        output_path = managed_paths.output_dir / 'panels' / f'hescape-{name}.yaml'
+        output_path = managed_paths.output_dir / 'panels' / 'hescape' / f'{name}.yaml'
         if output_path.exists():
             assert overwrite, f'Panel already exists: {output_path}'
         output_path.parent.mkdir(parents=True, exist_ok=True)
