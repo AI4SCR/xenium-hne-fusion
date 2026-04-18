@@ -310,10 +310,13 @@ MAX_EPOCHS=50
 FREEZE_MORPH=true
 
 # base models
-for ORGAN in "${ORGANS[@]}"; do
-  for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+for OUTER in 0 1 2 3 4; do
+  for ORGAN in "${ORGANS[@]}"; do
+    METADATA_PATH="hescape/${ORGAN}/outer=${OUTER}-seed=0.parquet"
+    PANEL_PATH="hescape/${ORGAN}.yaml"
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
-#        uv run python scripts/train/supervised.py --config ${CONFIG} --debug=true --data.cache_dir=null
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug=true --data.cache_dir=null
         sbatch \
             --cpus-per-task=12 \
             --mem=${MEMORY} \
@@ -321,13 +324,21 @@ for ORGAN in "${ORGANS[@]}"; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=hescape-${ORGAN}-${MODEL} \
-            --wrap="uv run python scripts/train/supervised.py --config ${CONFIG} --trainer.max_epochs ${MAX_EPOCHS}"
+            --job-name=hescape-${ORGAN}-${MODEL}-${OUTER} \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --trainer.max_epochs ${MAX_EPOCHS}"
     done
+  done
 done
 
 # concat fusion
-for ORGAN in "${ORGANS[@]}"; do
+for OUTER in 0 1 2 3 4; do
+  for ORGAN in "${ORGANS[@]}"; do
+    METADATA_PATH="hescape/${ORGAN}/outer=${OUTER}-seed=0.parquet"
+    PANEL_PATH="hescape/${ORGAN}.yaml"
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
         sbatch \
@@ -337,16 +348,22 @@ for ORGAN in "${ORGANS[@]}"; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=hescape-${ORGAN}-${MODEL}-concat \
+            --job-name=hescape-${ORGAN}-${MODEL}-concat-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
                 --backbone.fusion_strategy concat \
                 --trainer.max_epochs ${MAX_EPOCHS}"
     done
+  done
 done
 
 # learnable gate
-for ORGAN in "${ORGANS[@]}"; do
+for OUTER in 0 1 2 3 4; do
+  for ORGAN in "${ORGANS[@]}"; do
+    METADATA_PATH="hescape/${ORGAN}/outer=${OUTER}-seed=0.parquet"
+    PANEL_PATH="hescape/${ORGAN}.yaml"
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
         sbatch \
@@ -356,16 +373,22 @@ for ORGAN in "${ORGANS[@]}"; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=hescape-${ORGAN}-${MODEL}-gate \
+            --job-name=hescape-${ORGAN}-${MODEL}-gate-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
                 --backbone.learnable_gate true \
                 --trainer.max_epochs ${MAX_EPOCHS}"
     done
+  done
 done
 
 # freeze morph
-for ORGAN in "${ORGANS[@]}"; do
+for OUTER in 0 1 2 3 4; do
+  for ORGAN in "${ORGANS[@]}"; do
+    METADATA_PATH="hescape/${ORGAN}/outer=${OUTER}-seed=0.parquet"
+    PANEL_PATH="hescape/${ORGAN}.yaml"
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
         sbatch \
@@ -375,11 +398,14 @@ for ORGAN in "${ORGANS[@]}"; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=hescape-${ORGAN}-${MODEL}-freeze-morph \
+            --job-name=hescape-${ORGAN}-${MODEL}-freeze-morph-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
                 --backbone.freeze_morph ${FREEZE_MORPH} \
                 --trainer.max_epochs ${MAX_EPOCHS}"
     done
+  done
 done
 ```
