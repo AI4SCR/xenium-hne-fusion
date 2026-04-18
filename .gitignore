@@ -157,3 +157,4 @@ checkpoints/
 # Kaiko
 kaiko-ca-bundle.pem
 ray/runtime_envs/runtime_env.yml
+ray/other_modules
