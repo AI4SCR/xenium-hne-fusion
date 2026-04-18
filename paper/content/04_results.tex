@@ -1,0 +1,170 @@
+\section{Results}
+\label{sec:results}
+
+We present a comprehensive evaluation of our multimodal framework across two prediction tasks (gene expression and cell type composition prediction), three datasets (BEAT, HEST1k, HESCAPE), two gene panels (HVG-50, HESCAPE panel), and two model complexities (low, high). We additionally evaluate clinical downstream performance via MIL. Throughout, we use the model names defined in Section~\ref{sec:methods}: \textit{vision}, \textit{CONCH}, \textit{Geneformer}, \textit{expr-tile}, \textit{expr-token}, \textit{early-fusion-add}, \textit{early-fusion-concat}, \textit{late-fusion-tile-add/concat}, \textit{late-fusion-token-add/concat}.
+
+\subsection*{Gene Expression Prediction}
+\label{sec:results-gene}
+
+\paragraph{Multimodal fusion outperforms unimodal baselines.}
+\label{par:gene-fusion-outperforms}
+
+On BEAT, multimodal fusion models outperform all unimodal baselines on gene expression prediction (\autoref{fig:p-fus:gene-lvl_2}, \autoref{tab:p-fus:gene-table}). Our best multimodal models achieve a $26.5\%$ improvement in Spearman correlation over the best vision-only baseline and a $13\%$ improvement over the best expression-only baseline, demonstrating the complementary nature of the two modalities.
+
+\paragraph{Token-level representations drive performance gains.}
+\label{par:gene-token-level}
+
+Token-level transcript representations are a key driver of performance. \textit{late-fusion-token} variants substantially outperform their \textit{late-fusion-tile} counterparts, demonstrating that preserving within-tile spatial transcript structure during encoding is beneficial even when that spatial information is ultimately discarded before the prediction head. \textit{early-fusion} variants further benefit from joint processing of spatially aligned tokens throughout the transformer. CLIP-style contrastive pretraining experiments confirm this: CLIP-token achieves recall@1 of $0.062 \pm 0.004$ versus $0.041 \pm 0.003$ for CLIP-tile (random baseline: $0.004$), indicating that spatially resolved transcript features yield better-aligned multimodal embeddings (\autoref{tab:p-fus:clip-results}).
+
+\paragraph{Task-specific training outperforms frozen foundation models.}
+\label{par:gene-task-specific}
+
+Lightweight, task-specific models consistently outperform frozen foundation model embeddings. A low-capacity \textit{vision} model trained end-to-end achieves higher correlations than linear probes on frozen \textit{CONCH} or \textit{Geneformer} features, suggesting that task-specific adaptation to morpho-molecular relationships in spatial transcriptomics outweighs large-scale pretraining benefits.
+
+\paragraph{Comparison to Min-MAE baseline.}
+\label{par:gene-minmae}
+
+Both early and late fusion models clearly outperform the Min-MAE baseline across all genes and functional modules (\autoref{fig:p-fus:main-results-minmae}). The \textit{expr-tile} model performs comparably to Min-MAE, indicating that its predictions are largely driven by simple cross-panel gene--gene correlations. The \textit{vision} model is outperformed by Min-MAE across almost all genes, confirming that morphology alone provides limited information for predicting specific gene expression without transcriptomic context.
+
+\paragraph{Results on HEST1k and HESCAPE.}
+\label{par:gene-public-datasets}
+
+% TODO: Results pending. Subsection structure below will be filled once experiments complete.
+
+We extend the evaluation to HEST1k and HESCAPE to assess cross-dataset generalization. Table~[TODO] reports MSE, Pearson, and Spearman for all model variants across both gene panels (HVG-50, HESCAPE panel) and both complexity levels. [Results pending.]
+
+\subsection*{Cell Type Composition Prediction}
+\label{sec:results-cell}
+
+\paragraph{Early fusion achieves the strongest gains.}
+\label{par:cell-early-fusion}
+
+Multimodal fusion achieves even stronger gains on cell type composition prediction than on gene expression prediction (\autoref{tab:p-fus:cell-table}, \autoref{fig:p-fus:cell-lvl_2}). \textit{early-fusion-add} consistently outperforms all other model variants, substantially outperforming late fusion approaches. We attribute this to the inherent difficulty of the task: accurately reproducing cellular heterogeneity requires disentangling distinct phenotypes and their relative abundances, a task that benefits from fine-grained integration of morphological and molecular features at the token level.
+
+\paragraph{Token-level representations are critical.}
+\label{par:cell-token-level}
+
+\textit{late-fusion-token} variants outperform \textit{late-fusion-tile} counterparts for cell type prediction, consistent with the gene expression task. Token-level spatial structure captures the within-tile co-expression patterns that define cell identity, which are averaged out in tile-level aggregation.
+
+\paragraph{Model capacity selectively benefits multimodal models.}
+\label{par:cell-capacity}
+
+Increasing model capacity (from low to high) consistently improves multimodal and expression-only models but yields no gains for vision-only baselines (\autoref{fig:p-fus:high-low-capacity}). For \textit{early-fusion-add}, the high-capacity configuration (ViT-B) achieves mean Pearson $0.761$ versus $0.688$ for the low-capacity configuration (ViT-S), while \textit{vision} at both capacity levels performs comparably ($0.554$ vs.\ $0.541$--$0.543$). For expression-only models, increasing depth improves performance from $0.576$ to $0.655$. These results implicate cross-modal interaction rather than model size as the driver of performance.
+
+\paragraph{Core panel input is sufficient for cell type prediction.}
+\label{par:cell-panel}
+
+Models trained on the full or core panel substantially outperform those using only the add-on panel, while the gap between full- and core-panel models is modest (\autoref{fig:p-fus:cell-panel}). This is consistent with the biological design of the panels: the core Human Immuno-Oncology Panel covers established immune and cell-type-specific markers directly informative for cell identity. Multimodal models consistently outperform expression-only counterparts regardless of panel, and the morphological advantage is largest when only the add-on panel is available.
+
+\paragraph{Per-cell-type analysis reveals characteristic unimodal failure modes.}
+\label{sec:per-cell-type}
+
+Aggregate correlation statistics can mask important per-cell-type variation. \autoref{fig:p-fus:sample-level-pearson} shows per-cell-type Pearson correlations for \textit{early-fusion-add} across all 39 cell types. Performance is high and consistent for abundant cell types, with 14 of the top 15 most abundant populations exceeding $0.8$, and declines for rarer populations.
+
+\textit{early-fusion-add} achieves high and consistent correlations across the majority of cell types (\autoref{fig:p-fus:cell-type-level}). Unimodal models exhibit two characteristic failure patterns:
+
+\begin{enumerate}
+  \item Both unimodal models fail, but their combination substantially outperforms either alone: regulatory T cells, ciliated epithelial, club, and mesothelial cells.
+  \item Expression-only specifically fails while vision retains reasonable signal: NK cells, type 1 interferon response T cells. Most strikingly, plasmacytoid dendritic cells show near-perfect correlations for both \textit{early-fusion-add} and \textit{vision} (${\sim}0.95$) while \textit{expr-tile} collapses to ${\sim}0.60$, indicating that their identity is strongly encoded in morphology but poorly represented in the core transcriptomic panel.
+\end{enumerate}
+
+\paragraph{Results on HEST1k and HESCAPE.}
+\label{par:cell-public}
+
+% TODO: Results pending.
+
+We evaluate cell type prediction on HEST1k and HESCAPE to assess generalization. [Results pending.]
+
+\subsection*{Per-Sample vs. Per-Gene/Per-Cell-Type Evaluation}
+\label{sec:results-per-sample}
+
+Tile-weighted average metrics may be dominated by samples with large WSIs. We additionally report an equal-weighted sample-level score (metric computed per sample, then averaged uniformly across samples). This reveals per-patient predictive performance and complements tile-level evaluation.
+
+% TODO: Report sample-level vs. tile-level correlation comparison across model variants and datasets.
+
+\subsection*{Spatial Predictions}
+\label{sec:results-spatial}
+
+Spatially, our predictions closely mirror the true measurements (\autoref{fig:p-fus:true-vs-predicted}, \autoref{fig:p-fus:cell-type-spatial-pred}), capturing rich morpho-molecular structures of the tumor microenvironment. UMAP visualizations of the learned embeddings (\autoref{fig:p-fus:umaps}) show that \textit{early-fusion-add} captures transcript-driven heterogeneity while remaining spatially coherent, whereas \textit{late-fusion} closely mirrors \textit{vision} patterns.
+
+% TODO: Add spatial prediction figures for HEST1k / HESCAPE representative samples.
+
+\subsection*{Downstream Clinical Performance via MIL}
+\label{sec:results-mil}
+
+% TODO: Report MIL results for histology classification and survival prediction on BEAT (and HEST1k / HESCAPE where labels are available).
+
+We assess whether richer morpho-molecular representations translate to improved clinical endpoint prediction. Using frozen embeddings from all model variants as input to an ABMIL aggregator, we compare performance on (i)~histology classification and (ii)~survival prediction. This end-to-end evaluation quantifies the practical clinical value of multimodal representations beyond the supervised tile-level tasks above.
+
+% Placeholder paragraph: results will follow the same model ordering as above (vision, CONCH, Geneformer, expr-tile, expr-token, late-fusion-tile, late-fusion-token, early-fusion).
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width=0.65\textwidth]{papers/Fusion/figures/cell-boxplot-marsilea.pdf}
+    \caption{\textbf{Cell type composition prediction.}
+      Pearson correlation coefficient across all 39 cell types for each tested model configuration.
+      Multimodal fusion consistently outperforms unimodal baselines, with early fusion achieving the strongest gains.}
+    \label{fig:p-fus:cell-lvl_2}
+  \end{subfigure}
+
+  \vspace{1em}
+
+  \begin{subfigure}[b]{\textwidth}
+    \centering
+    \includegraphics[width=0.55\textwidth]{papers/Fusion/figures/gene-pcc-boxplot-marsilea.pdf}
+    \caption{\textbf{Gene expression prediction.}
+      Spearman correlation coefficient across all add-on panel genes for each tested model configuration.
+      Multimodal fusion consistently outperforms unimodal baselines, demonstrating the complementary nature of morphological and transcriptomic features.}
+    \label{fig:p-fus:gene-lvl_2}
+  \end{subfigure}
+
+  \caption{\textbf{Prediction performance across all model configurations on BEAT.}
+    Multimodal fusion consistently outperforms unimodal baselines on both tasks.}
+  \label{fig:p-fus:combined}
+\end{figure}
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{papers/Fusion/figures/cell-all-pcc-boxplot-marsilea.pdf}
+  \caption{\textbf{Cell type prediction performance stratified by input gene panel.}
+  Pearson correlation for models trained on the full panel, the core panel, and the add-on panel as transcript input.
+  Core-panel models closely match full-panel performance, while add-on-only models degrade substantially,
+  with multimodal integration providing the largest relative benefit in this low-information regime.}
+  \label{fig:p-fus:cell-panel}
+\end{figure}
+
+\input{papers/Fusion/tables/clip-v2}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{papers/Fusion/figures/cell_type_level_pearson_boxplot-early-only-all-cells.pdf}
+\caption{\textbf{Per-cell-type Pearson correlation for early-fusion-add across all 39 cell types.} Cell types are ordered by decreasing abundance from left to right. Correlations are high and consistent for the majority of abundant cell types, with 14 of the top 15 most abundant populations exceeding 0.8. Performance declines for rarer populations toward the right.}
+    \label{fig:p-fus:sample-level-pearson}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{papers/Fusion/figures/cell_type_level_pearson_boxplot-target-models-filtered.pdf}
+\caption{\textbf{Per-cell-type Pearson correlation for early-fusion-add and unimodal configurations on a representative filtered subset of cell types.} Boxes show the distribution of Pearson correlations across test splits for early-fusion-add (orange), expr-tile (blue), and vision (green). early-fusion-add correlations are consistently higher across all cell types. vision correlations collapse markedly for plasmacytoid dendritic cells; expr-tile for natural killer cells. Unimodal correlations are markedly lower for regulatory T, ciliated epithelial, club, and mesothelial cells compared to the fusion variant.}
+  \label{fig:p-fus:cell-type-level}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{papers/Fusion/figures/XE_1G11.03_HNE_1G1103.pdf}
+    \caption{\textbf{Spatial cell type abundance predictions for a representative sample.}
+    Predicted versus true cell type abundances mapped onto the tissue section
+    for selected cell types, demonstrating that the multimodal model captures
+    spatially coherent patterns of cellular composition.}
+    \label{fig:p-fus:cell-type-spatial-pred}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{papers/Fusion/figures/UMAPs.pdf}
+  \caption{\textbf{Learned embeddings capture rich morpho-molecular descriptions of the tumor microenvironment.} (\textbf{A}) Leiden clustering of tile embeddings for a single sample across models. (\textbf{B}) Corresponding UMAP visualizations colored by Leiden clusters, summarizing global neighborhood structure. \textit{expr-tile} yields granular, noisy clusters reflecting fine-grained transcriptomic variation; \textit{vision} produces larger coherent regions; \textit{early-fusion-add} captures transcript-driven heterogeneity while remaining spatially coherent; late fusion closely mirrors \textit{vision} patterns.}
+  \label{fig:p-fus:umaps}
+\end{figure}

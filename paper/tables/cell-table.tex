@@ -1,0 +1,54 @@
+% $\downarrow$
+% $\uparrow$
+\begin{sidewaystable}
+  \centering
+  \scriptsize
+\caption{Hyperparameter settings for all evaluated models on the gene prediction task. Entries marked with \{*\} indicate runs that did not converge.}
+\label{tab:p-fus:cell-table}
+
+\begin{tabular}{lllrlrrlllll}
+\toprule
+stage & strategy & morph\_encoder & freeze\_morph & expr\_encoder & expr\_dim & freeze\_expr & pool & panel & spearman & pearson & mse \\
+\midrule
+early & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & add & 0.606±0.021 & 0.688±0.020 & 0.424±0.028 \\
+early & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & token & add & 0.542±0.028 & 0.601±0.025 & 0.533±0.029 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & tile & add & 0.524±0.022 & 0.583±0.022 & 0.588±0.046 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & tile & add & 0.544±0.025 & 0.603±0.024 & 0.529±0.025 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & add & 0.553±0.025 & 0.619±0.023 & 0.540±0.037 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & token & add & 0.565±0.021 & 0.629±0.019 & 0.493±0.024 \\
+- & - & - & False & mlp & 32 & False & tile & add & 0.466±0.024 & 0.508±0.020 & 0.633±0.032 \\
+- & - & - & False & mlp & 32 & False & token & add & 0.424±0.043 & 0.447±0.031 & 0.720±0.027 \\
+- & - & vit\_small\_patch16\_224 & False & - & - & False & token & add & 0.484±0.026 & 0.541±0.024 & 0.657±0.043 \\
+- & - & vit\_small\_patch16\_224 & True & - & - & False & token & add & 0.416±0.027 & 0.463±0.024 & 0.756±0.034 \\
+early & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & all & 0.651±0.019 & 0.742±0.017 & 0.329±0.025 \\
+early & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & token & all & 0.585±0.021 & 0.651±0.015 & 0.457±0.025 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & tile & all & 0.560±0.028 & 0.622±0.020 & 0.514±0.020 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & tile & all & 0.587±0.021 & 0.654±0.017 & 0.434±0.013 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & all & 0.600±0.018 & 0.671±0.016 & 0.439±0.021 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & token & all & 0.608±0.003 & 0.686±0.006 & 0.396±0.016 \\
+- & - & - & False & mlp & 32 & False & tile & all & 0.529±0.025 & 0.576±0.022 & 0.528±0.029 \\
+- & - & - & False & mlp & 32 & False & token & all & 0.502±0.026 & 0.537±0.017 & 0.606±0.017 \\
+early & add & vit\_base\_patch16\_224 & False & mlp & 128 & False & token & all & 0.664±0.018 & 0.761±0.014 & 0.302±0.019 \\
+late & add & vit\_base\_patch16\_224 & True & mlp & 128 & False & tile & all & 0.632±0.016 & 0.714±0.013 & 0.358±0.011 \\
+late & add & vit\_base\_patch16\_224 & True & mlp & 128 & False & token & all & 0.652±0.016 & 0.741±0.007 & 0.343±0.015 \\
+- & - & - & False & mlp & 128 & False & tile & all & 0.589±0.012 & 0.655±0.019 & 0.408±0.017 \\
+- & - & - & False & mlp & 128 & False & token & all & 0.591±0.027 & 0.650±0.020 & 0.450±0.017 \\
+- & - & vit\_base\_patch16\_224 & False & - & - & False & token & all & 0.492±0.025 & 0.554±0.023 & 0.642±0.047 \\
+- & - & vit\_base\_patch16\_224 & True & - & - & False & token & all & 0.427±0.020 & 0.474±0.019 & 0.743±0.039 \\
+- & - & vit\_small\_patch16\_224 & False & - & - & False & token & all & 0.485±0.024 & 0.543±0.021 & 0.661±0.044 \\
+- & - & vit\_small\_patch16\_224 & True & - & - & False & token & all & 0.416±0.027 & 0.463±0.024 & 0.756±0.034 \\
+early & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & core & 0.644±0.022 & 0.736±0.019 & 0.338±0.020 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & tile & core & 0.564±0.021 & 0.625±0.018 & 0.512±0.040 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & tile & core & 0.569±0.021 & 0.633±0.017 & 0.471±0.019 \\
+late & add & vit\_small\_patch16\_224 & False & mlp & 32 & False & token & core & 0.593±0.020 & 0.665±0.017 & 0.455±0.025 \\
+late & add & vit\_small\_patch16\_224 & True & mlp & 32 & False & token & core & 0.615±0.020 & 0.687±0.014 & 0.404±0.016 \\
+- & - & - & False & mlp & 32 & False & tile & core & 0.522±0.027 & 0.566±0.022 & 0.567±0.040 \\
+- & - & - & False & mlp & 32 & False & token & core & 0.494±0.031 & 0.531±0.018 & 0.635±0.013 \\
+- & - & vit\_small\_patch16\_224 & False & - & - & False & token & core & 0.485±0.024 & 0.542±0.022 & 0.662±0.044 \\
+- & - & vit\_small\_patch16\_224 & True & - & - & False & token & core & 0.416±0.027 & 0.463±0.024 & 0.756±0.034 \\
+\bottomrule
+\end{tabular}
+
+
+
+\end{sidewaystable}

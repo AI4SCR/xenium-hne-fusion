@@ -1,0 +1,87 @@
+\begin{table}
+  \small
+  \caption{\textbf{Model complexity.} Parameter counts for all evaluated architectures, broken down by prediction head (total and trainable) and backbone (total and trainable).}
+  \label{tab:p-fus:model-complexity}
+
+\begin{tabular}{llllrrllrrrr}
+\toprule
+stage & strategy & morph & freeze & expr & freeze & pool & panel & \multicolumn{2}{r}{head} & \multicolumn{2}{r}{backbone} \\
+ &  & encoder & morph & encoder & expr &  &  & total & trainable & total & trainable \\
+\midrule
+add & early & mlp & vit\_b & False & False & token & all & 30.0K & 30.0K & 86.01M & 86.01M \\
+add & early & mlp & vit\_s & False & False & token & add & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & early & mlp & vit\_s & False & False & token & all & 15.0K & 15.0K & 21.70M & 21.70M \\
+add & early & mlp & vit\_s & False & False & token & core & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & early & mlp & vit\_s & False & False & token & default & 38.5K & 38.5K & 21.69M & 21.69M \\
+add & early & mlp & vit\_s & False & True & token & add & 15.0K & 15.0K & 21.69M & 19.9K \\
+add & early & mlp & vit\_s & False & True & token & all & 15.0K & 15.0K & 21.70M & 32.1K \\
+add & early & mlp & vit\_s & False & True & token & default & 38.5K & 38.5K & 21.69M & 28.9K \\
+add & late & geneformer & conch & True & True & tile & - & 76.9K & 76.9K & 306.51M & 397.8K \\
+add & late & geneformer & loki & True & True & tile & - & 76.9K & 76.9K & 638.85M & 397.8K \\
+add & late & geneformer & midnight & True & True & tile & - & 153.7K & 153.7K & 1137.28M & 795.6K \\
+add & late & geneformer & phikon & True & True & tile & - & 102.5K & 102.5K & 303.88M & 530.4K \\
+add & late & geneformer & vit\_s & True & False & tile & - & 38.5K & 38.5K & 21.86M & 21.86M \\
+add & late & geneformer & vit\_s & True & True & tile & - & 38.5K & 38.5K & 21.86M & 198.9K \\
+add & late & mlp & conch & False & True & tile & default & 76.9K & 76.9K & 306.15M & 43.5K \\
+add & late & mlp & loki & False & True & tile & - & 76.9K & 76.9K & 638.49M & 43.5K \\
+add & late & mlp & phikon & False & True & tile & default & 102.5K & 102.5K & 303.41M & 53.2K \\
+add & late & mlp & vit\_b & False & True & tile & all & 30.0K & 30.0K & 86.01M & 214.0K \\
+add & late & mlp & vit\_b & False & True & token & all & 30.0K & 30.0K & 86.01M & 214.0K \\
+add & late & mlp & vit\_s & False & False & tile & add & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & False & tile & all & 15.0K & 15.0K & 21.70M & 21.70M \\
+add & late & mlp & vit\_s & False & False & tile & core & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & False & tile & default & 38.5K & 38.5K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & False & token & add & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & False & token & all & 15.0K & 15.0K & 21.70M & 21.70M \\
+add & late & mlp & vit\_s & False & False & token & core & 15.0K & 15.0K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & False & token & default & 38.5K & 38.5K & 21.69M & 21.69M \\
+add & late & mlp & vit\_s & False & True & tile & add & 15.0K & 15.0K & 21.69M & 19.9K \\
+add & late & mlp & vit\_s & False & True & tile & all & 15.0K & 15.0K & 21.70M & 32.1K \\
+add & late & mlp & vit\_s & False & True & tile & core & 15.0K & 15.0K & 21.69M & 28.9K \\
+add & late & mlp & vit\_s & False & True & tile & default & 38.5K & 38.5K & 21.69M & 28.9K \\
+add & late & mlp & vit\_s & False & True & token & add & 15.0K & 15.0K & 21.69M & 19.9K \\
+add & late & mlp & vit\_s & False & True & token & all & 15.0K & 15.0K & 21.70M & 32.1K \\
+add & late & mlp & vit\_s & False & True & token & core & 15.0K & 15.0K & 21.69M & 28.9K \\
+add & late & mlp & vit\_s & False & True & token & default & 38.5K & 38.5K & 21.69M & 28.9K \\
+concat & early & mlp & vit\_s & False & False & token & - & 38.5K & 38.5K & 21.69M & 21.69M \\
+concat & late & geneformer & conch & True & True & tile & - & 153.7K & 153.7K & 306.51M & 397.8K \\
+concat & late & geneformer & loki & True & True & tile & - & 153.7K & 153.7K & 638.85M & 397.8K \\
+concat & late & geneformer & midnight & True & True & tile & - & 307.3K & 307.3K & 1137.28M & 795.6K \\
+concat & late & geneformer & phikon & True & True & tile & - & 204.9K & 204.9K & 303.88M & 530.4K \\
+concat & late & geneformer & vit\_s & True & False & tile & - & 76.9K & 76.9K & 21.86M & 21.86M \\
+concat & late & geneformer & vit\_s & True & True & tile & - & 76.9K & 76.9K & 21.86M & 198.9K \\
+concat & late & mlp & conch & False & True & tile & - & 153.7K & 153.7K & 306.15M & 43.5K \\
+concat & late & mlp & loki & False & True & tile & - & 153.7K & 153.7K & 638.49M & 43.5K \\
+concat & late & mlp & phikon & False & True & tile & - & 204.9K & 204.9K & 303.41M & 53.2K \\
+concat & late & mlp & vit\_s & False & False & tile & default & 76.9K & 76.9K & 21.69M & 21.69M \\
+concat & late & mlp & vit\_s & False & False & token & - & 76.9K & 76.9K & 21.69M & 21.69M \\
+concat & late & mlp & vit\_s & False & True & tile & default & 76.9K & 76.9K & 21.69M & 28.9K \\
+concat & late & mlp & vit\_s & False & True & token & default & 76.9K & 76.9K & 21.69M & 28.9K \\
+- & - & geneformer & - & True & False & tile & - & 51.3K & 51.3K & 2.6K & 2.6K \\
+- & - & mlp & - & False & False & tile & add & 1.3K & 1.3K & 5.5K & 5.5K \\
+- & - & mlp & - & False & False & tile & all & 5.0K & 5.0K & 111.7K & 111.7K \\
+- & - & mlp & - & False & False & tile & core & 1.3K & 1.3K & 14.5K & 14.5K \\
+- & - & mlp & - & False & False & token & add & 1.3K & 1.3K & 5.5K & 5.5K \\
+- & - & mlp & - & False & False & token & all & 5.0K & 5.0K & 111.7K & 111.7K \\
+- & - & mlp & - & False & False & token & core & 1.3K & 1.3K & 14.5K & 14.5K \\
+- & - & mlp & - & False & False & token & default & 3.3K & 3.3K & 14.5K & 14.5K \\
+- & - & - & conch & False & True & token & - & 76.9K & 76.9K & 306.11M & 3.8K \\
+- & - & - & loki & False & True & token & - & 76.9K & 76.9K & 638.45M & 3.8K \\
+- & - & - & phikon & False & True & token & - & 102.5K & 102.5K & 303.36M & 5.1K \\
+- & - & - & vit\_b & False & False & token & all & 30.0K & 30.0K & 85.80M & 85.80M \\
+- & - & - & vit\_b & False & True & token & all & 30.0K & 30.0K & 85.80M & 3.8K \\
+- & - & - & vit\_s & False & False & token & add & 15.0K & 15.0K & 21.67M & 21.67M \\
+- & - & - & vit\_s & False & False & token & all & 15.0K & 15.0K & 21.67M & 21.67M \\
+- & - & - & vit\_s & False & False & token & core & 15.0K & 15.0K & 21.67M & 21.67M \\
+- & - & - & vit\_s & False & False & token & default & 38.5K & 38.5K & 21.67M & 21.67M \\
+- & - & - & vit\_s & False & True & token & add & 15.0K & 15.0K & 21.67M & 1.9K \\
+- & - & - & vit\_s & False & True & token & all & 15.0K & 15.0K & 21.67M & 1.9K \\
+- & - & - & vit\_s & False & True & token & core & 15.0K & 15.0K & 21.67M & 1.9K \\
+- & - & - & vit\_s & False & True & token & default & 38.5K & 38.5K & 21.67M & 1.9K \\
+\bottomrule
+\end{tabular}
+
+
+
+
+\end{table}
