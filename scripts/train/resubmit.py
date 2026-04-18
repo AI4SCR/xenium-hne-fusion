@@ -230,7 +230,7 @@ def choose_candidate(records: list[dict]) -> dict | None:
 
 def build_sbatch(r: dict, partition: str, memory: str, time: str) -> str:
     is_concat = r["fusion_strategy"] == "concat"
-    job_name_parts = [r["organ"], r["task"], r["model"]]
+    job_name_parts = [r["dataset_name"], r["organ"], r["task"], r["model"]]
     if is_concat:
         job_name_parts.append("concat")
     if r["outer"] is not None:
