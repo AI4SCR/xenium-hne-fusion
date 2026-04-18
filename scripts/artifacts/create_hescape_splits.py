@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import pandas as pd
 from dotenv import load_dotenv
 from jsonargparse import auto_cli
 
@@ -120,36 +121,108 @@ PANEL_TO_SPLITS = {
 }
 
 
-def _create_single_hescape_split(
+def _get_outer_test_chunks(split_to_ids: dict[str, dict[int, str]]) -> list[list[str]]:
+    """Return list of test-sample lists per outer fold.
+
+    Chunk 0 = hardcoded test samples. Remaining samples (sorted by index) are
+    split into equal-size chunks for folds 1..N.
+    """
+    all_indexed: dict[int, str] = {}
+    for ids in split_to_ids.values():
+        all_indexed.update(ids)
+
+    test_samples = list(split_to_ids['test'].values())
+    test_set = set(test_samples)
+    chunk_size = len(test_samples)
+
+    remaining = [all_indexed[k] for k in sorted(all_indexed) if all_indexed[k] not in test_set]
+    assert len(remaining) % chunk_size == 0, (
+        f'Remaining {len(remaining)} samples not divisible by chunk size {chunk_size}'
+    )
+    chunks = [remaining[i:i + chunk_size] for i in range(0, len(remaining), chunk_size)]
+    return [test_samples] + chunks
+
+
+def _resolve_val(
+    val_samples: list[str],
+    test_chunk: list[str],
+    fallback_pool: list[str],
+) -> list[str]:
+    """Return val sample list for a fold, replacing any test-conflicts with fallback_pool samples."""
+    test_set = set(test_chunk)
+    conflicts = [s for s in val_samples if s in test_set]
+    if not conflicts:
+        return val_samples
+
+    assert len(conflicts) <= len(fallback_pool), (
+        f'Not enough fallback samples ({len(fallback_pool)}) to replace {len(conflicts)} conflicts'
+    )
+    replacements = fallback_pool[:len(conflicts)]
+    resolved = [s for s in val_samples if s not in test_set] + replacements
+    assert set(resolved).isdisjoint(test_set), 'Val still overlaps with test after resolution'
+    return resolved
+
+
+def _assign_splits(
+    filtered: pd.DataFrame,
+    fit_samples: list[str],
+    val_samples: list[str],
+    test_samples: list[str],
+) -> pd.DataFrame:
+    filtered = filtered.copy()
+    filtered['split'] = None
+    for label, samples in [('fit', fit_samples), ('val', val_samples), ('test', test_samples)]:
+        filtered.loc[filtered['sample_id'].isin(samples), 'split'] = label
+
+    assert filtered['split'].notna().all(), 'Some tiles are missing split labels'
+    assert filtered.index.is_unique, 'Tile-level metadata index must be unique'
+
+    dtype = pd.CategoricalDtype(categories=['fit', 'val', 'test'], ordered=False)
+    filtered['split'] = filtered['split'].astype(dtype)
+    return filtered
+
+
+def _create_outer_split_files(
     name: str,
     split_to_ids: dict[str, dict[int, str]],
-    joined,
+    joined: pd.DataFrame,
     output_dir: Path,
     overwrite: bool,
-) -> Path:
-    output_path = output_dir / 'splits' / 'hescape' / name / 'hescape.parquet'
-    if output_path.exists():
-        assert overwrite, f'Split already exists: {output_path}'
-
-    split_ids = {sample_id for ids in split_to_ids.values() for sample_id in ids.values()}
-    keep = joined['sample_id'].isin(split_ids)
-    filtered = joined.loc[keep].copy()
+) -> list[Path]:
+    split_ids = {s for ids in split_to_ids.values() for s in ids.values()}
+    filtered = joined.loc[joined['sample_id'].isin(split_ids)].copy()
 
     present = set(filtered['sample_id'])
     missing = sorted(split_ids - present)
     assert not missing, f'Split samples missing from items: {missing}'
 
-    filtered['split'] = None
-    for split_name, indexed_ids in split_to_ids.items():
-        mask = filtered['sample_id'].isin(indexed_ids.values())
-        filtered.loc[mask, 'split'] = split_name
+    hardcoded_test = list(split_to_ids['test'].values())
+    hardcoded_val = list(split_to_ids['val'].values())
+    hardcoded_fit = list(split_to_ids['fit'].values())
 
-    assert filtered.index.is_unique, 'Tile-level metadata index must be unique'
-    assert filtered['split'].notna().all(), 'Some tiles are missing split labels'
+    test_chunks = _get_outer_test_chunks(split_to_ids)
+    all_samples = set(split_ids)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    filtered.to_parquet(output_path)
-    return output_path
+    output_paths = []
+    for outer, test_chunk in enumerate(test_chunks):
+        output_path = output_dir / 'splits' / 'hescape' / name / f'outer={outer}-seed=0.parquet'
+        if output_path.exists():
+            assert overwrite, f'Split already exists: {output_path}'
+
+        if outer == 0:
+            val = hardcoded_val
+            fit = hardcoded_fit
+        else:
+            val = _resolve_val(hardcoded_val, test_chunk, fallback_pool=hardcoded_test)
+            fit = sorted(all_samples - set(test_chunk) - set(val))
+
+        df = _assign_splits(filtered, fit_samples=fit, val_samples=val, test_samples=test_chunk)
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(output_path)
+        output_paths.append(output_path)
+
+    return output_paths
 
 
 def create_hescape_splits(overwrite: bool = False) -> list[Path]:
@@ -163,14 +236,12 @@ def create_hescape_splits(overwrite: bool = False) -> list[Path]:
     joined = join_items_with_metadata(items_path, metadata_path)
     output_paths = []
     for name, split_to_ids in PANEL_TO_SPLITS.items():
-        output_paths.append(
-            _create_single_hescape_split(
-                name=name,
-                split_to_ids=split_to_ids,
-                joined=joined,
-                output_dir=managed_paths.output_dir,
-                overwrite=overwrite,
-            )
+        output_paths += _create_outer_split_files(
+            name=name,
+            split_to_ids=split_to_ids,
+            joined=joined,
+            output_dir=managed_paths.output_dir,
+            overwrite=overwrite,
         )
     return output_paths
 
