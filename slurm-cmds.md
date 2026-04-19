@@ -184,10 +184,20 @@ for OUTER in 0 1 2 3; do
             --panel.name ${PANEL_NAME}"
 done
 
+# warmup cache
+for OUTER in 0 1 2 3; do
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --time=02:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scribble/warmup-cache.py --outer ${OUTER}"
+done
+
 # TASK=cell_types
 TASK=expression
 PARTITION=gpu-l40
-TIME=05:30:00
+TIME=04:30:00
 MEMORY=64G
 #PANEL_PATH=default.yaml
 for OUTER in 0 1 2 3; do
@@ -195,6 +205,7 @@ for OUTER in 0 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="expr/${SPLIT_NAME}.parquet"
         PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+        PANEL_NAME="${PANEL_PATH%.yaml}"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
         
     #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
@@ -211,7 +222,8 @@ for OUTER in 0 1 2 3; do
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
                 --data.metadata_path ${METADATA_PATH} \
-                --data.panel_path ${PANEL_PATH}"
+                --data.panel_path ${PANEL_PATH} \
+                --data.cache_dir=expression/${PANEL_NAME}"
     done
 done
 
@@ -221,6 +233,7 @@ for OUTER in 0 1 2 3; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="expr/${SPLIT_NAME}.parquet"
         PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+        PANEL_NAME="${PANEL_PATH%.yaml}"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
     
     #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
@@ -237,16 +250,18 @@ for OUTER in 0 1 2 3; do
                 --config ${CONFIG} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
-                --backbone.fusion_strategy concat"
+                --backbone.fusion_strategy concat \
+                --data.cache_dir=expression/${PANEL_NAME}"
     done
 done
 
 # freeze_morph_encoder=true
 for OUTER in 0 1 2 3; do
-    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+    for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="expr/${SPLIT_NAME}.parquet"
         PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+        PANEL_NAME="${PANEL_PATH%.yaml}"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
     
     #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
@@ -263,7 +278,8 @@ for OUTER in 0 1 2 3; do
                 --config ${CONFIG} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
-                --backbone.freeze_morph_encoder true"
+                --backbone.freeze_morph_encoder true \
+                --data.cache_dir=expression/${PANEL_NAME}"
     done
 done
 
