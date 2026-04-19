@@ -1,0 +1,8 @@
+project: xe-hne-fus-cell-v0
+target: cell_types
+refresh: false
+data:
+  name: beat
+  items_path: cells.json
+  panel_path: default.yaml
+  split_dir: cells

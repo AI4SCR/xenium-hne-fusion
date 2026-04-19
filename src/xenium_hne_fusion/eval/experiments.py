@@ -1,94 +1,64 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
 from loguru import logger
 
-from xenium_hne_fusion.config import ArtifactsConfig, PanelConfig
+from xenium_hne_fusion.config import EvalConfig
+from xenium_hne_fusion.utils.getters import get_managed_paths, get_panels_dir
 
 TARGETS = {'expression', 'cell_types'}
 DATASET_LABELS = {'beat': 'BEAT', 'hest1k': 'HEST1K'}
 TARGET_LABELS = {'expression': 'expression', 'cell_types': 'cell types'}
 
 
-def select_artifact_runs(
+def resolve_eval_paths(eval_cfg: EvalConfig) -> tuple[Path, Path, Path]:
+    name = eval_cfg.data.name
+    output_dir = get_managed_paths(name).output_dir
+    items_path = output_dir / 'items' / eval_cfg.data.items_path
+    panel_path = get_panels_dir(name) / eval_cfg.data.panel_path
+    splits_dir = output_dir / 'splits' / eval_cfg.data.split_dir
+    return items_path, panel_path, splits_dir
+
+
+def select_runs(
     runs: pd.DataFrame,
     *,
-    artifacts_cfg: ArtifactsConfig,
-    target: str,
+    eval_cfg: EvalConfig,
 ) -> tuple[pd.DataFrame, str, str]:
-    assert target in TARGETS, f'Unknown target: {target}'
-    _assert_columns(runs, ['config.data.name', 'config.data.items_path', 'config.data.metadata_path'])
+    assert eval_cfg.target in TARGETS, f'Unknown target: {eval_cfg.target}'
+    _assert_columns(runs, ['config.data.name', 'config.data.items_path', 'config.data.panel_path', 'config.data.metadata_path'])
 
-    matching = runs.apply(lambda row: _matches_artifact_scope(row, artifacts_cfg), axis=1)
-    selected = runs.loc[matching].copy()
+    items_path, panel_path, splits_dir = resolve_eval_paths(eval_cfg)
+
+    def matches(row: pd.Series) -> bool:
+        if row['config.data.name'] != eval_cfg.data.name:
+            return False
+        if not _path_equals(row['config.data.items_path'], items_path):
+            return False
+        if not _path_equals(row['config.data.panel_path'], panel_path):
+            return False
+        return _path_parent_equals(row['config.data.metadata_path'], splits_dir)
+
+    selected = runs.loc[runs.apply(matches, axis=1)].copy()
     logger.info(
         f'Selected {len(selected)}/{len(runs)} W&B runs for '
-        f'dataset={artifacts_cfg.name}, items={artifacts_cfg.items.name}, split={artifacts_cfg.split.name}'
+        f'dataset={eval_cfg.data.name}, split_dir={eval_cfg.data.split_dir}'
     )
-    assert not selected.empty, 'No W&B runs match artifact config'
-
-    return selected, _plot_title(artifacts_cfg, target), _output_name(artifacts_cfg, target)
-
-
-def _matches_artifact_scope(row: pd.Series, artifacts_cfg: ArtifactsConfig) -> bool:
-    if row['config.data.name'] != artifacts_cfg.name:
-        return False
-    if not _matches_path_suffix(row['config.data.items_path'], f'/items/{artifacts_cfg.items.name}.json'):
-        return False
-
-    split_stem = split_stem_from_metadata_path(row['config.data.metadata_path'], artifacts_cfg.split.name)
-    if split_stem is None:
-        return False
-    return _matches_panel(row, artifacts_cfg.panel, split_stem=split_stem)
+    assert not selected.empty, 'No W&B runs match eval config'
+    return selected, _plot_title(eval_cfg), _output_name(eval_cfg)
 
 
-def split_stem_from_metadata_path(value, split_name: str) -> str | None:
+def _path_equals(value, expected: Path) -> bool:
     path = _normalize_path(value)
-    if path is None:
-        return None
-    path = f'/{path.lstrip("/")}'
-
-    if path.endswith(f'/splits/{split_name}.parquet'):
-        return split_name
-
-    marker = f'/splits/{split_name}/'
-    if marker not in path:
-        return None
-
-    filename = path.split(marker, maxsplit=1)[1]
-    assert '/' not in filename and filename.endswith('.parquet'), f'Expected split parquet: {path}'
-    return Path(filename).stem
+    return path is not None and Path(path) == expected
 
 
-def _matches_panel(row: pd.Series, panel: PanelConfig | None, *, split_stem: str) -> bool:
-    if panel is None:
-        return True
-    if _is_generated_panel(panel):
-        prefix = _generated_panel_prefix(panel)
-        return _matches_path_suffix(row.get('config.data.panel_path'), f'/panels/{prefix}{split_stem}.yaml')
-    assert panel.name is not None, 'panel.name is required'
-    return _matches_path_suffix(row.get('config.data.panel_path'), f'/panels/{panel.name}.yaml')
-
-
-def _is_generated_panel(panel: PanelConfig) -> bool:
-    fields = [panel.metadata_path, panel.n_top_genes, panel.flavor]
-    assert all(value is not None for value in fields) or all(value is None for value in fields), 'Invalid panel config'
-    return any(value is not None for value in fields)
-
-
-def _generated_panel_prefix(panel: PanelConfig) -> str:
-    assert panel.name is not None, 'panel.name is required'
-    assert panel.metadata_path is not None, 'panel.metadata_path is required'
-    split_stem = Path(str(panel.metadata_path).replace('\\', '/')).stem
-    assert panel.name.endswith(split_stem), f'Panel name must end with split stem: {panel.name}'
-    return panel.name.removesuffix(split_stem)
-
-
-def _matches_path_suffix(value, suffix: str) -> bool:
+def _path_parent_equals(value, expected_dir: Path) -> bool:
     path = _normalize_path(value)
-    return path is not None and f'/{path.lstrip("/")}'.endswith(suffix)
+    return path is not None and Path(path).parent == expected_dir
 
 
 def _normalize_path(value) -> str | None:
@@ -97,17 +67,14 @@ def _normalize_path(value) -> str | None:
     return str(value).replace('\\', '/')
 
 
-def _plot_title(artifacts_cfg: ArtifactsConfig, target: str) -> str:
-    dataset = DATASET_LABELS.get(artifacts_cfg.name, artifacts_cfg.name)
-    artifact = artifacts_cfg.items.name if artifacts_cfg.items.name == artifacts_cfg.split.name else artifacts_cfg.split.name
-    return f'{dataset} {artifact} {TARGET_LABELS[target]}'
+def _plot_title(eval_cfg: EvalConfig) -> str:
+    dataset = DATASET_LABELS.get(eval_cfg.data.name, eval_cfg.data.name)
+    return f'{dataset} {eval_cfg.data.split_dir} {TARGET_LABELS[eval_cfg.target]}'
 
 
-def _output_name(artifacts_cfg: ArtifactsConfig, target: str) -> str:
-    parts = [artifacts_cfg.name, target, artifacts_cfg.items.name]
-    if artifacts_cfg.split.name != artifacts_cfg.items.name:
-        parts.append(artifacts_cfg.split.name)
-    return '-'.join(_clean_name(part) for part in parts)
+def _output_name(eval_cfg: EvalConfig) -> str:
+    parts = [eval_cfg.data.name, eval_cfg.target, eval_cfg.data.split_dir]
+    return '-'.join(_clean_name(p) for p in parts)
 
 
 def _clean_name(value: str) -> str:

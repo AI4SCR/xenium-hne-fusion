@@ -76,4 +76,20 @@ class ArtifactsConfig:
     panel: PanelConfig | None = None
 
 
+@dataclass
+class EvalDataConfig:
+    name: str        # hest1k / beat — binds to managed output root
+    items_path: str  # relative to output_dir/items/
+    panel_path: str  # relative to panels/<name>/
+    split_dir: str   # directory under splits/ to match (e.g. hescape/breast, expr)
+
+
+@dataclass
+class EvalConfig:
+    project: str
+    target: str       # expression / cell_types
+    data: EvalDataConfig
+    refresh: bool = False
+
+
 ProcessingConfig = DataConfig

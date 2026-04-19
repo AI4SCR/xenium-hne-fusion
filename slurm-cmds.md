@@ -440,4 +440,15 @@ for OUTER in 0 1 2 3 4; do
     done
   done
 done
+
+# eval plots
+for ORGAN in "${ORGANS[@]}"; do
+    uv run python scripts/eval/plot_wandb_scores.py \
+        --config configs/eval/hescape/${ORGAN}.yaml
+done
+
+for TARGET in expression cell_types; do
+    uv run python scripts/eval/plot_wandb_scores.py \
+        --config configs/eval/beat/${TARGET}.yaml
+done
 ```

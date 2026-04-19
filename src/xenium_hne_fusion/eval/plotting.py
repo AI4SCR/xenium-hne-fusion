@@ -29,6 +29,8 @@ ANNOTATION_PALETTES = {
     'learnable_gate': {'False': '#F0F0F0', 'True': '#F2B8A0'},
     'morph_encoder': {'ViT-S': '#ADB2D4', 'ViT-B': '#EEF1DA', 'Loki': '#C7D9DD', 'Phikon': '#D5E5D5'},
     'expr_encoder': {'MLP': '#D7BDE2', 'Geneformer': '#F2B8A0'},
+    'freeze_morph': {'False': '#F0F0F0', 'True': '#B0C4DE'},
+    'freeze_expr': {'False': '#F0F0F0', 'True': '#B0C4DE'},
 }
 MODALITY_PALETTE = {'uni-modal': '#A8C8E8', 'multi-modal': '#F5C08A'}
 NA_COLOR = '#E0E0E0'

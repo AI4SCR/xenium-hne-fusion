@@ -7,7 +7,7 @@ import pandas as pd
 from loguru import logger
 
 
-SLUG_COLUMNS = ['stage', 'strategy', 'pool', 'learnable_gate', 'morph_encoder', 'expr_encoder']
+SLUG_COLUMNS = ['stage', 'strategy', 'pool', 'learnable_gate', 'morph_encoder', 'expr_encoder', 'freeze_morph', 'freeze_expr']
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,8 @@ class SlugSpec:
     learnable_gate: bool | None
     morph_encoder: str | None
     expr_encoder: str | None
+    freeze_morph: bool | None = None
+    freeze_expr: bool | None = None
 
 
 def validate_slug_specs(specs: Mapping[str, SlugSpec]) -> None:
@@ -91,24 +93,44 @@ def _slug_from_config(row: Mapping[str, Any]) -> str | None:
     expr_pool = _value(row, 'config.data.expr_pool')
     expr_token_pool = _value(row, 'config.backbone.expr_token_pool')
     learnable_gate = _value(row, 'config.backbone.learnable_gate')
+    freeze_morph = _value(row, 'config.backbone.freeze_morph_encoder')
+    freeze_expr = _value(row, 'config.backbone.freeze_expr_encoder')
+    freeze_suffix = _freeze_suffix(freeze_morph, freeze_expr)
 
     if fusion_strategy is not None:
         if fusion_strategy != 'add':
             return None
         if fusion_stage == 'early':
             slug = 'early-fusion'
-            return f'{slug}-gate' if _is_true(learnable_gate) else slug
+            if _is_true(learnable_gate):
+                slug = f'{slug}-gate'
+            return f'{slug}{freeze_suffix}'
         if fusion_stage == 'late':
             pool = 'tile' if expr_pool == 'tile' or expr_token_pool is None else 'token'
             slug = f'late-fusion-{pool}'
-            return f'{slug}-gate' if _is_true(learnable_gate) else slug
+            if _is_true(learnable_gate):
+                slug = f'{slug}-gate'
+            return f'{slug}{freeze_suffix}'
         return None
 
     if morph_encoder is not None and expr_encoder is None:
-        return 'vision'
+        return f'vision{freeze_suffix}'
     if expr_encoder is not None and morph_encoder is None:
-        return 'expr-tile' if expr_pool == 'tile' else 'expr-token'
+        base = 'expr-tile' if expr_pool == 'tile' else 'expr-token'
+        return f'{base}{freeze_suffix}'
     return None
+
+
+def _freeze_suffix(freeze_morph: Any, freeze_expr: Any) -> str:
+    fm = _is_true(freeze_morph)
+    fe = _is_true(freeze_expr)
+    if fm and fe:
+        return '-frozen'
+    if fm:
+        return '-morph-frozen'
+    if fe:
+        return '-expr-frozen'
+    return ''
 
 
 def _has_slug_config(row: Mapping[str, Any]) -> bool:
@@ -119,6 +141,8 @@ def _has_slug_config(row: Mapping[str, Any]) -> bool:
         'config.backbone.expr_encoder_name',
         'config.data.expr_pool',
         'config.backbone.expr_token_pool',
+        'config.backbone.freeze_morph_encoder',
+        'config.backbone.freeze_expr_encoder',
     ]
     return any(_value(row, key) is not None for key in keys)
 
