@@ -3,7 +3,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{papers/Fusion/figures/model_overview.pdf}
+  \includegraphics[width=\textwidth]{figures/model_overview.pdf}
 \caption{\textbf{Model architecture for multimodal prediction of spatial gene expression and cell type composition.}
 \textit{Left:} A representative $512 \times 512$ pixel tile cropped from a whole-slide H\&E image, overlaid with the Vision Transformer (ViT) patch grid. Each grid cell corresponds to a $16 \times 16$ pixel image patch that is encoded as a single token. Coloured crosses mark a subset of spatially aligned Xenium transcripts, demonstrating the co-localisation of transcriptomic measurements with the ViT token grid.
 \textit{Right:} The multimodal model processes two aligned token sequences. Image patches are embedded by the \emph{Morph Encoder} into a sequence of morphological token embeddings $\mathbf{h}_{\mathrm{img}}^{(i)}$. In parallel, transcripts aggregated within each ViT patch position are encoded by the \emph{Expr Encoder} and projected to the same embedding dimensionality, yielding a spatially aligned sequence of transcriptomic token embeddings $\mathbf{h}_{\mathrm{core}}^{(i)}$. The two token sequences are fused by either concatenation or element-wise addition (\emph{early fusion}), and a learnable classification token (\texttt{[CLS]}) is prepended to the combined sequence. The resulting sequence is processed by the remaining ViT transformer layers, which allow all tokens to interact via self-attention. The \texttt{[CLS]} token aggregates information across both modalities and spatial positions into a single tile-level representation, which is passed to a linear prediction head to predict either add-on panel gene expression or cell type abundances.}
@@ -38,7 +38,7 @@ We register the H\&E whole-slide image (WSI) to the Xenium coordinate system usi
 
 We tile each WSI into $512\times512$ pixel tiles with a stride of 256 pixels at a resolution of $0.5\,\mu$m per pixel. The 50\% overlap ensures that tissue structures near tile boundaries are captured across multiple tiles, reducing information loss from cells split at edges. Each tile is resized to $224\times224$ pixels prior to inference, after which the vision transformer tokenizes it into $16\times16$ pixel patches. At the resulting effective resolution of approximately $1.14\,\mu$m per pixel, each patch spans roughly $18\,\mu$m, approximately the diameter of a human lung cell~\cite{crapo_cellnumbercell_1982}.
 
-To ensure sufficient signal for downstream modeling, we apply task-specific quality filters. For gene expression prediction, we filter tiles to contain at least 1,000 transcripts. For cell type count prediction, we filter tiles to contain at least 20 cells. Cell density per tile does not correlate with whole-slide image size (\autoref{fig:p-fus:tiles-vs-density}), supporting the validity of cross-sample comparisons.
+To ensure sufficient signal for downstream modeling, we apply task-specific quality filters. For gene expression prediction, we filter tiles to contain at least 1,000 transcripts. For cell type count prediction, we filter tiles to contain at least 20 cells. Cell density per tile does not correlate with whole-slide image size, supporting the validity of cross-sample comparisons.
 
 \subsubsection{Cell Phenotyping}
 \label{sec:p-fus:cell-phenotyping}
@@ -194,5 +194,3 @@ Following prior work~\cite{chen_visualomicsfoundation_2025,gindra_largescalebenc
 \end{itemize}
 
 Because samples differ widely in tile count, tile-weighted averages may be dominated by large WSIs. We therefore additionally report an \textbf{equal-weighted sample-level score}: we compute the metric for each sample independently (aggregating its tiles) and average uniformly across samples. This score reflects per-patient predictive performance and is complementary to tile-level metrics.
-
-\end{document}
