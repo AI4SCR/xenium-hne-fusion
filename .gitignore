@@ -122,6 +122,13 @@ ipython_config.py
 .nextflow
 nextflow_test/work
 
+# LaTeX
+paper/*.aux
+paper/*.bbl
+paper/*.bcf
+paper/*.blg
+paper/*.log
+
 # Documentation
 docs/_build/
 /site
