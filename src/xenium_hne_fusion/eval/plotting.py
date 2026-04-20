@@ -190,7 +190,7 @@ def _plot_metric(
     board.group_cols(models, order=models, spacing=0)
     _add_annotation_rows(board, annotations, models)
     board.add_legends()
-    board.add_title(left=f'{title}: {METRIC_LABELS.get(metric, metric)}', fontsize=10, pad=0.5)
+    board.add_title(top=f'{title}: {METRIC_LABELS.get(metric, metric)}', fontsize=10, pad=0.5)
     board.render()
     _add_guides(board)
     _add_modality_legend(board, modalities)
