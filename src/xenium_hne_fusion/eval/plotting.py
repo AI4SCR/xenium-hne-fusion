@@ -42,6 +42,10 @@ _ANNOTATION_SOURCES = [
 ]
 DEFAULT_PARAMETER_COLUMNS = [src_col for _, src_col in _ANNOTATION_SOURCES]
 _PARAMETER_LABELS = {src_col: label for label, src_col in _ANNOTATION_SOURCES}
+_MORPH_ENCODER_SLUGS = {
+    'vit_small_patch16_224': 'ViT-S',
+    'vit_base_patch16_224': 'ViT-B',
+}
 
 
 def _relative_metadata_path(value) -> str | None:
@@ -89,7 +93,7 @@ def prepare_metric_plot_table(
     assert metric in scores.columns, f'Missing W&B metric: {metric}'
     missing_columns = sorted(set(parameter_columns) - set(scores.columns))
     assert not missing_columns, f'Missing W&B parameter columns: {missing_columns}'
-    keep_cols = ['run_id', 'run_name', 'model', metric, *parameter_columns]
+    keep_cols = ['run_id', 'run_name', 'model', 'metadata', metric, *parameter_columns]
     return scores[[c for c in keep_cols if c in scores.columns]].dropna(subset=[metric]).copy()
 
 
@@ -101,6 +105,7 @@ def plot_metrics(
     output_prefix: Path,
     order_by_name: bool = False,
     parameter_columns: list[str] | None = None,
+    color_by_split: bool = False,
 ) -> list[Path]:
     scores = prepare_scores_table(runs, metrics=metrics)
     if parameter_columns is None:
@@ -118,6 +123,7 @@ def plot_metrics(
                 title=title,
                 output_prefix=output_prefix,
                 order_by_name=order_by_name,
+                color_by_split=color_by_split,
             )
         )
     return outputs
@@ -149,6 +155,7 @@ def _plot_metric(
     title: str,
     output_prefix: Path,
     order_by_name: bool,
+    color_by_split: bool,
 ) -> list[Path]:
     models = _ordered_models(data, metric=metric, order_by_name=order_by_name)
     annotations = _build_parameter_table(data, models, parameter_columns=parameter_columns)
@@ -158,13 +165,28 @@ def _plot_metric(
     pdat = data.assign(rep=lambda df: df.groupby('model').cumcount()).pivot(
         index='rep', columns='model', values=metric
     ).reindex(columns=models)
+    split_data = None
+    split_palette = None
+    if color_by_split:
+        assert 'metadata' in data.columns, 'Missing split metadata'
+        assert data['metadata'].notna().all(), 'Missing split metadata'
+        split_data = data.assign(rep=lambda df: df.groupby('model').cumcount()).pivot(
+            index='rep', columns='model', values='metadata'
+        ).reindex(columns=models)
+        split_palette = _split_palette(data['metadata'])
 
     board = ma.ClusterBoard(pdat, height=3.0, margin=0.4)
     board.add_layer(
         mp.Box(pdat, hue=modalities, palette=modality_colors, fill=True, showfliers=False, linewidth=0.7),
         name='boxplot',
     )
-    board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
+    if color_by_split:
+        board.add_layer(
+            mp.Strip(pdat, hue=split_data, palette=split_palette, jitter=0.25, size=4, alpha=0.75),
+            name='stripplot',
+        )
+    else:
+        board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
     board.group_cols(models, order=models, spacing=0)
     _add_annotation_rows(board, annotations, models)
     board.add_legends()
@@ -186,6 +208,12 @@ def _plot_metric(
     return outputs
 
 
+def _split_palette(metadata: pd.Series) -> dict[str, tuple[float, float, float, float]]:
+    splits = sorted(metadata.astype(str).unique())
+    cmap = plt.get_cmap('tab20', len(splits))
+    return {split: cmap(i) for i, split in enumerate(splits)}
+
+
 def _ordered_models(data: pd.DataFrame, *, metric: str, order_by_name: bool) -> list[str]:
     models = sorted(data['model'].unique())
     if order_by_name:
@@ -203,7 +231,11 @@ def _build_parameter_table(data: pd.DataFrame, models: list[str], *, parameter_c
         for model in models:
             subset = data.loc[data['model'] == model, src_col]
             val = subset.iloc[0] if not subset.empty else None
-            row_values[model] = None if (val is None or (isinstance(val, float) and pd.isna(val))) else val
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                val = None
+            elif src_col == 'config.backbone.morph_encoder_name':
+                val = _MORPH_ENCODER_SLUGS.get(str(val).split('.', maxsplit=1)[0], val)
+            row_values[model] = val
         rows[_PARAMETER_LABELS.get(src_col, src_col)] = row_values
     return pd.DataFrame(rows).T
 
