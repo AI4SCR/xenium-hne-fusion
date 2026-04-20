@@ -1,8 +1,0 @@
-project: xe-hne-fus-expr-v0
-target: expression
-refresh: false
-data:
-  name: hest1k
-  items_path: all.json
-  panel_path: hescape/lung-healthy.yaml
-  split_dir: hescape/lung-healthy

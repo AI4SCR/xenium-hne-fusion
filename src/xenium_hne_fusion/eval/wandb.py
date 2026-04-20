@@ -14,8 +14,8 @@ from xenium_hne_fusion.utils.getters import get_data_dir
 DEFAULT_ENTITY = 'chuv'
 
 
-def default_cache_dir() -> Path:
-    return get_data_dir() / '03_output' / 'eval' / 'wandb'
+def default_cache_dir(name: str) -> Path:
+    return get_data_dir() / '03_output' / name / 'eval' / 'wandb'
 
 
 def load_project_runs(

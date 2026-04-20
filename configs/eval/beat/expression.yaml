@@ -1,8 +1,0 @@
-project: xe-hne-fus-expr-v0
-target: expression
-refresh: false
-data:
-  name: beat
-  items_path: expr.json
-  panel_path: default.yaml
-  split_dir: expr

@@ -9,19 +9,14 @@ from loguru import logger
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 
-from xenium_hne_fusion.eval.slugs import (
-    SlugSpec,
-    add_slugs,
-    build_annotation_table,
-    ordered_labels,
-    ordered_slugs,
-)
+from xenium_hne_fusion.eval.runs import keep_latest_per_group
 
 
 METRIC_LABELS = {
     'test/pearson_mean': 'Pearson Correlation',
     'test/spearman_mean': 'Spearman Correlation',
 }
+
 ANNOTATION_PALETTES = {
     'stage': {'early': '#C5E3C9', 'late': '#AACFDB'},
     'strategy': {'add': '#FAE0B3', 'concat': '#F5D2D2'},
@@ -34,143 +29,101 @@ ANNOTATION_PALETTES = {
 }
 MODALITY_PALETTE = {'uni-modal': '#A8C8E8', 'multi-modal': '#F5C08A'}
 NA_COLOR = '#E0E0E0'
-RUN_SETTING_COLUMNS = [
-    'slug',
-    'config.data.items_path',
-    'config.data.metadata_path',
-    'config.data.panel_path',
-    'config.data.expr_pool',
-    'config.head.output_dim',
-    'config.head.hidden_dim',
-    'config.head.num_hidden_layers',
-    'config.head.dropout',
-    'config.backbone.morph_encoder_name',
-    'config.backbone.expr_encoder_name',
-    'config.backbone.fusion_strategy',
-    'config.backbone.fusion_stage',
-    'config.backbone.global_pool',
-    'config.backbone.expr_token_pool',
-    'config.backbone.morph_token_pool',
-    'config.backbone.use_proj',
-    'config.backbone.learnable_gate',
-    'config.backbone.freeze_morph_encoder',
-    'config.backbone.freeze_expr_encoder',
-    'config.lit.lr_head',
-    'config.lit.lr_backbone',
-    'config.lit.weight_decay',
-    'config.lit.schedule',
-    'config.trainer.max_epochs',
-    'config.trainer.accumulate_grad_batches',
-    'config.trainer.gradient_clip_val',
+
+_ANNOTATION_SOURCES = [
+    ('stage', 'config.backbone.fusion_stage'),
+    ('strategy', 'config.backbone.fusion_strategy'),
+    ('pool', 'config.data.expr_pool'),
+    ('learnable_gate', 'config.backbone.learnable_gate'),
+    ('morph_encoder', 'config.backbone.morph_encoder_name'),
+    ('expr_encoder', 'config.backbone.expr_encoder_name'),
+    ('freeze_morph', 'config.backbone.freeze_morph_encoder'),
+    ('freeze_expr', 'config.backbone.freeze_expr_encoder'),
 ]
 
 
 def prepare_plot_table(
     runs: pd.DataFrame,
     *,
-    specs: dict[str, SlugSpec],
     metrics: list[str],
 ) -> pd.DataFrame:
     missing_metrics = sorted(set(metrics) - set(runs.columns))
     assert not missing_metrics, f'Missing W&B metrics: {missing_metrics}'
 
-    runs = add_slugs(runs, specs)
-    runs = keep_latest_duplicate_settings(runs)
-    keep_cols = ['run_id', 'run_name', 'slug', *metrics]
-    data = runs[keep_cols].dropna(subset=metrics, how='all').copy()
-    assert not data.empty, 'No runs have the requested W&B metrics'
-    return data
-
-
-def keep_latest_duplicate_settings(runs: pd.DataFrame) -> pd.DataFrame:
-    key_cols = [column for column in RUN_SETTING_COLUMNS if column in runs.columns]
-    assert 'slug' in key_cols, 'Missing slug in run settings'
-    if len(runs) < 2:
-        return runs
-
-    order_col = _run_order_column(runs)
-    ordered = runs.assign(_run_order=order_col).sort_values('_run_order', kind='stable', na_position='first')
-    duplicated = ordered.duplicated(key_cols, keep=False)
-    if not duplicated.any():
-        return ordered.drop(columns='_run_order')
-
-    for _, group in ordered.loc[duplicated].groupby(key_cols, dropna=False, sort=False):
-        ids = group['run_id'].astype(str).tolist()
-        kept = str(group.iloc[-1]['run_id'])
-        logger.warning(f'Duplicate W&B runs for identical eval setting; keeping latest {kept}; duplicate run_ids={ids}')
-
-    return ordered.drop_duplicates(key_cols, keep='last').drop(columns='_run_order')
-
-
-def _run_order_column(runs: pd.DataFrame) -> pd.Series:
-    if 'run_created_at' in runs.columns:
-        created_at = pd.to_datetime(runs['run_created_at'], errors='coerce', utc=True)
-        if created_at.notna().any():
-            return created_at
-    if 'run_updated_at' in runs.columns:
-        updated_at = pd.to_datetime(runs['run_updated_at'], errors='coerce', utc=True)
-        if updated_at.notna().any():
-            return updated_at
-    return pd.Series(range(len(runs)), index=runs.index)
+    assert 'config.wandb.name' in runs.columns, 'Missing config.wandb.name'
+    runs = runs.copy()
+    runs['model'] = runs['config.wandb.name'].astype(str)
+    runs = keep_latest_per_group(runs)
+    keep_cols = ['run_id', 'run_name', 'model', *metrics]
+    return runs[[c for c in keep_cols if c in runs.columns]].dropna(subset=metrics, how='all').copy()
 
 
 def plot_metrics(
     runs: pd.DataFrame,
     *,
-    specs: dict[str, SlugSpec],
     metrics: list[str],
     title: str,
     output_prefix: Path,
+    order_by_name: bool = False,
 ) -> list[Path]:
-    data = prepare_plot_table(runs, specs=specs, metrics=metrics)
+    _save_runs_csv(runs, metrics=metrics, output_prefix=output_prefix)
+    data = prepare_plot_table(runs, metrics=metrics)
     outputs = []
     for metric in metrics:
         metric_data = data.dropna(subset=[metric]).copy()
         assert not metric_data.empty, f'No W&B values for {metric}'
         outputs.extend(
-            _plot_metric(metric_data, specs=specs, metric=metric, title=title, output_prefix=output_prefix)
+            _plot_metric(metric_data, metric=metric, title=title, output_prefix=output_prefix, order_by_name=order_by_name)
         )
     return outputs
+
+
+def _save_runs_csv(
+    runs: pd.DataFrame,
+    *,
+    metrics: list[str],
+    output_prefix: Path,
+) -> Path:
+    table = runs.copy()
+    if 'config.wandb.name' in table.columns:
+        table['model'] = table['config.wandb.name'].astype(str)
+
+    csv_path = output_prefix.with_suffix('.csv')
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    export_cols = ['run_id', 'run_name']
+    if 'model' in table.columns:
+        export_cols.append('model')
+    export_cols += [m for m in metrics if m in table.columns]
+    table[export_cols].to_csv(csv_path, index=False)
+    logger.info(f'Saved runs CSV ({len(table)} rows) -> {csv_path}')
+    return csv_path
 
 
 def _plot_metric(
     data: pd.DataFrame,
     *,
-    specs: dict[str, SlugSpec],
     metric: str,
     title: str,
     output_prefix: Path,
+    order_by_name: bool,
 ) -> list[Path]:
-    slugs = ordered_slugs(data, specs)
-    labels = ordered_labels(slugs, specs)
-    pdat = data.assign(rep=lambda df: df.groupby('slug').cumcount()).pivot(
-        index='rep',
-        columns='slug',
-        values=metric,
-    )
-    pdat = pdat.reindex(columns=slugs)
-    pdat.columns = labels
+    models = _ordered_models(data, metric=metric, order_by_name=order_by_name)
+    annotations = _build_annotation_table(data, models)
+    modalities = [_get_modality(data, m) for m in models]
+    modality_colors = [MODALITY_PALETTE[mod] for mod in modalities]
 
-    annotations = build_annotation_table(specs, slugs)
-    annotations.columns = labels
-    modalities = [specs[slug].modality for slug in slugs]
-    modality_colors = [MODALITY_PALETTE[modality] for modality in modalities]
+    pdat = data.assign(rep=lambda df: df.groupby('model').cumcount()).pivot(
+        index='rep', columns='model', values=metric
+    ).reindex(columns=models)
 
     board = ma.ClusterBoard(pdat, height=3.0, margin=0.4)
     board.add_layer(
-        mp.Box(
-            pdat,
-            hue=modalities,
-            palette=modality_colors,
-            fill=True,
-            showfliers=False,
-            linewidth=0.7,
-        ),
+        mp.Box(pdat, hue=modalities, palette=modality_colors, fill=True, showfliers=False, linewidth=0.7),
         name='boxplot',
     )
     board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
-    board.group_cols(labels, order=labels, spacing=0)
-    _add_annotation_rows(board, annotations, labels)
+    board.group_cols(models, order=models, spacing=0)
+    _add_annotation_rows(board, annotations, models)
     board.add_legends()
     board.add_title(left=f'{title}: {METRIC_LABELS.get(metric, metric)}', fontsize=10, pad=0.5)
     board.render()
@@ -190,14 +143,47 @@ def _plot_metric(
     return outputs
 
 
-def _add_annotation_rows(board: ma.ClusterBoard, annotations: pd.DataFrame, labels: list[str]) -> None:
+def _ordered_models(data: pd.DataFrame, *, metric: str, order_by_name: bool) -> list[str]:
+    models = sorted(data['model'].unique())
+    if order_by_name:
+        return models
+    if metric in data.columns:
+        mean_scores = data.groupby('model')[metric].mean()
+        return mean_scores.sort_values(ascending=False).index.tolist()
+    return models
+
+
+def _build_annotation_table(data: pd.DataFrame, models: list[str]) -> pd.DataFrame:
+    rows = {}
+    for row_label, src_col in _ANNOTATION_SOURCES:
+        if src_col not in data.columns:
+            row_values = {m: None for m in models}
+        else:
+            row_values = {}
+            for model in models:
+                subset = data.loc[data['model'] == model, src_col]
+                val = subset.iloc[0] if not subset.empty else None
+                row_values[model] = None if (val is None or (isinstance(val, float) and pd.isna(val))) else val
+        rows[row_label] = row_values
+    return pd.DataFrame(rows).T
+
+
+def _get_modality(data: pd.DataFrame, model: str) -> str:
+    col = 'config.backbone.fusion_strategy'
+    if col not in data.columns:
+        return 'uni-modal'
+    vals = data.loc[data['model'] == model, col]
+    return 'multi-modal' if vals.notna().any() and (vals != '').any() else 'uni-modal'
+
+
+def _add_annotation_rows(board: ma.ClusterBoard, annotations: pd.DataFrame, models: list[str]) -> None:
     for i, row in enumerate(annotations.index):
         palette = ANNOTATION_PALETTES[row]
-        values = [annotations.loc[row, label] for label in labels]
+        values = [annotations.loc[row, m] for m in models]
         fill_colors = []
         display = []
         for value in values:
-            if pd.isna(value):
+            if value is None or (isinstance(value, float) and pd.isna(value)):
                 fill_colors.append(NA_COLOR)
                 display.append('')
                 continue
