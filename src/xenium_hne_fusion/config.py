@@ -83,6 +83,7 @@ class EvalConfig:
     name: str         # hest1k / beat
     items_path: str   # filename as in train config, e.g. all.json
     metadata_dir: str  # dir under splits/ matching metadata parent, e.g. hescape/breast
+    parameter_columns: list[str] | None = None
 
 
 ProcessingConfig = DataConfig

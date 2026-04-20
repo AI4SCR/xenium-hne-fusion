@@ -40,6 +40,8 @@ _ANNOTATION_SOURCES = [
     ('freeze_morph', 'config.backbone.freeze_morph_encoder'),
     ('freeze_expr', 'config.backbone.freeze_expr_encoder'),
 ]
+DEFAULT_PARAMETER_COLUMNS = [src_col for _, src_col in _ANNOTATION_SOURCES]
+_PARAMETER_LABELS = {src_col: label for label, src_col in _ANNOTATION_SOURCES}
 
 
 def _relative_metadata_path(value) -> str | None:
@@ -51,7 +53,7 @@ def _relative_metadata_path(value) -> str | None:
     return path[idx + len(marker):] if idx != -1 else path
 
 
-def prepare_plot_table(
+def prepare_scores_table(
     runs: pd.DataFrame,
     *,
     metrics: list[str],
@@ -65,9 +67,30 @@ def prepare_plot_table(
     runs = keep_latest_per_group(runs)
     if 'config.data.metadata_path' in runs.columns:
         runs['metadata'] = runs['config.data.metadata_path'].apply(_relative_metadata_path)
-    annotation_cols = [src_col for _, src_col in _ANNOTATION_SOURCES]
-    keep_cols = ['run_id', 'run_name', 'model', 'metadata', *annotation_cols, *metrics]
-    return runs[[c for c in keep_cols if c in runs.columns]].dropna(subset=metrics, how='all').copy()
+    return runs.dropna(subset=metrics, how='all').copy()
+
+
+def prepare_plot_table(
+    runs: pd.DataFrame,
+    *,
+    metrics: list[str],
+) -> pd.DataFrame:
+    table = prepare_scores_table(runs, metrics=metrics)
+    keep_cols = ['run_id', 'run_name', 'model', 'metadata', *DEFAULT_PARAMETER_COLUMNS, *metrics]
+    return table[[c for c in keep_cols if c in table.columns]].copy()
+
+
+def prepare_metric_plot_table(
+    scores: pd.DataFrame,
+    *,
+    metric: str,
+    parameter_columns: list[str],
+) -> pd.DataFrame:
+    assert metric in scores.columns, f'Missing W&B metric: {metric}'
+    missing_columns = sorted(set(parameter_columns) - set(scores.columns))
+    assert not missing_columns, f'Missing W&B parameter columns: {missing_columns}'
+    keep_cols = ['run_id', 'run_name', 'model', metric, *parameter_columns]
+    return scores[[c for c in keep_cols if c in scores.columns]].dropna(subset=[metric]).copy()
 
 
 def plot_metrics(
@@ -77,41 +100,43 @@ def plot_metrics(
     title: str,
     output_prefix: Path,
     order_by_name: bool = False,
+    parameter_columns: list[str] | None = None,
 ) -> list[Path]:
-    data = prepare_plot_table(runs, metrics=metrics)
-    _save_runs_csv(data, metrics=metrics, output_prefix=output_prefix)
+    scores = prepare_scores_table(runs, metrics=metrics)
+    if parameter_columns is None:
+        parameter_columns = [c for c in DEFAULT_PARAMETER_COLUMNS if c in scores.columns]
+    _save_runs_csv(scores, output_prefix=output_prefix)
     outputs = []
     for metric in metrics:
-        metric_data = data.dropna(subset=[metric]).copy()
+        metric_data = prepare_metric_plot_table(scores, metric=metric, parameter_columns=parameter_columns)
         assert not metric_data.empty, f'No W&B values for {metric}'
         outputs.extend(
-            _plot_metric(metric_data, metric=metric, title=title, output_prefix=output_prefix, order_by_name=order_by_name)
+            _plot_metric(
+                metric_data,
+                metric=metric,
+                parameter_columns=parameter_columns,
+                title=title,
+                output_prefix=output_prefix,
+                order_by_name=order_by_name,
+            )
         )
     return outputs
-
-
-_CSV_CONFIG_COLUMNS = [src_col for _, src_col in _ANNOTATION_SOURCES]
 
 
 def _save_runs_csv(
     runs: pd.DataFrame,
     *,
-    metrics: list[str],
     output_prefix: Path,
 ) -> Path:
     table = runs.copy()
     if 'config.wandb.name' in table.columns:
         table['model'] = table['config.wandb.name'].astype(str)
+    if 'metadata' not in table.columns and 'config.data.metadata_path' in table.columns:
+        table['metadata'] = table['config.data.metadata_path'].apply(_relative_metadata_path)
 
     csv_path = output_prefix.with_suffix('.csv')
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    base_cols = ['run_id', 'run_name']
-    if 'model' in table.columns:
-        base_cols.append('model')
-    config_cols = [c for c in _CSV_CONFIG_COLUMNS if c in table.columns]
-    metric_cols = [m for m in metrics if m in table.columns]
-    export_cols = base_cols + config_cols + metric_cols
-    table[export_cols].to_csv(csv_path, index=False)
+    table.to_csv(csv_path, index=False)
     logger.info(f'Saved runs CSV ({len(table)} rows) -> {csv_path}')
     return csv_path
 
@@ -120,12 +145,13 @@ def _plot_metric(
     data: pd.DataFrame,
     *,
     metric: str,
+    parameter_columns: list[str],
     title: str,
     output_prefix: Path,
     order_by_name: bool,
 ) -> list[Path]:
     models = _ordered_models(data, metric=metric, order_by_name=order_by_name)
-    annotations = _build_annotation_table(data, models)
+    annotations = _build_parameter_table(data, models, parameter_columns=parameter_columns)
     modalities = [_get_modality(data, m) for m in models]
     modality_colors = [MODALITY_PALETTE[mod] for mod in modalities]
 
@@ -170,18 +196,15 @@ def _ordered_models(data: pd.DataFrame, *, metric: str, order_by_name: bool) -> 
     return models
 
 
-def _build_annotation_table(data: pd.DataFrame, models: list[str]) -> pd.DataFrame:
+def _build_parameter_table(data: pd.DataFrame, models: list[str], *, parameter_columns: list[str]) -> pd.DataFrame:
     rows = {}
-    for row_label, src_col in _ANNOTATION_SOURCES:
-        if src_col not in data.columns:
-            row_values = {m: None for m in models}
-        else:
-            row_values = {}
-            for model in models:
-                subset = data.loc[data['model'] == model, src_col]
-                val = subset.iloc[0] if not subset.empty else None
-                row_values[model] = None if (val is None or (isinstance(val, float) and pd.isna(val))) else val
-        rows[row_label] = row_values
+    for src_col in parameter_columns:
+        row_values = {}
+        for model in models:
+            subset = data.loc[data['model'] == model, src_col]
+            val = subset.iloc[0] if not subset.empty else None
+            row_values[model] = None if (val is None or (isinstance(val, float) and pd.isna(val))) else val
+        rows[_PARAMETER_LABELS.get(src_col, src_col)] = row_values
     return pd.DataFrame(rows).T
 
 
@@ -195,7 +218,7 @@ def _get_modality(data: pd.DataFrame, model: str) -> str:
 
 def _add_annotation_rows(board: ma.ClusterBoard, annotations: pd.DataFrame, models: list[str]) -> None:
     for i, row in enumerate(annotations.index):
-        palette = ANNOTATION_PALETTES[row]
+        palette = ANNOTATION_PALETTES.get(row, {})
         values = [annotations.loc[row, m] for m in models]
         fill_colors = []
         display = []

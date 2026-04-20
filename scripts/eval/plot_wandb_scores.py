@@ -38,6 +38,7 @@ def main(
         title=title,
         output_prefix=output_dir / name,
         order_by_name=order_by_name,
+        parameter_columns=eval_cfg.parameter_columns,
     )
 
 
@@ -64,6 +65,7 @@ def cli(argv: list[str] | None = None) -> int:
         name=args['name'],
         items_path=args['items_path'],
         metadata_dir=args['metadata_dir'],
+        parameter_columns=args.get('parameter_columns'),
     )
     main(
         eval_cfg=eval_cfg,

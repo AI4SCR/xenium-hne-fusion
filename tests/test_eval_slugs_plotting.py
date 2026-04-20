@@ -241,3 +241,33 @@ def test_plot_metrics_smoke(tmp_path: Path):
 
     assert sorted(path.suffix for path in outputs) == ['.pdf', '.png']
     assert all(path.exists() for path in outputs)
+
+
+def test_save_runs_csv_writes_split_metadata_suffix_and_scores(tmp_path: Path):
+    runs = pd.DataFrame(
+        [
+            {
+                'run_id': 'r1',
+                'run_name': 'vision',
+                'config.wandb.name': 'vision',
+                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=0-inner=0-seed=0.parquet',
+                'test/pearson_mean': 0.2,
+                'test/spearman_mean': 0.3,
+            },
+        ]
+    )
+
+    csv_path = plotting._save_runs_csv(
+        runs,
+        output_prefix=tmp_path / 'scores',
+    )
+
+    table = pd.read_csv(csv_path)
+    assert 'model' in table.columns
+    assert 'metadata' in table.columns
+    assert 'config.data.metadata_path' in table.columns
+    assert 'test/pearson_mean' in table.columns
+    assert 'test/spearman_mean' in table.columns
+    assert table.loc[0, 'metadata'] == 'breast/outer=0-inner=0-seed=0.parquet'
+    assert table.loc[0, 'test/pearson_mean'] == pytest.approx(0.2)
+    assert table.loc[0, 'test/spearman_mean'] == pytest.approx(0.3)
