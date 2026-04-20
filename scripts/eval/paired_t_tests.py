@@ -70,7 +70,7 @@ def cli(argv: list[str] | None = None) -> int:
         metadata_dir=args['metadata_dir'],
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
-        color_by_split=args.get('color_by_split', False),
+        color_by_splits=args.get('color_by_splits', False),
     )
     main(
         eval_cfg=eval_cfg,

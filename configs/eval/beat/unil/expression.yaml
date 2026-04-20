@@ -4,3 +4,4 @@ name: beat
 items_path: expr.json
 metadata_dir: expr
 baseline: vision
+color_by_splits: false

@@ -4,3 +4,4 @@ name: beat
 items_path: cells.json
 metadata_dir: cells
 baseline: vision
+color_by_splits: false

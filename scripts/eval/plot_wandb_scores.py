@@ -39,7 +39,7 @@ def main(
         output_prefix=output_dir / name,
         order_by_name=order_by_name,
         parameter_columns=eval_cfg.parameter_columns,
-        color_by_split=eval_cfg.color_by_split,
+        color_by_split=eval_cfg.color_by_splits,
     )
 
 
@@ -68,7 +68,7 @@ def cli(argv: list[str] | None = None) -> int:
         metadata_dir=args['metadata_dir'],
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
-        color_by_split=args.get('color_by_split', False),
+        color_by_splits=args.get('color_by_splits', False),
     )
     main(
         eval_cfg=eval_cfg,

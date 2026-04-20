@@ -85,7 +85,7 @@ class EvalConfig:
     metadata_dir: str  # dir under splits/ matching metadata parent, e.g. hescape/breast
     baseline: str = 'vision'
     parameter_columns: list[str] | None = None
-    color_by_split: bool = False
+    color_by_splits: bool = False
 
 
 ProcessingConfig = DataConfig

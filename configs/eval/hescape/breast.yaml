@@ -4,3 +4,4 @@ name: hest1k
 items_path: all.json
 metadata_dir: hescape/breast
 baseline: vision
+color_by_splits: false
