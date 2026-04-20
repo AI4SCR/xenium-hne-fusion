@@ -22,7 +22,6 @@ def main(
     metrics: list[str] | None = None,
     entity: str = DEFAULT_ENTITY,
     wandb_filters: dict | None = None,
-    order_by_name: bool = False,
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
     cache_dir = cache_dir or default_cache_dir(eval_cfg.name)
@@ -37,7 +36,7 @@ def main(
         metrics=metrics,
         title=title,
         output_prefix=output_dir / name,
-        order_by_name=order_by_name,
+        sort_by_score=eval_cfg.sort_by_score,
         parameter_columns=eval_cfg.parameter_columns,
         color_by_split=eval_cfg.color_by_splits,
     )
@@ -53,7 +52,6 @@ def _build_parser() -> ArgumentParser:
     parser.add_argument('--metrics', type=list[str], default=None)
     parser.add_argument('--entity', type=str, default=DEFAULT_ENTITY)
     parser.add_argument('--wandb-filters', type=dict, default=None)
-    parser.add_argument('--order-by-name', type=bool, default=False)
     return parser
 
 
@@ -69,6 +67,7 @@ def cli(argv: list[str] | None = None) -> int:
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
         color_by_splits=args.get('color_by_splits', False),
+        sort_by_score=args.get('sort_by_score', True),
     )
     main(
         eval_cfg=eval_cfg,
@@ -78,7 +77,6 @@ def cli(argv: list[str] | None = None) -> int:
         metrics=args.get('metrics'),
         entity=args.get('entity', DEFAULT_ENTITY),
         wandb_filters=args.get('wandb_filters'),
-        order_by_name=args.get('order_by_name', False),
     )
     return 0
 

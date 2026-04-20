@@ -21,11 +21,11 @@ ANNOTATION_PALETTES = {
     'stage': {'early': '#C5E3C9', 'late': '#AACFDB'},
     'strategy': {'add': '#FAE0B3', 'concat': '#F5D2D2'},
     'pool': {'token': '#BDC3A8', 'tile': '#B7A99F'},
-    'learnable_gate': {'False': '#F0F0F0', 'True': '#F2B8A0'},
+    'learnable_gate': {'False': '#F5D2D2', 'True': '#B0C4DE'},
     'morph_encoder': {'ViT-S': '#ADB2D4', 'ViT-B': '#EEF1DA', 'Loki': '#C7D9DD', 'Phikon': '#D5E5D5'},
-    'expr_encoder': {'MLP': '#D7BDE2', 'Geneformer': '#F2B8A0'},
-    'freeze_morph': {'False': '#F0F0F0', 'True': '#B0C4DE'},
-    'freeze_expr': {'False': '#F0F0F0', 'True': '#B0C4DE'},
+    'expr_encoder': {'mlp': '#D7BDE2', 'gf': '#F4D35E'},
+    'freeze_morph': {'False': '#F5D2D2', 'True': '#B0C4DE'},
+    'freeze_expr': {'False': '#F5D2D2', 'True': '#B0C4DE'},
 }
 MODALITY_PALETTE = {'uni-modal': '#A8C8E8', 'multi-modal': '#F5C08A'}
 NA_COLOR = '#E0E0E0'
@@ -45,6 +45,10 @@ _PARAMETER_LABELS = {src_col: label for label, src_col in _ANNOTATION_SOURCES}
 _MORPH_ENCODER_SLUGS = {
     'vit_small_patch16_224': 'ViT-S',
     'vit_base_patch16_224': 'ViT-B',
+}
+_EXPR_ENCODER_SLUGS = {
+    'geneformer': 'gf',
+    'mlp': 'mlp',
 }
 
 
@@ -103,7 +107,7 @@ def plot_metrics(
     metrics: list[str],
     title: str,
     output_prefix: Path,
-    order_by_name: bool = False,
+    sort_by_score: bool = True,
     parameter_columns: list[str] | None = None,
     color_by_split: bool = False,
 ) -> list[Path]:
@@ -122,7 +126,7 @@ def plot_metrics(
                 parameter_columns=parameter_columns,
                 title=title,
                 output_prefix=output_prefix,
-                order_by_name=order_by_name,
+                sort_by_score=sort_by_score,
                 color_by_split=color_by_split,
             )
         )
@@ -154,25 +158,28 @@ def _plot_metric(
     parameter_columns: list[str],
     title: str,
     output_prefix: Path,
-    order_by_name: bool,
+    sort_by_score: bool,
     color_by_split: bool,
 ) -> list[Path]:
-    models = _ordered_models(data, metric=metric, order_by_name=order_by_name)
-    annotations = _build_parameter_table(data, models, parameter_columns=parameter_columns)
-    modalities = [_get_modality(data, m) for m in models]
+    data = data.copy()
+    config_columns = _config_columns(parameter_columns)
+    data['config_id'] = _configuration_ids(data, config_columns)
+    configs = _ordered_configs(data, metric=metric, sort_by_score=sort_by_score)
+    annotations = _build_parameter_table(data, configs, parameter_columns=parameter_columns)
+    modalities = [_get_modality(data, c) for c in configs]
     modality_colors = [MODALITY_PALETTE[mod] for mod in modalities]
 
-    pdat = data.assign(rep=lambda df: df.groupby('model').cumcount()).pivot(
-        index='rep', columns='model', values=metric
-    ).reindex(columns=models)
+    pdat = data.assign(rep=lambda df: df.groupby('config_id').cumcount()).pivot(
+        index='rep', columns='config_id', values=metric
+    ).reindex(columns=configs)
     split_data = None
     split_palette = None
     if color_by_split:
         assert 'metadata' in data.columns, 'Missing split metadata'
         assert data['metadata'].notna().all(), 'Missing split metadata'
-        split_data = data.assign(rep=lambda df: df.groupby('model').cumcount()).pivot(
-            index='rep', columns='model', values='metadata'
-        ).reindex(columns=models)
+        split_data = data.assign(rep=lambda df: df.groupby('config_id').cumcount()).pivot(
+            index='rep', columns='config_id', values='metadata'
+        ).reindex(columns=configs)
         split_palette = _split_palette(data['metadata'])
 
     board = ma.ClusterBoard(pdat, height=3.0, margin=0.4)
@@ -187,8 +194,8 @@ def _plot_metric(
         )
     else:
         board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
-    board.group_cols(models, order=models, spacing=0)
-    _add_annotation_rows(board, annotations, models)
+    board.group_cols(configs, order=configs, spacing=0)
+    _add_annotation_rows(board, annotations, configs)
     board.add_legends()
     metric_label = METRIC_LABELS.get(metric, metric)
     board.add_title(top=title, fontsize=10, pad=0.5)
@@ -216,44 +223,56 @@ def _split_palette(metadata: pd.Series) -> dict[str, tuple[float, float, float, 
     return {split: cmap(i) for i, split in enumerate(splits)}
 
 
-def _ordered_models(data: pd.DataFrame, *, metric: str, order_by_name: bool) -> list[str]:
-    models = sorted(data['model'].unique())
-    if order_by_name:
-        return models
-    if metric in data.columns:
-        mean_scores = data.groupby('model')[metric].mean()
+def _config_columns(parameter_columns: list[str]) -> list[str]:
+    return ['model', *parameter_columns]
+
+
+def _configuration_ids(data: pd.DataFrame, config_columns: list[str]) -> pd.Series:
+    missing_columns = sorted(set(config_columns) - set(data.columns))
+    assert not missing_columns, f'Missing configuration columns: {missing_columns}'
+    values = data[config_columns].astype('string').fillna('<NA>')
+    return values.apply(lambda row: ' | '.join(row), axis=1)
+
+
+def _ordered_configs(data: pd.DataFrame, *, metric: str, sort_by_score: bool) -> list[str]:
+    configs = sorted(data['config_id'].unique())
+    if sort_by_score:
+        assert metric in data.columns, f'Missing W&B metric: {metric}'
+        mean_scores = data.groupby('config_id')[metric].mean()
         return mean_scores.sort_values(ascending=False).index.tolist()
-    return models
+    return configs
 
 
-def _build_parameter_table(data: pd.DataFrame, models: list[str], *, parameter_columns: list[str]) -> pd.DataFrame:
+def _build_parameter_table(data: pd.DataFrame, configs: list[str], *, parameter_columns: list[str]) -> pd.DataFrame:
     rows = {}
     for src_col in parameter_columns:
         row_values = {}
-        for model in models:
-            subset = data.loc[data['model'] == model, src_col]
+        for config in configs:
+            subset = data.loc[data['config_id'] == config, src_col]
             val = subset.iloc[0] if not subset.empty else None
             if val is None or (isinstance(val, float) and pd.isna(val)):
                 val = None
             elif src_col == 'config.backbone.morph_encoder_name':
                 val = _MORPH_ENCODER_SLUGS.get(str(val).split('.', maxsplit=1)[0], val)
-            row_values[model] = val
+            elif src_col == 'config.backbone.expr_encoder_name':
+                val = _EXPR_ENCODER_SLUGS.get(str(val).split('.', maxsplit=1)[0], val)
+            row_values[config] = val
         rows[_PARAMETER_LABELS.get(src_col, src_col)] = row_values
     return pd.DataFrame(rows).T
 
 
-def _get_modality(data: pd.DataFrame, model: str) -> str:
+def _get_modality(data: pd.DataFrame, config: str) -> str:
     col = 'config.backbone.fusion_strategy'
     if col not in data.columns:
         return 'uni-modal'
-    vals = data.loc[data['model'] == model, col]
+    vals = data.loc[data['config_id'] == config, col]
     return 'multi-modal' if vals.notna().any() and (vals != '').any() else 'uni-modal'
 
 
-def _add_annotation_rows(board: ma.ClusterBoard, annotations: pd.DataFrame, models: list[str]) -> None:
+def _add_annotation_rows(board: ma.ClusterBoard, annotations: pd.DataFrame, configs: list[str]) -> None:
     for i, row in enumerate(annotations.index):
         palette = ANNOTATION_PALETTES.get(row, {})
-        values = [annotations.loc[row, m] for m in models]
+        values = [annotations.loc[row, c] for c in configs]
         fill_colors = []
         display = []
         for value in values:

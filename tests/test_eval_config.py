@@ -15,6 +15,7 @@ def test_eval_plot_cli_reads_color_by_splits_from_eval_config(tmp_path: Path):
                 'metadata_dir: hescape/breast',
                 'baseline: vision',
                 'color_by_splits: true',
+                'sort_by_score: false',
             ]
         )
     )
@@ -22,3 +23,4 @@ def test_eval_plot_cli_reads_color_by_splits_from_eval_config(tmp_path: Path):
     args = _build_parser().parse_args(['--config', str(config_path)]).as_dict()
 
     assert args['color_by_splits'] is True
+    assert args['sort_by_score'] is False

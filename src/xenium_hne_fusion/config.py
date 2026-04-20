@@ -86,6 +86,7 @@ class EvalConfig:
     baseline: str = 'vision'
     parameter_columns: list[str] | None = None
     color_by_splits: bool = False
+    sort_by_score: bool = True
 
 
 ProcessingConfig = DataConfig
