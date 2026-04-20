@@ -1,0 +1,5 @@
+project: xe-hne-fus-expr-v0
+target: expression
+name: hest1k
+items_path: all.json
+metadata_dir: hescape/human-multi-tissue
