@@ -42,6 +42,15 @@ _ANNOTATION_SOURCES = [
 ]
 
 
+def _relative_metadata_path(value) -> str | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    path = str(value).replace('\\', '/')
+    marker = 'splits/'
+    idx = path.rfind(marker)
+    return path[idx + len(marker):] if idx != -1 else path
+
+
 def prepare_plot_table(
     runs: pd.DataFrame,
     *,
@@ -54,7 +63,10 @@ def prepare_plot_table(
     runs = runs.copy()
     runs['model'] = runs['config.wandb.name'].astype(str)
     runs = keep_latest_per_group(runs)
-    keep_cols = ['run_id', 'run_name', 'model', *metrics]
+    if 'config.data.metadata_path' in runs.columns:
+        runs['metadata'] = runs['config.data.metadata_path'].apply(_relative_metadata_path)
+    annotation_cols = [src_col for _, src_col in _ANNOTATION_SOURCES]
+    keep_cols = ['run_id', 'run_name', 'model', 'metadata', *annotation_cols, *metrics]
     return runs[[c for c in keep_cols if c in runs.columns]].dropna(subset=metrics, how='all').copy()
 
 
@@ -66,8 +78,8 @@ def plot_metrics(
     output_prefix: Path,
     order_by_name: bool = False,
 ) -> list[Path]:
-    _save_runs_csv(runs, metrics=metrics, output_prefix=output_prefix)
     data = prepare_plot_table(runs, metrics=metrics)
+    _save_runs_csv(data, metrics=metrics, output_prefix=output_prefix)
     outputs = []
     for metric in metrics:
         metric_data = data.dropna(subset=[metric]).copy()

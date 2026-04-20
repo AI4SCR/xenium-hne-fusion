@@ -75,4 +75,14 @@ class ArtifactsConfig:
     split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
     panel: PanelConfig | None = None
 
+
+@dataclass
+class EvalConfig:
+    project: str
+    target: str       # expression / cell_types
+    name: str         # hest1k / beat
+    items_path: str   # filename as in train config, e.g. all.json
+    metadata_dir: str  # dir under splits/ matching metadata parent, e.g. hescape/breast
+
+
 ProcessingConfig = DataConfig

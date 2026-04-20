@@ -309,12 +309,19 @@ done
 #  done
 #done
 
+# eval plots
+for TARGET in expression cell_types; do
+    uv run python scripts/eval/plot_wandb_scores.py \
+        --config configs/eval/beat/unil/${TARGET}.yaml
+done
 ```
 
 ## HESCAPE
 
 ```bash
 ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+MODELS=(early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token)
+MODELS=(expr-tile expr-token)
 
 # artifacts (filter items + cross-validated splits + compute stats)
 for ORGAN in "${ORGANS[@]}"; do
@@ -341,12 +348,16 @@ MEMORY=64G
 MAX_EPOCHS=50
 FREEZE_MORPH=true
 
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+MODELS=(early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token)
+MODELS=(expr-tile expr-token)
+
 # base models
 for OUTER in 0 1 2 3 4; do
   for ORGAN in "${ORGANS[@]}"; do
     METADATA_PATH="hescape/${ORGAN}/outer=${OUTER}-seed=0.parquet"
     PANEL_PATH="hescape/${ORGAN}.yaml"
-    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+    for MODEL in "${MODELS[@]}"; do
         CONFIG=configs/train/hescape/${TASK}/${ORGAN}/${MODEL}.yaml
 #        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug=true --data.cache_dir=null
         sbatch \
@@ -441,21 +452,12 @@ for OUTER in 0 1 2 3 4; do
   done
 done
 
+
 # eval plots
 ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
 ORGAN=breast
-uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/${ORGAN}.yaml --project xe-hne-fus-expr-v0 --target expression
+uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/hescape/${ORGAN}.yaml
 for ORGAN in "${ORGANS[@]}"; do
-    uv run python scripts/eval/plot_wandb_scores.py \
-        --config configs/artifacts/hescape/${ORGAN}.yaml \
-        --project xe-hne-fus-expr-v0 \
-        --target expression
-done
-
-for TARGET in expression cell_types; do
-    uv run python scripts/eval/plot_wandb_scores.py \
-        --config configs/artifacts/beat/unil/${TARGET}.yaml \
-        --project xe-hne-fus-expr-v0 \
-        --target ${TARGET}
+    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/hescape/${ORGAN}.yaml
 done
 ```
