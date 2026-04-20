@@ -1,4 +1,4 @@
-project: xe-hne-fus-expr-v0
+project: xe-hne-fus-cell-v0
 target: cell_types
 name: beat
 items_path: cells.json
