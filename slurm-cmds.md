@@ -444,11 +444,15 @@ done
 # eval plots
 for ORGAN in "${ORGANS[@]}"; do
     uv run python scripts/eval/plot_wandb_scores.py \
-        --config configs/eval/hescape/${ORGAN}.yaml
+        --config configs/artifacts/hescape/${ORGAN}.yaml \
+        --project xe-hne-fus-expr-v0 \
+        --target expression
 done
 
 for TARGET in expression cell_types; do
     uv run python scripts/eval/plot_wandb_scores.py \
-        --config configs/eval/beat/${TARGET}.yaml
+        --config configs/artifacts/beat/unil/${TARGET}.yaml \
+        --project xe-hne-fus-expr-v0 \
+        --target ${TARGET}
 done
 ```

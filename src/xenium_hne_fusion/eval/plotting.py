@@ -78,6 +78,9 @@ def plot_metrics(
     return outputs
 
 
+_CSV_CONFIG_COLUMNS = [src_col for _, src_col in _ANNOTATION_SOURCES]
+
+
 def _save_runs_csv(
     runs: pd.DataFrame,
     *,
@@ -90,10 +93,12 @@ def _save_runs_csv(
 
     csv_path = output_prefix.with_suffix('.csv')
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    export_cols = ['run_id', 'run_name']
+    base_cols = ['run_id', 'run_name']
     if 'model' in table.columns:
-        export_cols.append('model')
-    export_cols += [m for m in metrics if m in table.columns]
+        base_cols.append('model')
+    config_cols = [c for c in _CSV_CONFIG_COLUMNS if c in table.columns]
+    metric_cols = [m for m in metrics if m in table.columns]
+    export_cols = base_cols + config_cols + metric_cols
     table[export_cols].to_csv(csv_path, index=False)
     logger.info(f'Saved runs CSV ({len(table)} rows) -> {csv_path}')
     return csv_path
