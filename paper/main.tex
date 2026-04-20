@@ -1,0 +1,107 @@
+\documentclass[11pt]{article}
+
+% --- Page geometry ---
+\usepackage[a4paper, margin=2.5cm]{geometry}
+
+% --- Fonts and encoding ---
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Math ---
+\usepackage{amsmath, amssymb}
+
+% --- Figures ---
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{placeins}   % \FloatBarrier
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{rotating}   % sidewaystable
+\usepackage{tabularx}
+\usepackage{longtable}
+
+% --- Lists ---
+\usepackage{enumitem}
+
+% --- Colors and hyperlinks ---
+\usepackage[dvipsnames]{xcolor}
+\usepackage[
+  colorlinks=true,
+  linkcolor=NavyBlue,
+  citecolor=NavyBlue,
+  urlcolor=NavyBlue
+]{hyperref}
+
+% --- Cross-references ---
+\usepackage{cleveref}
+
+% --- Bibliography ---
+\usepackage[
+  backend=biber,
+  style=nature,
+  sorting=none,
+  maxnames=6,
+  minnames=1
+]{biblatex}
+\addbibresource{zotero.bib}
+
+% --- Spacing ---
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+
+% -----------------------------------------------------------------------
+
+\begin{document}
+
+% --- Title block ---
+\begin{center}
+  {\LARGE\bfseries Token-Level Multimodal Fusion of Histology and Spatial\\
+  Transcriptomics for Morpho-Molecular Tissue Representation}
+
+  \vspace{1em}
+
+  {\large
+    Adriano Martinelli$^{1,2}$,
+    Daria Buszta$^{2}$,
+    Jonathan Bac$^{2}$,
+    Senbai Kang$^{2}$,
+    % TODO: add remaining authors
+  }
+
+  \vspace{0.5em}
+
+  {\small
+    $^{1}$TODO: affiliation 1 \\
+    $^{2}$Biomedical Data Science Center, CHUV, Lausanne, Switzerland
+  }
+
+  \vspace{0.5em}
+
+  {\small \today}
+\end{center}
+
+\vspace{1em}
+
+% --- Abstract ---
+\input{content/01_abstract}
+
+\vspace{1em}
+
+% --- Main body ---
+\input{content/02_introduction}
+\input{content/03_methods}
+\input{content/04_results}
+\input{content/05_discussion}
+
+% --- References ---
+\printbibliography
+
+% --- Appendix ---
+\appendix
+\input{content/06_appendix}
+
+\end{document}

@@ -442,6 +442,9 @@ for OUTER in 0 1 2 3 4; do
 done
 
 # eval plots
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+ORGAN=breast
+uv run python scripts/eval/plot_wandb_scores.py --config configs/artifacts/hescape/${ORGAN}.yaml --project xe-hne-fus-expr-v0 --target expression
 for ORGAN in "${ORGANS[@]}"; do
     uv run python scripts/eval/plot_wandb_scores.py \
         --config configs/artifacts/hescape/${ORGAN}.yaml \
