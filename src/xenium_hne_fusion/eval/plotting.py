@@ -190,8 +190,10 @@ def _plot_metric(
     board.group_cols(models, order=models, spacing=0)
     _add_annotation_rows(board, annotations, models)
     board.add_legends()
-    board.add_title(top=f'{title}: {METRIC_LABELS.get(metric, metric)}', fontsize=10, pad=0.5)
+    metric_label = METRIC_LABELS.get(metric, metric)
+    board.add_title(top=title, fontsize=10, pad=0.5)
     board.render()
+    _set_metric_ylabel(board, metric_label)
     _add_guides(board)
     _add_modality_legend(board, modalities)
 
@@ -288,6 +290,13 @@ def _add_guides(board: ma.ClusterBoard) -> None:
             ax.axhline(y, linestyle='--', linewidth=0.5, alpha=0.7, color='0.6', zorder=0)
         for x in ax.get_xticks():
             ax.axvline(x, linestyle='--', linewidth=0.5, alpha=0.7, color='0.6', zorder=0)
+
+
+def _set_metric_ylabel(board: ma.ClusterBoard, label: str) -> None:
+    main_axes = board.get_main_ax()
+    if not isinstance(main_axes, (list, tuple)):
+        main_axes = [main_axes]
+    main_axes[0].set_ylabel(label)
 
 
 def _add_modality_legend(board: ma.ClusterBoard, modalities: list[str]) -> None:
