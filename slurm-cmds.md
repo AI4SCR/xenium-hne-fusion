@@ -460,4 +460,12 @@ uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/hescape/${
 for ORGAN in "${ORGANS[@]}"; do
     uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/hescape/${ORGAN}.yaml
 done
+
+# paired t-test stats vs the eval config baseline
+ORGANS=(breast bowel lung-healthy human-immuno-oncology human-multi-tissue)
+ORGAN=breast
+uv run python scripts/eval/paired_t_tests.py --config configs/eval/hescape/${ORGAN}.yaml
+for ORGAN in "${ORGANS[@]}"; do
+    uv run python scripts/eval/paired_t_tests.py --config configs/eval/hescape/${ORGAN}.yaml
+done
 ```

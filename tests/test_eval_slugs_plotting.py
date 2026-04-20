@@ -158,6 +158,7 @@ def test_eval_plot_cli_uses_artifact_config_scope():
     assert args['split']['name'] == 'breast'
     assert args['project'] == 'xe-hne-fus-expr'
     assert args['target'] == 'expression'
+    assert args['baseline'] == 'vision'
     assert 'dataset' not in args
     assert 'organ' not in args
     assert 'slugs_path' not in args
@@ -271,3 +272,21 @@ def test_save_runs_csv_writes_split_metadata_suffix_and_scores(tmp_path: Path):
     assert table.loc[0, 'metadata'] == 'breast/outer=0-inner=0-seed=0.parquet'
     assert table.loc[0, 'test/pearson_mean'] == pytest.approx(0.2)
     assert table.loc[0, 'test/spearman_mean'] == pytest.approx(0.3)
+
+
+def test_build_parameter_table_slugs_morph_encoder_names():
+    data = pd.DataFrame(
+        [
+            {'model': 'small', 'config.backbone.morph_encoder_name': 'vit_small_patch16_224'},
+            {'model': 'base', 'config.backbone.morph_encoder_name': 'vit_base_patch16_224.augreg_in21k'},
+            {'model': 'loki', 'config.backbone.morph_encoder_name': 'loki'},
+        ]
+    )
+
+    table = plotting._build_parameter_table(
+        data,
+        ['small', 'base', 'loki'],
+        parameter_columns=['config.backbone.morph_encoder_name'],
+    )
+
+    assert table.loc['morph_encoder'].to_dict() == {'small': 'ViT-S', 'base': 'ViT-B', 'loki': 'loki'}

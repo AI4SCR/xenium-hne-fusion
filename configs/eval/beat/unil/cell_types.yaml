@@ -3,3 +3,4 @@ target: cell_types
 name: beat
 items_path: cells.json
 metadata_dir: cells
+baseline: vision

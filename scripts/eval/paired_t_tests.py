@@ -6,7 +6,8 @@ from jsonargparse import ArgumentParser
 
 from xenium_hne_fusion.config import EvalConfig
 from xenium_hne_fusion.eval.experiments import select_runs
-from xenium_hne_fusion.eval.plotting import METRIC_LABELS, plot_metrics
+from xenium_hne_fusion.eval.plotting import METRIC_LABELS
+from xenium_hne_fusion.eval.stats import DEFAULT_PAIR_KEY, save_paired_t_tests
 from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs, restrict_to_wandb_filter
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
@@ -22,7 +23,8 @@ def main(
     metrics: list[str] | None = None,
     entity: str = DEFAULT_ENTITY,
     wandb_filters: dict | None = None,
-    order_by_name: bool = False,
+    candidates: list[str] | None = None,
+    pair_key: str = DEFAULT_PAIR_KEY,
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
     cache_dir = cache_dir or default_cache_dir(eval_cfg.name)
@@ -31,15 +33,14 @@ def main(
     table = load_project_runs(eval_cfg.project, entity=entity, cache_dir=cache_dir, refresh=refresh)
     if wandb_filters:
         table = restrict_to_wandb_filter(table, eval_cfg.project, entity=entity, filters=wandb_filters)
-    runs, title, name = select_runs(table, eval_cfg=eval_cfg)
-    plot_metrics(
+    runs, _, name = select_runs(table, eval_cfg=eval_cfg)
+    save_paired_t_tests(
         runs,
+        output_path=output_dir / f'{name}-paired-t-tests.csv',
         metrics=metrics,
-        title=title,
-        output_prefix=output_dir / name,
-        order_by_name=order_by_name,
-        parameter_columns=eval_cfg.parameter_columns,
-        color_by_split=eval_cfg.color_by_split,
+        baseline=eval_cfg.baseline,
+        candidates=candidates,
+        pair_key=pair_key,
     )
 
 
@@ -53,7 +54,8 @@ def _build_parser() -> ArgumentParser:
     parser.add_argument('--metrics', type=list[str], default=None)
     parser.add_argument('--entity', type=str, default=DEFAULT_ENTITY)
     parser.add_argument('--wandb-filters', type=dict, default=None)
-    parser.add_argument('--order-by-name', type=bool, default=False)
+    parser.add_argument('--candidates', type=list[str], default=None)
+    parser.add_argument('--pair-key', type=str, default=DEFAULT_PAIR_KEY)
     return parser
 
 
@@ -78,7 +80,8 @@ def cli(argv: list[str] | None = None) -> int:
         metrics=args.get('metrics'),
         entity=args.get('entity', DEFAULT_ENTITY),
         wandb_filters=args.get('wandb_filters'),
-        order_by_name=args.get('order_by_name', False),
+        candidates=args.get('candidates'),
+        pair_key=args.get('pair_key', DEFAULT_PAIR_KEY),
     )
     return 0
 
