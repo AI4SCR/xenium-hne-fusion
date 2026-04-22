@@ -344,6 +344,9 @@ for OUTER in 0 1 2 3; do
                 --data.items_path cells.json"
     done
 done
+
+# eval plots
+uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/cell_types.yaml --metadata_dir cells-legacy
 ```
 
 ## HESCAPE
