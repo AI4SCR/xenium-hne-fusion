@@ -59,7 +59,6 @@ for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-#        PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
         PANEL_NAME="${PANEL_PATH%.yaml}"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
