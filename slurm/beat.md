@@ -17,30 +17,43 @@ uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/b
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
-# hvg panels (run after artifact jobs)
+# warmup cache
+TASK=expression
+SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
+ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
+PANEL_PATH=default.yaml
+PANEL_NAME="${PANEL_PATH%.yaml}"
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_NAME="expr-hvg-${SPLIT_NAME}"
-    sbatch \
-        --cpus-per-task=10 \
-        --mem=32G \
-        --time=04:00:00 \
-        --output=$HOME/logs/%j.out \
-        --wrap="uv run python scripts/artifacts/create_panel.py \
-            --config configs/artifacts/beat/unil/expr-hvg.yaml \
-            --panel.metadata_path ${METADATA_PATH} \
-            --panel.name ${PANEL_NAME}"
-done
-
-# warmup cache
-for OUTER in 0 1 2 3; do
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
     sbatch \
         --cpus-per-task=10 \
         --mem=32G \
         --time=02:00:00 \
         --output=$HOME/logs/%j.out \
-        --wrap="uv run python scribble/warmup-cache.py --outer ${OUTER}"
+        --wrap="uv run python scribble/warmup-cache.py \
+            --config configs/train/beat/${TASK}/early-fusion.yaml \
+            --items-path ${ITEMS_PATH} \
+            --metadata-path ${METADATA_PATH} \
+            --panel-path ${PANEL_PATH} \
+            --cache-dir ${TASK}/${PANEL_NAME}"
+done
+
+TASK=cell_types
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    sbatch \
+        --cpus-per-task=10 \
+        --mem=32G \
+        --time=02:00:00 \
+        --output=$HOME/logs/%j.out \
+        --wrap="uv run python scribble/warmup-cache.py \
+            --config configs/train/beat/${TASK}/early-fusion.yaml \
+            --items-path ${ITEMS_PATH} \
+            --metadata-path ${METADATA_PATH} \
+            --panel-path ${PANEL_PATH} \
+            --cache-dir ${TASK}/${PANEL_NAME}"
 done
 ```
 
@@ -54,7 +67,7 @@ MEMORY=64G
 # TASK=cell_types
 TASK=expression
 SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
-ITEMS_PATH=cells.json  # note we only use the cells splits across tasks for consistency
+ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 PANEL_PATH=default.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
 for OUTER in 0 1 2 3; do
@@ -87,12 +100,10 @@ done
 for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-        PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-        PANEL_NAME="${PANEL_PATH%.yaml}"
+        METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true --data.cache_dir=null
 
         sbatch \
             --cpus-per-task=12 \
@@ -104,10 +115,11 @@ for OUTER in 0 1 2 3; do
             --job-name=${TASK}-${MODEL}-concat-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --backbone.fusion_strategy concat \
-                --data.cache_dir=expression/${PANEL_NAME}"
+                --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
 done
 
@@ -115,12 +127,10 @@ done
 for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-        PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
-        PANEL_NAME="${PANEL_PATH%.yaml}"
+        METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.freeze_morph_encoder true --debug true --data.cache_dir=null
 
         sbatch \
             --cpus-per-task=12 \
@@ -129,13 +139,14 @@ for OUTER in 0 1 2 3; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-concat-${OUTER} \
+            --job-name=${TASK}-${MODEL}-freeze-morph-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --backbone.freeze_morph_encoder true \
-                --data.cache_dir=expression/${PANEL_NAME}"
+                --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
 done
 
