@@ -19,42 +19,31 @@ uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/b
 
 # warmup cache
 TASK=expression
-SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
 ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 PANEL_PATH=default.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
-for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-    sbatch \
-        --cpus-per-task=10 \
-        --mem=32G \
-        --time=02:00:00 \
-        --output=$HOME/logs/%j.out \
-        --wrap="uv run python scribble/warmup-cache.py \
-            --config configs/train/beat/${TASK}/early-fusion.yaml \
-            --items-path ${ITEMS_PATH} \
-            --metadata-path ${METADATA_PATH} \
-            --panel-path ${PANEL_PATH} \
-            --cache-dir ${TASK}/${PANEL_NAME}"
-done
+sbatch \
+    --cpus-per-task=10 \
+    --mem=32G \
+    --time=02:00:00 \
+    --output=$HOME/logs/%j.out \
+    --wrap="uv run python scribble/warmup-cache.py \
+        --config configs/train/beat/${TASK}/early-fusion.yaml \
+        --items-path ${ITEMS_PATH} \
+        --panel-path ${PANEL_PATH} \
+        --cache-dir ${TASK}/${PANEL_NAME}"
 
 TASK=cell_types
-for OUTER in 0 1 2 3; do
-    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-    sbatch \
-        --cpus-per-task=10 \
-        --mem=32G \
-        --time=02:00:00 \
-        --output=$HOME/logs/%j.out \
-        --wrap="uv run python scribble/warmup-cache.py \
-            --config configs/train/beat/${TASK}/early-fusion.yaml \
-            --items-path ${ITEMS_PATH} \
-            --metadata-path ${METADATA_PATH} \
-            --panel-path ${PANEL_PATH} \
-            --cache-dir ${TASK}/${PANEL_NAME}"
-done
+sbatch \
+    --cpus-per-task=10 \
+    --mem=32G \
+    --time=02:00:00 \
+    --output=$HOME/logs/%j.out \
+    --wrap="uv run python scribble/warmup-cache.py \
+        --config configs/train/beat/${TASK}/early-fusion.yaml \
+        --items-path ${ITEMS_PATH} \
+        --panel-path ${PANEL_PATH} \
+        --cache-dir ${TASK}/${PANEL_NAME}"
 ```
 
 ## Model Training
