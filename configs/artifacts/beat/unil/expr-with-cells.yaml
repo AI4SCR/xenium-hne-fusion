@@ -1,0 +1,39 @@
+name: beat
+items:
+  name: expr
+  filter:
+    organs: null
+    include_ids: null
+    exclude_ids:
+      - XE_1JAT.01_HNE_1JAT
+      - XE_1IVR.01_HNE_1IVR_01-1
+      - XE_1FYV.01_HNE_1FYV-01
+      - XE_1GX4.01_HNE_1GX4-01
+      - 'XE_1H0U.01_24_HNE_1H0U-01'
+      - 'XE_1G4X.01_42_HNE_1G4X'
+      - 'XE_1GJA.01_24_HNE_1GJA-01'
+      - 'XE_1GP0.01_HNE_1GPO'
+      - 'XE_1HJ4.01_42_HNE_HJ4'
+      - 'XE_1FYP.01_HNE_1FYP'
+      - 'XE_1G52.01_24_HNE_1G52-01'
+      - 'XE_1CGZ.01_42_HNE_1CGZ'
+      - 'XE_1G9J.01_24_HNE_1G9J-01'
+      - 'XE_1H5K.01_27_HNE_1H5K_01'
+    num_transcripts: 200
+    num_unique_transcripts: null
+    num_cells: null
+    num_unique_cells: null
+split:
+  name: expr-with-cells
+  test_size: 0.25
+  val_size: 0.25
+  stratify: false
+  target_column_name: null
+  encode_targets: false
+  nan_value: -1
+  use_filtered_targets_for_train: false
+  include_targets: null
+  group_column_name: sample_id
+  random_state: 0
+panel:
+  name: default

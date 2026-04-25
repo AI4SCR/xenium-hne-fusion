@@ -1,8 +1,11 @@
 # BEAT Slurm Commands
 
+
+## Data Preparation
+
 ```bash
 # NOTE: transfer and process cell annotations
-uv run python chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
+chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
 uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml
 ./scribble/sbatch_process_beat_cells.sh --config configs/data/remote/beat.yaml
 uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml
@@ -11,6 +14,7 @@ uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat
 uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
 
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
 # hvg panels (run after artifact jobs)
@@ -38,18 +42,24 @@ for OUTER in 0 1 2 3; do
         --output=$HOME/logs/%j.out \
         --wrap="uv run python scribble/warmup-cache.py --outer ${OUTER}"
 done
+```
 
+## Model Training
+
+```bash
 # TASK=cell_types
 TASK=expression
 PARTITION=gpu-l40
 TIME=04:30:00
 MEMORY=64G
-#PANEL_PATH=default.yaml
+SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
+PANEL_PATH=default.yaml
+ITEMS_PATH=expr-with-cells
 for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-        PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
+        METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+#        PANEL_PATH="expr-hvg-outer=${OUTER}-inner=0-seed=0.yaml"
         PANEL_NAME="${PANEL_PATH%.yaml}"
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
@@ -66,9 +76,10 @@ for OUTER in 0 1 2 3; do
             --job-name=${TASK}-${MODEL}-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
-                --data.cache_dir=expression/${PANEL_NAME}"
+                --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
 done
 
