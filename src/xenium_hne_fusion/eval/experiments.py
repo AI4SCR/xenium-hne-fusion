@@ -16,9 +16,11 @@ def select_runs(
     eval_cfg: EvalConfig,
 ) -> tuple[pd.DataFrame, str, str]:
     assert eval_cfg.target in TARGETS, f'Unknown target: {eval_cfg.target}'
-    _assert_columns(runs, ['config.data.name', 'config.data.items_path', 'config.data.metadata_path'])
+    _assert_columns(runs, ['config.task.target', 'config.data.name', 'config.data.items_path', 'config.data.metadata_path'])
 
     def matches(row: pd.Series) -> bool:
+        if row['config.task.target'] != eval_cfg.target:
+            return False
         if row['config.data.name'] != eval_cfg.name:
             return False
         if not _items_path_matches(row['config.data.items_path'], eval_cfg.items_path):

@@ -5,6 +5,7 @@ import pytest
 
 from scripts.eval import plot_wandb_score_tables
 from xenium_hne_fusion.config import EvalConfig
+from xenium_hne_fusion.eval.experiments import select_runs
 from xenium_hne_fusion.eval.tables import prepare_score_latex_table
 
 
@@ -26,6 +27,7 @@ def _run(
         'run_id': run_id,
         'run_name': model,
         'config.wandb.name': model,
+        'config.task.target': 'expression',
         'config.data.name': 'hest1k',
         'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
         'config.data.metadata_path': f'/data/03_output/hest1k/splits/{organ}/outer={split}-inner=0-seed=0.parquet',
@@ -126,3 +128,36 @@ def test_score_table_cli_writes_latex_from_cached_runs(monkeypatch: pytest.Monke
     assert 'model' in latex
     assert 'spearman' in latex
     assert '0.200±0.141' in latex
+
+
+def test_select_runs_filters_on_logged_task_target():
+    runs = pd.DataFrame(
+        [
+            {
+                'run_id': 'expr',
+                'config.task.target': 'expression',
+                'config.data.name': 'beat',
+                'config.data.items_path': '/data/03_output/beat/items/cells.json',
+                'config.data.metadata_path': '/data/03_output/beat/splits/cells/outer=0-inner=0-seed=0.parquet',
+            },
+            {
+                'run_id': 'cells',
+                'config.task.target': 'cell_types',
+                'config.data.name': 'beat',
+                'config.data.items_path': '/data/03_output/beat/items/cells.json',
+                'config.data.metadata_path': '/data/03_output/beat/splits/cells/outer=0-inner=0-seed=0.parquet',
+            },
+        ]
+    )
+
+    eval_cfg = EvalConfig(
+        project='xe-hne-fus-expr-v0',
+        target='expression',
+        name='beat',
+        items_path='cells.json',
+        metadata_dir='cells',
+    )
+
+    selected, _, _ = select_runs(runs, eval_cfg=eval_cfg)
+
+    assert selected['run_id'].tolist() == ['expr']
