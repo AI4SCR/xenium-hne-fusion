@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
-from typing import Literal
+from typing import Any, Literal
 
 import lightning as L
 import torch
@@ -48,22 +48,12 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def train(cfg: Config, debug: bool | None = None, config_path: str | None = None):
-    debug = debug if debug is not None else cfg.debug
-    if debug or cfg.trainer.fast_dev_run:
-        cfg = set_fast_dev_run_settings(cfg)
-    cfg, output_dir = resolve_training_paths(cfg)
+def build_supervised_lit(cfg: Config) -> tuple[RegressionLit, dict[str, Any]]:
+    cfg, _ = resolve_training_paths(cfg)
     cfg = load_panel_config(cfg)
     validate_task_config(cfg)
-
-    logs_dir = output_dir / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
-
     num_source_genes = resolve_num_source_genes(cfg)
     num_outputs = resolve_num_outputs(cfg)
-    logger.info(
-        f"Training task.target={cfg.task.target} with num_outputs={num_outputs} and num_source_genes={num_source_genes}"
-    )
 
     morph_encoder_name = cfg.backbone.morph_encoder_name
     morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
@@ -140,6 +130,47 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         num_warmup_epochs=cfg.lit.num_warmup_epochs,
         save_hparams=False,
     )
+    dataset_kws = dict(
+        dataset_cls=TileDataset,
+        dataset_kws=dict(
+            target=cfg.task.target,
+            metadata_path=cfg.data.metadata_path,
+            source_panel=cfg.data.source_panel,
+            target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
+            include_image=morph_encoder is not None,
+            include_expr=expr_encoder is not None,
+            target_transform=log1p_transform,
+            image_transform=image_transform,
+            expr_transform=expr_transform,
+            expr_pool=cfg.data.expr_pool,
+            cache_dir=cfg.data.cache_dir,
+            drop_nan_columns=True,
+            id_key="id",
+        ),
+        num_outputs=num_outputs,
+        num_source_genes=num_source_genes,
+    )
+    return lit, dataset_kws
+
+
+def train(cfg: Config, debug: bool | None = None, config_path: str | None = None):
+    debug = debug if debug is not None else cfg.debug
+    if debug or cfg.trainer.fast_dev_run:
+        cfg = set_fast_dev_run_settings(cfg)
+    cfg, output_dir = resolve_training_paths(cfg)
+    cfg = load_panel_config(cfg)
+    validate_task_config(cfg)
+
+    logs_dir = output_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    num_source_genes = resolve_num_source_genes(cfg)
+    num_outputs = resolve_num_outputs(cfg)
+    logger.info(
+        f"Training task.target={cfg.task.target} with num_outputs={num_outputs} and num_source_genes={num_source_genes}"
+    )
+
+    lit, dataset_build = build_supervised_lit(cfg)
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -150,34 +181,20 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     if cfg.data.num_workers > 0 and cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
-    dataset_kws = dict(
-        target=cfg.task.target,
-        items_path=cfg.data.items_path,
-        metadata_path=cfg.data.metadata_path,
-        source_panel=cfg.data.source_panel,
-        target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
-        include_image=morph_encoder is not None,
-        include_expr=expr_encoder is not None,
-        target_transform=log1p_transform,
-        image_transform=image_transform,
-        expr_transform=expr_transform,
-        expr_pool=cfg.data.expr_pool,
-        cache_dir=cfg.data.cache_dir,
-        drop_nan_columns=True,
-        id_key="id",
-    )
+    dataset_cls = dataset_build["dataset_cls"]
+    dataset_kws = {**dataset_build["dataset_kws"], "items_path": cfg.data.items_path}
 
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
         kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
-        ds_all = TileDataset(**kws)
+        ds_all = dataset_cls(**kws)
         ds_all.setup()
 
-    ds_fit = TileDataset(**dataset_kws, split="fit")
+    ds_fit = dataset_cls(**dataset_kws, split="fit")
     ds_fit.setup()
-    ds_val = TileDataset(**dataset_kws, split="val")
+    ds_val = dataset_cls(**dataset_kws, split="val")
     ds_val.setup()
-    ds_test = TileDataset(**dataset_kws, split="test")
+    ds_test = dataset_cls(**dataset_kws, split="test")
     ds_test.setup()
 
     global_batch_size = cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
@@ -237,8 +254,6 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     wandb.finish()
 
     return {
-        "head": head,
-        "backbone": backbone,
         "lit": lit,
         "trainer": trainer,
         "ds_fit": ds_fit,

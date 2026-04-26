@@ -107,6 +107,10 @@ class Config:
         data = yaml.safe_load(path.read_text()) or {}
         return _merge_dataclass(cls, data)
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> 'Config':
+        return _merge_dataclass(cls, data)
+
 
 def _merge_dataclass(cls, data: dict):
     """Recursively construct a dataclass from a dict, using field defaults for missing keys."""
