@@ -17,11 +17,9 @@ class PretrainedConfig:
 @dataclass
 class MILDataConfig:
     name: str | None = None
-    items_path: Path | None = None
-    split_metadata_path: Path | None = None
-    target_column: str | None = None
+    metadata_path: Path | None = None
     cache_dir: Path | None = None
-    batch_size: int = 64
+    batch_size: int = 8
     num_workers: int = 10
     prefetch_factor: int | None = 4
 

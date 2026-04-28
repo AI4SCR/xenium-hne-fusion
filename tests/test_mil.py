@@ -21,7 +21,7 @@ from xenium_hne_fusion.train.mil import (
     resolve_pretrained_run,
     write_mil_items_from_prediction_cache,
 )
-from xenium_hne_fusion.train.supervised import build_supervised_lit
+from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws, build_supervised_lit
 from xenium_hne_fusion.train.mil_config import (
     AggregatorConfig,
     MILConfig,
@@ -52,7 +52,6 @@ def test_mil_parser_reads_yaml_config_into_namespace(tmp_path: Path):
                 "  run_id: run-123",
                 "data:",
                 "  name: beat",
-                "  items_path: expr.json",
                 "  metadata_path: expr/outer=0-inner=0-seed=0.parquet",
                 "aggregator:",
                 "  name: attention",
@@ -74,7 +73,6 @@ def test_mil_parser_reads_yaml_config_into_namespace(tmp_path: Path):
     data = namespace.as_dict()
 
     assert data["pretrained"]["run_id"] == "run-123"
-    assert data["data"]["items_path"] == Path("expr.json")
     assert data["data"]["metadata_path"] == Path("expr/outer=0-inner=0-seed=0.parquet")
     assert data["task"]["kind"] == "classification"
     assert data["aggregator"]["gated"] is True
@@ -90,7 +88,6 @@ def test_mil_namespace_bridge_returns_concrete_config(tmp_path: Path):
                 "  run_id: run-123",
                 "data:",
                 "  name: beat",
-                "  items_path: expr.json",
                 "  metadata_path: expr/outer=0-inner=0-seed=0.parquet",
                 "wandb:",
                 "  project: mil-v0",
@@ -238,8 +235,9 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
         cache_dir / "000000.pt",
     )
 
-    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "mil-items.json")
+    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "bags.json")
     items = json.loads(items_path.read_text(encoding="utf-8"))
+    assert items_path.name == "bags.json"
     assert [item["sample_id"] for item in items] == ["S1", "S2"]
     assert all("instance_ids" in item for item in items)
     assert all("z_path" in item for item in items)
@@ -258,6 +256,7 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
         split=Split.FIT.value,
         task_kind="regression",
         target_key="metadata.response",
+        id_key="sample_id",
     )
     dataset.setup()
 
@@ -287,7 +286,7 @@ def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
         [{"id": ["tile-0", "tile-1"], "sample_id": ["S1", "S2"], "z": torch.tensor([[1.0, 2.0], [3.0, 4.0]])}],
         cache_dir / "000000.pt",
     )
-    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "items.json")
+    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "bags.json")
     metadata_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         [
@@ -302,6 +301,7 @@ def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
         split=Split.FIT.value,
         task_kind="classification",
         target_key="metadata.label",
+        id_key="sample_id",
     )
     dataset.setup()
     batch = pad_bags_collate([dataset[0], dataset[1]])
@@ -341,7 +341,7 @@ def test_build_sample_level_mil_metadata_converts_classification_target_in_place
     assert result.loc["S2", "label"] == 1
 
 
-def test_build_supervised_lit_returns_lazy_dataset(tmp_path: Path):
+def test_build_supervised_builders_split_model_and_dataset_kws(tmp_path: Path):
     cfg = Config()
     cfg.task.target = "expression"
     cfg.lit.target_key = "target"
@@ -357,11 +357,12 @@ def test_build_supervised_lit_returns_lazy_dataset(tmp_path: Path):
     pd.DataFrame([{"sample_id": "S1", "split": "fit"}]).set_index("sample_id").to_parquet(cfg.data.metadata_path)
     cfg.data.panel_path.write_text("{}", encoding="utf-8")
 
-    lit, dataset = build_supervised_lit(cfg)
+    lit = build_supervised_lit(cfg)
+    dataset_kws = build_supervised_dataset_kws(cfg)
 
     assert lit.num_outputs == 1
-    assert dataset.split is None
-    assert dataset.id_key == "id"
+    assert dataset_kws["id_key"] == "id"
+    assert dataset_kws["items_path"] == cfg.data.items_path
 
 
 def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
@@ -370,7 +371,6 @@ def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
 ):
     cfg = MILConfig()
     cfg.data.name = "beat"
-    cfg.data.items_path = Path("items.json")
     cfg.data.metadata_path = Path("split.parquet")
     cfg.data.cache_dir = tmp_path / "cache"
     cfg.lit.target_key = "metadata.response"
@@ -402,34 +402,19 @@ def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
         current_cfg.data.metadata_path = tmp_path / "supervised-metadata.parquet"
         return SimpleNamespace(cfg=current_cfg, output_dir=tmp_path, num_source_genes=1, num_outputs=1)
 
-    def fake_build_supervised_lit(current_cfg: Config):
+    def fake_build_supervised_lit(current_cfg: Config, checkpoint_path: Path | None = None):
+        calls["checkpoint_path"] = checkpoint_path
+
         class DummyLit:
-            backbone = object()
-            head = object()
-            num_outputs = 1
-            batch_key = "modalities"
-            target_key = "target"
-            lr_head = 1e-4
-            lr_backbone = 1e-5
-            lr_alpha = 1e-3
-            weight_decay = 1e-3
-            eta = 1e-6
-            schedule = "cosine"
-            max_epochs = 35
-            num_warmup_epochs = 5
-            pooling = None
+            def eval(self):
+                calls["eval"] = True
 
-        class DummyDataset:
-            def __init__(self, **kwargs):
-                calls["dataset_kwargs"] = kwargs
-                for key, value in kwargs.items():
-                    setattr(self, key, value)
+        return DummyLit()
 
-            def setup(self):
-                calls["dataset_setup"] = True
-
-        dataset = DummyDataset(
+    def fake_build_supervised_dataset_kws(current_cfg: Config):
+        return dict(
             target="expression",
+            items_path=tmp_path / "supervised-items.json",
             metadata_path=tmp_path / "supervised-metadata.parquet",
             source_panel=["A"],
             target_panel=["B"],
@@ -443,16 +428,6 @@ def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
             drop_nan_columns=True,
             id_key="id",
         )
-        return DummyLit(), dataset
-
-    class DummyLoadedLit:
-        def eval(self):
-            calls["eval"] = True
-
-    def fake_load_from_checkpoint(checkpoint_path: Path, **kwargs):
-        calls["checkpoint_path"] = checkpoint_path
-        calls["load_kwargs"] = kwargs
-        return DummyLoadedLit()
 
     class DummyTrainer:
         def __init__(self, *args, **kwargs):
@@ -461,9 +436,17 @@ def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
         def predict(self, *args, **kwargs):
             calls["predict_called"] = True
 
+    class DummyTileDataset:
+        def __init__(self, **kwargs):
+            calls["dataset_kwargs"] = kwargs
+
+        def setup(self):
+            calls["dataset_setup"] = True
+
     monkeypatch.setattr("xenium_hne_fusion.train.mil.prepare_training_config", fake_prepare_training_config)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_lit", fake_build_supervised_lit)
-    monkeypatch.setattr("xenium_hne_fusion.train.mil.RegressionLit.load_from_checkpoint", fake_load_from_checkpoint)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_dataset_kws", fake_build_supervised_dataset_kws)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.TileDataset", DummyTileDataset)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.L.Trainer", DummyTrainer)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.DataLoader", lambda *args, **kwargs: None)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.write_mil_items_from_prediction_cache", lambda **kwargs: kwargs["items_path"])
@@ -474,10 +457,9 @@ def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
         run_root=tmp_path / "run",
     )
 
-    assert items_path == tmp_path / "run" / "mil-items.json"
+    assert items_path == tmp_path / "run" / "bags.json"
     assert calls["checkpoint_path"] == tmp_path / "best.ckpt"
-    assert calls["load_kwargs"]["target_key"] == "target"
-    assert calls["dataset_kwargs"]["items_path"] == Path("items.json")
+    assert calls["dataset_kwargs"]["items_path"] == tmp_path / "supervised-items.json"
     assert calls["dataset_setup"] is True
     assert calls["eval"] is True
     assert "predict_called" not in calls
@@ -489,7 +471,6 @@ def test_extract_mil_embeddings_builds_minimal_prediction_cache(
 ):
     cfg = MILConfig()
     cfg.data.name = "beat"
-    cfg.data.items_path = Path("items.json")
     cfg.data.metadata_path = Path("split.parquet")
     cfg.data.cache_dir = tmp_path / "cache"
 
@@ -511,33 +492,19 @@ def test_extract_mil_embeddings_builds_minimal_prediction_cache(
     def fake_prepare_training_config(current_cfg: Config):
         return SimpleNamespace(cfg=current_cfg, output_dir=tmp_path, num_source_genes=1, num_outputs=1)
 
-    def fake_build_supervised_lit(current_cfg: Config):
+    def fake_build_supervised_lit(current_cfg: Config, checkpoint_path: Path | None = None):
+        calls["checkpoint_path"] = checkpoint_path
+
         class DummyLit:
-            backbone = object()
-            head = object()
-            num_outputs = 1
-            batch_key = "modalities"
-            target_key = "target"
-            lr_head = 1e-4
-            lr_backbone = 1e-5
-            lr_alpha = 1e-3
-            weight_decay = 1e-3
-            eta = 1e-6
-            schedule = "cosine"
-            max_epochs = 35
-            num_warmup_epochs = 5
-            pooling = None
-
-        class DummyDataset:
-            def __init__(self, **kwargs):
-                for key, value in kwargs.items():
-                    setattr(self, key, value)
-
-            def setup(self):
+            def eval(self):
                 return None
 
-        return DummyLit(), DummyDataset(
+        return DummyLit()
+
+    def fake_build_supervised_dataset_kws(current_cfg: Config):
+        return dict(
             target="expression",
+            items_path=tmp_path / "supervised-items.json",
             metadata_path=tmp_path / "supervised-metadata.parquet",
             source_panel=["A"],
             target_panel=["B"],
@@ -552,10 +519,6 @@ def test_extract_mil_embeddings_builds_minimal_prediction_cache(
             id_key="id",
         )
 
-    class DummyLoadedLit:
-        def eval(self):
-            return None
-
     class DummyTrainer:
         def __init__(self, *args, **kwargs):
             calls["trainer_kwargs"] = kwargs
@@ -563,9 +526,17 @@ def test_extract_mil_embeddings_builds_minimal_prediction_cache(
         def predict(self, *args, **kwargs):
             calls["predict_called"] = True
 
+    class DummyTileDataset:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def setup(self):
+            return None
+
     monkeypatch.setattr("xenium_hne_fusion.train.mil.prepare_training_config", fake_prepare_training_config)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_lit", fake_build_supervised_lit)
-    monkeypatch.setattr("xenium_hne_fusion.train.mil.RegressionLit.load_from_checkpoint", lambda **kwargs: DummyLoadedLit())
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_dataset_kws", fake_build_supervised_dataset_kws)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.TileDataset", DummyTileDataset)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.L.Trainer", DummyTrainer)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.DataLoader", lambda *args, **kwargs: None)
     monkeypatch.setattr("xenium_hne_fusion.train.mil.write_mil_items_from_prediction_cache", lambda **kwargs: kwargs["items_path"])
