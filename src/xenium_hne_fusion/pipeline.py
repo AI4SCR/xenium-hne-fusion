@@ -56,7 +56,7 @@ def maybe_reset_sample(cfg: PipelineConfig, sample_id: str, overwrite: bool) -> 
         shutil.rmtree(processed_dir)
 
 
-def create_all_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool = False) -> Path:
+def create_items(cfg: PipelineConfig, kernel_size: int = 16, overwrite: bool = False) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     if items_path.exists() and not overwrite:
         logger.info(f"Items already exist: {items_path}")

@@ -170,7 +170,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
             ("metadata", dataset, metadata_path, output_path, selected_sample_ids)
         ),
     )
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(module, "compute_all_items_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats", cell_type_col, overwrite)))
     monkeypatch.setattr(
         module,
@@ -344,7 +344,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
         ),
     )
     monkeypatch.setattr(module, "process_dataset_metadata", lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)))
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(module, "compute_all_items_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats", cell_type_col, overwrite)))
     monkeypatch.setattr(
         module,

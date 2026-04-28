@@ -1,10 +1,19 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.utils.getters import get_managed_paths, get_panels_dir
+
+
+@dataclass
+class ResolvedTrainingConfig:
+    cfg: Config
+    output_dir: Path
+    num_source_genes: int | None
+    num_outputs: int
 
 
 def load_panel_config(cfg: Config) -> Config:
@@ -53,6 +62,20 @@ def resolve_num_outputs(cfg: Config) -> int:
         return len(cfg.data.target_panel)
     assert cfg.head.output_dim is not None
     return cfg.head.output_dim
+
+
+def prepare_training_config(cfg: Config) -> ResolvedTrainingConfig:
+    cfg, output_dir = resolve_training_paths(cfg)
+    cfg = load_panel_config(cfg)
+    validate_task_config(cfg)
+    num_source_genes = resolve_num_source_genes(cfg)
+    num_outputs = resolve_num_outputs(cfg)
+    return ResolvedTrainingConfig(
+        cfg=cfg,
+        output_dir=output_dir,
+        num_source_genes=num_source_genes,
+        num_outputs=num_outputs,
+    )
 
 
 def infer_head_input_dim(

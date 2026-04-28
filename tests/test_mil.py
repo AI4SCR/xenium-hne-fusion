@@ -1,6 +1,8 @@
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -9,13 +11,17 @@ from ai4bmr_learn.data.splits import Split
 from ai4bmr_learn.datasets import pad_bags_collate, write_mil_items_from_cache
 from ai4bmr_learn.models.mil import AttentionAggregation
 
+from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.config import HeadConfig, TrainerConfig, WandbConfig
 from xenium_hne_fusion.train.mil import (
     MetadataBagsDataset,
     build_mil_module,
     build_sample_level_mil_metadata,
+    extract_mil_embeddings,
     resolve_pretrained_run,
+    write_mil_items_from_prediction_cache,
 )
+from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws, build_supervised_lit
 from xenium_hne_fusion.train.mil_config import (
     AggregatorConfig,
     MILConfig,
@@ -46,9 +52,7 @@ def test_mil_parser_reads_yaml_config_into_namespace(tmp_path: Path):
                 "  run_id: run-123",
                 "data:",
                 "  name: beat",
-                "  items_path: expr.json",
-                "  split_metadata_path: expr/outer=0-inner=0-seed=0.parquet",
-                "  target_column: response",
+                "  metadata_path: expr/outer=0-inner=0-seed=0.parquet",
                 "aggregator:",
                 "  name: attention",
                 "  hidden_dim: 64",
@@ -69,9 +73,7 @@ def test_mil_parser_reads_yaml_config_into_namespace(tmp_path: Path):
     data = namespace.as_dict()
 
     assert data["pretrained"]["run_id"] == "run-123"
-    assert data["data"]["items_path"] == Path("expr.json")
-    assert data["data"]["split_metadata_path"] == Path("expr/outer=0-inner=0-seed=0.parquet")
-    assert data["data"]["target_column"] == "response"
+    assert data["data"]["metadata_path"] == Path("expr/outer=0-inner=0-seed=0.parquet")
     assert data["task"]["kind"] == "classification"
     assert data["aggregator"]["gated"] is True
 
@@ -86,9 +88,7 @@ def test_mil_namespace_bridge_returns_concrete_config(tmp_path: Path):
                 "  run_id: run-123",
                 "data:",
                 "  name: beat",
-                "  items_path: expr.json",
-                "  split_metadata_path: expr/outer=0-inner=0-seed=0.parquet",
-                "  target_column: score",
+                "  metadata_path: expr/outer=0-inner=0-seed=0.parquet",
                 "wandb:",
                 "  project: mil-v0",
             ]
@@ -110,7 +110,7 @@ def test_mil_namespace_bridge_returns_concrete_config(tmp_path: Path):
     assert isinstance(cfg.lit, MILLitConfig)
     assert isinstance(cfg.trainer, TrainerConfig)
     assert isinstance(cfg.wandb, WandbConfig)
-    assert cfg.data.target_column == "score"
+    assert cfg.data.metadata_path == Path("expr/outer=0-inner=0-seed=0.parquet")
 
 
 def test_build_sample_level_mil_metadata_collapses_tile_rows(tmp_path: Path):
@@ -145,8 +145,8 @@ def test_build_sample_level_mil_metadata_collapses_tile_rows(tmp_path: Path):
     ).to_parquet(split_path, index=False)
 
     output_path = build_sample_level_mil_metadata(
-        split_metadata_path=split_path,
-        target_column="response",
+        metadata_path=split_path,
+        target_key="metadata.response",
         task_kind="regression",
         output_path=tmp_path / "sample.parquet",
     )
@@ -155,7 +155,6 @@ def test_build_sample_level_mil_metadata_collapses_tile_rows(tmp_path: Path):
     assert list(result.index.astype(str)) == ["S1", "S2"]
     assert result.loc["S1", Split.COLUMN_NAME.value] == Split.FIT.value
     assert result.loc["S1", "response"] == pytest.approx(1.5)
-    assert result.loc["S1", "target"] == pytest.approx(1.5)
     assert "tile_id" not in result.columns
     assert "tile_dir" not in result.columns
 
@@ -171,8 +170,8 @@ def test_build_sample_level_mil_metadata_rejects_inconsistent_sample_values(tmp_
 
     with pytest.raises(AssertionError, match="inconsistent split"):
         build_sample_level_mil_metadata(
-            split_metadata_path=split_path,
-            target_column="label",
+            metadata_path=split_path,
+            target_key="metadata.label",
             task_kind="classification",
             output_path=tmp_path / "sample.parquet",
         )
@@ -228,6 +227,7 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
     torch.save(
         [
             {
+                "id": ["tile-0", "tile-1", "tile-2"],
                 "sample_id": ["S1", "S1", "S2"],
                 "z": torch.tensor([[1.0, 0.0], [0.5, 1.5], [2.0, 3.0]]),
             }
@@ -235,19 +235,18 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
         cache_dir / "000000.pt",
     )
 
-    items_path = write_mil_items_from_cache(
-        cache_dir=cache_dir,
-        items_path=tmp_path / "mil-items.json",
-        id_key="sample_id",
-    )
+    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "bags.json")
     items = json.loads(items_path.read_text(encoding="utf-8"))
-    assert [item["sample_id"] for item in items] == ["S1", "S1", "S2"]
+    assert items_path.name == "bags.json"
+    assert [item["sample_id"] for item in items] == ["S1", "S2"]
+    assert all("instance_ids" in item for item in items)
+    assert all("z_path" in item for item in items)
 
     metadata_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         [
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "target": 1.0},
-            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.FIT.value, "target": 0.0},
+            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "response": 1.0},
+            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.FIT.value, "response": 0.0},
         ]
     ).set_index("sample_id").to_parquet(metadata_path)
 
@@ -256,18 +255,21 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
         metadata_path=metadata_path,
         split=Split.FIT.value,
         task_kind="regression",
+        target_key="metadata.response",
+        id_key="sample_id",
     )
     dataset.setup()
 
     first = dataset[0]
     assert first["bag"].shape == (2, 2)
-    assert first["target"].dtype == torch.float32
+    assert first["metadata"]["response"] == pytest.approx(1.0)
 
     batch = pad_bags_collate([dataset[0], dataset[1]])
     cfg = MILConfig()
     cfg.task.kind = "regression"
     cfg.aggregator.name = "attention"
     cfg.aggregator.hidden_dim = 4
+    cfg.lit.target_key = "metadata.response"
     module = build_mil_module(cfg=cfg, input_dim=2)
     module.log = lambda *args, **kwargs: None
     output = module.training_step(batch, 0)
@@ -278,21 +280,18 @@ def test_write_mil_items_from_cache_and_dataset_module_smoke(tmp_path: Path):
 
 
 def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
-    items_path = tmp_path / "items.json"
-    items_path.write_text(
-        json.dumps(
-            [
-                {"id": "0", "sample_id": "S1", "z": [1.0, 2.0]},
-                {"id": "1", "sample_id": "S2", "z": [3.0, 4.0]},
-            ]
-        ),
-        encoding="utf-8",
+    cache_dir = tmp_path / "cache" / "prediction"
+    cache_dir.mkdir(parents=True)
+    torch.save(
+        [{"id": ["tile-0", "tile-1"], "sample_id": ["S1", "S2"], "z": torch.tensor([[1.0, 2.0], [3.0, 4.0]])}],
+        cache_dir / "000000.pt",
     )
+    items_path = write_mil_items_from_prediction_cache(cache_dir=cache_dir, items_path=tmp_path / "bags.json")
     metadata_path = tmp_path / "sample.parquet"
     pd.DataFrame(
         [
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "target": 0},
-            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.FIT.value, "target": 1},
+            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "label": 0},
+            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.FIT.value, "label": 1},
         ]
     ).set_index("sample_id").to_parquet(metadata_path)
 
@@ -301,6 +300,8 @@ def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
         metadata_path=metadata_path,
         split=Split.FIT.value,
         task_kind="classification",
+        target_key="metadata.label",
+        id_key="sample_id",
     )
     dataset.setup()
     batch = pad_bags_collate([dataset[0], dataset[1]])
@@ -309,6 +310,7 @@ def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
         task=MILTaskConfig(kind="classification"),
         aggregator=AggregatorConfig(name="attention", hidden_dim=4, gated=True),
     )
+    cfg.lit.target_key = "metadata.label"
     module = build_mil_module(cfg=cfg, input_dim=2, num_classes=2)
     module.log = lambda *args, **kwargs: None
 
@@ -316,3 +318,235 @@ def test_classification_bags_dataset_and_module_smoke(tmp_path: Path):
     output = module.training_step(batch, 0)
     assert torch.isfinite(output["loss"])
     assert output["prediction"].dtype == torch.long
+
+
+def test_build_sample_level_mil_metadata_converts_classification_target_in_place(tmp_path: Path):
+    split_path = tmp_path / "split.parquet"
+    pd.DataFrame(
+        [
+            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "label": "A"},
+            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.TEST.value, "label": "B"},
+        ]
+    ).to_parquet(split_path, index=False)
+
+    output_path = build_sample_level_mil_metadata(
+        metadata_path=split_path,
+        target_key="metadata.label",
+        task_kind="classification",
+        output_path=tmp_path / "sample.parquet",
+    )
+    result = pd.read_parquet(output_path)
+
+    assert result.loc["S1", "label"] == 0
+    assert result.loc["S2", "label"] == 1
+
+
+def test_build_supervised_builders_split_model_and_dataset_kws(tmp_path: Path):
+    cfg = Config()
+    cfg.task.target = "expression"
+    cfg.lit.target_key = "target"
+    cfg.data.name = "beat"
+    cfg.data.items_path = tmp_path / "items.json"
+    cfg.data.metadata_path = tmp_path / "metadata.parquet"
+    cfg.data.panel_path = tmp_path / "panel.yaml"
+    cfg.data.source_panel = ["A", "B"]
+    cfg.data.target_panel = ["C"]
+    cfg.backbone.expr_encoder_name = "mlp"
+    cfg.backbone.expr_encoder_kws = {"hidden_dim": 4, "output_dim": 4}
+    cfg.data.items_path.write_text("[]", encoding="utf-8")
+    pd.DataFrame([{"sample_id": "S1", "split": "fit"}]).set_index("sample_id").to_parquet(cfg.data.metadata_path)
+    cfg.data.panel_path.write_text("{}", encoding="utf-8")
+
+    lit = build_supervised_lit(cfg)
+    dataset_kws = build_supervised_dataset_kws(cfg)
+
+    assert lit.num_outputs == 1
+    assert dataset_kws["id_key"] == "id"
+    assert dataset_kws["items_path"] == cfg.data.items_path
+
+
+def test_extract_mil_embeddings_uses_load_from_checkpoint_and_reuses_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    cfg = MILConfig()
+    cfg.data.name = "beat"
+    cfg.data.metadata_path = Path("split.parquet")
+    cfg.data.cache_dir = tmp_path / "cache"
+    cfg.lit.target_key = "metadata.response"
+
+    source_cfg = Config()
+    source_cfg.task.target = "expression"
+    source_cfg.lit.target_key = "target"
+    source_cfg.data.name = "beat"
+    source_cfg.data.items_path = Path("items.json")
+    source_cfg.data.metadata_path = Path("metadata.parquet")
+    source_cfg.data.panel_path = tmp_path / "panel.yaml"
+    source_cfg.data.source_panel = ["A"]
+    source_cfg.data.target_panel = ["B"]
+    source_cfg.backbone.expr_encoder_name = "mlp"
+    source_cfg.backbone.expr_encoder_kws = {"hidden_dim": 4, "output_dim": 4}
+    source_cfg.data.panel_path.write_text("{}", encoding="utf-8")
+
+    prediction_dir = cfg.data.cache_dir / "prediction"
+    prediction_dir.mkdir(parents=True)
+    torch.save(
+        [{"id": ["tile-0"], "sample_id": ["S1"], "z": torch.tensor([[1.0, 2.0]])}],
+        prediction_dir / "000000.pt",
+    )
+
+    calls: dict[str, Any] = {}
+
+    def fake_prepare_training_config(current_cfg: Config):
+        current_cfg.data.items_path = tmp_path / "supervised-items.json"
+        current_cfg.data.metadata_path = tmp_path / "supervised-metadata.parquet"
+        return SimpleNamespace(cfg=current_cfg, output_dir=tmp_path, num_source_genes=1, num_outputs=1)
+
+    def fake_build_supervised_lit(current_cfg: Config, checkpoint_path: Path | None = None):
+        calls["checkpoint_path"] = checkpoint_path
+
+        class DummyLit:
+            def eval(self):
+                calls["eval"] = True
+
+        return DummyLit()
+
+    def fake_build_supervised_dataset_kws(current_cfg: Config):
+        return dict(
+            target="expression",
+            items_path=tmp_path / "supervised-items.json",
+            metadata_path=tmp_path / "supervised-metadata.parquet",
+            source_panel=["A"],
+            target_panel=["B"],
+            include_image=False,
+            include_expr=True,
+            target_transform=None,
+            image_transform=None,
+            expr_transform=None,
+            expr_pool="token",
+            cache_dir=None,
+            drop_nan_columns=True,
+            id_key="id",
+        )
+
+    class DummyTrainer:
+        def __init__(self, *args, **kwargs):
+            calls["trainer_kwargs"] = kwargs
+
+        def predict(self, *args, **kwargs):
+            calls["predict_called"] = True
+
+    class DummyTileDataset:
+        def __init__(self, **kwargs):
+            calls["dataset_kwargs"] = kwargs
+
+        def setup(self):
+            calls["dataset_setup"] = True
+
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.prepare_training_config", fake_prepare_training_config)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_lit", fake_build_supervised_lit)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_dataset_kws", fake_build_supervised_dataset_kws)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.TileDataset", DummyTileDataset)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.L.Trainer", DummyTrainer)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.DataLoader", lambda *args, **kwargs: None)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.write_mil_items_from_prediction_cache", lambda **kwargs: kwargs["items_path"])
+
+    items_path = extract_mil_embeddings(
+        resolved_run=SimpleNamespace(checkpoint_path=tmp_path / "best.ckpt", source_config=source_cfg),
+        cfg=cfg,
+        run_root=tmp_path / "run",
+    )
+
+    assert items_path == tmp_path / "run" / "bags.json"
+    assert calls["checkpoint_path"] == tmp_path / "best.ckpt"
+    assert calls["dataset_kwargs"]["items_path"] == tmp_path / "supervised-items.json"
+    assert calls["dataset_setup"] is True
+    assert calls["eval"] is True
+    assert "predict_called" not in calls
+
+
+def test_extract_mil_embeddings_builds_minimal_prediction_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    cfg = MILConfig()
+    cfg.data.name = "beat"
+    cfg.data.metadata_path = Path("split.parquet")
+    cfg.data.cache_dir = tmp_path / "cache"
+
+    source_cfg = Config()
+    source_cfg.task.target = "expression"
+    source_cfg.lit.target_key = "target"
+    source_cfg.data.name = "beat"
+    source_cfg.data.items_path = Path("items.json")
+    source_cfg.data.metadata_path = Path("metadata.parquet")
+    source_cfg.data.panel_path = tmp_path / "panel.yaml"
+    source_cfg.data.source_panel = ["A"]
+    source_cfg.data.target_panel = ["B"]
+    source_cfg.backbone.expr_encoder_name = "mlp"
+    source_cfg.backbone.expr_encoder_kws = {"hidden_dim": 4, "output_dim": 4}
+    source_cfg.data.panel_path.write_text("{}", encoding="utf-8")
+
+    calls: dict[str, Any] = {}
+
+    def fake_prepare_training_config(current_cfg: Config):
+        return SimpleNamespace(cfg=current_cfg, output_dir=tmp_path, num_source_genes=1, num_outputs=1)
+
+    def fake_build_supervised_lit(current_cfg: Config, checkpoint_path: Path | None = None):
+        calls["checkpoint_path"] = checkpoint_path
+
+        class DummyLit:
+            def eval(self):
+                return None
+
+        return DummyLit()
+
+    def fake_build_supervised_dataset_kws(current_cfg: Config):
+        return dict(
+            target="expression",
+            items_path=tmp_path / "supervised-items.json",
+            metadata_path=tmp_path / "supervised-metadata.parquet",
+            source_panel=["A"],
+            target_panel=["B"],
+            include_image=False,
+            include_expr=True,
+            target_transform=None,
+            image_transform=None,
+            expr_transform=None,
+            expr_pool="token",
+            cache_dir=None,
+            drop_nan_columns=True,
+            id_key="id",
+        )
+
+    class DummyTrainer:
+        def __init__(self, *args, **kwargs):
+            calls["trainer_kwargs"] = kwargs
+
+        def predict(self, *args, **kwargs):
+            calls["predict_called"] = True
+
+    class DummyTileDataset:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def setup(self):
+            return None
+
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.prepare_training_config", fake_prepare_training_config)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_lit", fake_build_supervised_lit)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.build_supervised_dataset_kws", fake_build_supervised_dataset_kws)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.TileDataset", DummyTileDataset)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.L.Trainer", DummyTrainer)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.DataLoader", lambda *args, **kwargs: None)
+    monkeypatch.setattr("xenium_hne_fusion.train.mil.write_mil_items_from_prediction_cache", lambda **kwargs: kwargs["items_path"])
+
+    extract_mil_embeddings(
+        resolved_run=SimpleNamespace(checkpoint_path=tmp_path / "best.ckpt", source_config=source_cfg),
+        cfg=cfg,
+        run_root=tmp_path / "run",
+    )
+
+    prediction_cache = calls["trainer_kwargs"]["callbacks"][0]
+    assert prediction_cache.include_keys == ["z", "id", "sample_id"]
+    assert calls["predict_called"] is True

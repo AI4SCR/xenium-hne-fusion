@@ -145,12 +145,34 @@ This is the simplest end-to-end path to keep in mind.
 ### 1. Create the base `hest1k` data
 
 ```bash
-uv run python scripts/data/run_hest1k.py \
-  --config configs/data/local/hest1k.yaml \
-  --executor serial
+# Download missing raw HEST-1k files and build the structured dataset layout.
+uv run python scripts/data/structure_hest1k.py \
+  --config configs/data/local/hest1k.yaml
+
+# Detect tissues, tile each slide, and write per-tile processed artifacts.
+uv run python scripts/data/process_hest1k.py \
+  --config configs/data/local/hest1k.yaml
+
+# Normalize sample metadata into the canonical processed parquet.
+uv run python scripts/data/process_metadata.py \
+  --config configs/data/local/hest1k.yaml
+
+# Build the tile-level training item list at data/03_output/hest1k/items/all.json.
+uv run python scripts/data/create_items.py \
+  --config configs/data/local/hest1k.yaml
+
+# Compute dataset-wide item statistics and summary plots.
+uv run python scripts/data/compute_all_items_stats.py \
+  --config configs/data/local/hest1k.yaml
 ```
 
-This structures raw HEST-1k samples, detects tissues, tiles slides, creates processed tile artifacts, and finalizes `items/all.json` plus processed metadata under `data/03_output/hest1k/`.
+This makes the pipeline stages explicit:
+
+- `structure_hest1k.py`: downloads missing HEST-1k samples, validates MPP, and builds `data/01_structured/hest1k/`
+- `process_hest1k.py`: detects tissues, tiles slides, extracts tile crops, and writes per-tile processed artifacts under `data/02_processed/hest1k/`
+- `process_metadata.py`: writes cleaned sample metadata to `data/02_processed/hest1k/metadata.parquet`
+- `create_items.py`: builds `data/03_output/hest1k/items/all.json`
+- `compute_all_items_stats.py`: writes the base item statistics used by downstream artifact steps
 
 ### 2. Create HESCAPE lung-healthy artifacts
 
@@ -163,11 +185,19 @@ This structures raw HEST-1k samples, detects tissues, tiles slides, creates proc
 Run:
 
 ```bash
-uv run python scripts/artifacts/create_artifacts.py \
+# Filter all.json down to the lung-healthy HESCAPE subset.
+uv run python scripts/artifacts/filter_items.py \
   --config configs/artifacts/hescape/lung-healthy.yaml
 
+# Materialize the fixed HESCAPE outer-fold split parquet files.
 uv run python scripts/artifacts/create_hescape_splits.py
+
+# Build the HESCAPE source/target panel YAML from the split feature universe.
 uv run python scripts/artifacts/create_hescape_panels.py
+
+# Compute subset-specific item statistics and plots.
+uv run python scripts/artifacts/compute_items_stats.py \
+  --config configs/artifacts/hescape/lung-healthy.yaml
 ```
 
 This produces:
@@ -175,7 +205,7 @@ This produces:
 - `data/03_output/hest1k/items/hescape/lung-healthy.json`
 - `data/03_output/hest1k/splits/hescape/lung-healthy/outer=0-seed=0.parquet`
 - `data/03_output/hest1k/panels/hescape/lung-healthy.yaml`
-- item stats and overlap figures under `data/03_output/hest1k/figures/`
+- item stats under `data/03_output/hest1k/statistics/` and item-stat figures under `data/03_output/hest1k/figures/items/stats/`
 
 ### 3. Train one model on that split and panel
 
@@ -185,6 +215,7 @@ Example training config:
 Run:
 
 ```bash
+# Train the vision-only baseline on the lung-healthy split and panel.
 uv run python scripts/train/supervised.py \
   --config configs/train/hescape/expression/lung-healthy/vision.yaml
 ```

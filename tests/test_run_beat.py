@@ -128,7 +128,7 @@ def test_run_beat_runs_full_pipeline_in_training_order(
         "process_dataset_metadata",
         lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(
         module,
         "compute_all_items_stats",
@@ -235,7 +235,7 @@ def test_run_beat_skips_processing_for_completed_samples_and_keeps_metadata(
         "process_dataset_metadata",
         lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: None)
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: None)
     monkeypatch.setattr(module, "compute_all_items_stats", lambda cfg, cell_type_col, overwrite: None)
     monkeypatch.setattr(
         module,
@@ -293,7 +293,7 @@ def test_run_beat_ray_chains_samples_and_finalizes_after_barrier(
         "process_dataset_metadata",
         lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: calls.append(("items", kernel_size, overwrite)))
     monkeypatch.setattr(
         module,
         "compute_all_items_stats",
@@ -367,7 +367,7 @@ def test_run_beat_ray_aborts_finalization_when_any_sample_fails(
         "process_dataset_metadata",
         lambda dataset, metadata_path, output_path, selected_sample_ids=None: calls.append(("metadata", selected_sample_ids)),
     )
-    monkeypatch.setattr(module, "create_all_items", lambda cfg, kernel_size, overwrite: calls.append(("items",)))
+    monkeypatch.setattr(module, "create_items", lambda cfg, kernel_size, overwrite: calls.append(("items",)))
     monkeypatch.setattr(module, "compute_all_items_stats", lambda cfg, cell_type_col, overwrite: calls.append(("stats",)))
     monkeypatch.setattr(
         module,
