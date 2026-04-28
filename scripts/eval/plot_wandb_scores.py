@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
 
 from xenium_hne_fusion.config import EvalConfig
-from xenium_hne_fusion.eval.experiments import select_runs
+from xenium_hne_fusion.eval.experiments import build_plot_output_prefix, select_runs
 from xenium_hne_fusion.eval.plotting import METRIC_LABELS, plot_metrics
 from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs, restrict_to_wandb_filter
 from xenium_hne_fusion.utils.getters import get_managed_paths
@@ -30,12 +30,12 @@ def main(
     table = load_project_runs(eval_cfg.project, entity=entity, cache_dir=cache_dir, refresh=refresh)
     if wandb_filters:
         table = restrict_to_wandb_filter(table, eval_cfg.project, entity=entity, filters=wandb_filters)
-    runs, title, name = select_runs(table, eval_cfg=eval_cfg)
+    runs, title, _ = select_runs(table, eval_cfg=eval_cfg)
     plot_metrics(
         runs,
         metrics=metrics,
         title=title,
-        output_prefix=output_dir / name,
+        output_prefix=build_plot_output_prefix(runs, eval_cfg=eval_cfg, output_dir=output_dir),
         sort_by_score=eval_cfg.sort_by_score,
         parameter_columns=eval_cfg.parameter_columns,
         color_by_split=eval_cfg.color_by_splits,

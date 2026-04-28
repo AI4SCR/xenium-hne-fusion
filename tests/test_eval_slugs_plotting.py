@@ -6,162 +6,51 @@ import pytest
 
 matplotlib.use('Agg')
 
-from scripts.eval.plot_wandb_scores import _build_parser
-from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, PanelConfig, SplitConfig
+from xenium_hne_fusion.config import EvalConfig
 from xenium_hne_fusion.eval import plotting
-from xenium_hne_fusion.eval.experiments import select_artifact_runs
+from xenium_hne_fusion.eval.experiments import build_plot_output_prefix
 from xenium_hne_fusion.eval.plotting import plot_metrics, prepare_plot_table
 
 
-def test_select_artifact_runs_keeps_split_scoped_generated_hvg_panels():
-    artifacts_cfg = ArtifactsConfig(
-        name='hest1k',
-        items=ItemsConfig(name='breast'),
-        split=SplitConfig(name='breast'),
-        panel=PanelConfig(
-            name='hvg-breast-breast-outer=0-inner=0-seed=0',
-            metadata_path=Path('breast/outer=0-inner=0-seed=0.parquet'),
-            n_top_genes=16,
-            flavor='seurat_v3',
+def test_build_plot_output_prefix_nests_task_panel_and_split_dirs():
+    runs = pd.DataFrame(
+        [
+            {
+                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=0-inner=0-seed=0.yaml',
+            },
+        ]
+    )
+    output_prefix = build_plot_output_prefix(
+        runs,
+        eval_cfg=EvalConfig(
+            project='xe-hne-fus-expr',
+            target='expression',
+            name='hest1k',
+            items_path='breast.json',
+            metadata_dir='breast/outer-sweep',
         ),
-    )
-    runs = pd.DataFrame(
-        [
-            {
-                'run_id': 'outer-0',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=0-inner=0-seed=0.yaml',
-            },
-            {
-                'run_id': 'outer-2',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=2-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=2-inner=0-seed=0.yaml',
-            },
-            {
-                'run_id': 'wrong-panel-split',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=2-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=0-inner=0-seed=0.yaml',
-            },
-            {
-                'run_id': 'wrong-panel-family',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=2-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-default-default-outer=2-inner=0-seed=0.yaml',
-            },
-            {
-                'run_id': 'wrong-split',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/bowel/outer=2-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=2-inner=0-seed=0.yaml',
-            },
-            {
-                'run_id': 'wrong-items',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/default.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast/outer=2-inner=0-seed=0.parquet',
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=2-inner=0-seed=0.yaml',
-            },
-        ]
+        output_dir=Path('/tmp/eval'),
     )
 
-    selected, title, name = select_artifact_runs(runs, artifacts_cfg=artifacts_cfg, target='expression')
-
-    assert selected['run_id'].tolist() == ['outer-0', 'outer-2']
-    assert title == 'HEST1K breast expression'
-    assert name == 'hest1k-expression-breast'
-
-
-def test_select_artifact_runs_handles_static_and_missing_panel_filters():
-    static_cfg = ArtifactsConfig(
-        name='beat',
-        items=ItemsConfig(name='default'),
-        split=SplitConfig(name='default'),
-        panel=PanelConfig(name='default'),
-    )
-    no_panel_cfg = ArtifactsConfig(
-        name='beat',
-        items=ItemsConfig(name='default'),
-        split=SplitConfig(name='default'),
-        panel=None,
-    )
-    runs = pd.DataFrame(
-        [
-            {
-                'run_id': 'static-panel',
-                'config.data.name': 'beat',
-                'config.data.items_path': 'items/default.json',
-                'config.data.metadata_path': 'splits/default/outer=0-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'panels/default.yaml',
-            },
-            {
-                'run_id': 'hvg-panel',
-                'config.data.name': 'beat',
-                'config.data.items_path': 'items/default.json',
-                'config.data.metadata_path': 'splits/default/outer=1-inner=0-seed=0.parquet',
-                'config.data.panel_path': 'panels/hvg-default-default-outer=1-inner=0-seed=0.yaml',
-            },
-        ]
+    assert output_prefix == Path(
+        '/tmp/eval/expression/hvg-breast-breast-outer=0-inner=0-seed=0/breast/outer-sweep/'
+        'hest1k-expression-breast-outer-sweep'
     )
 
-    static_selected, _, _ = select_artifact_runs(runs, artifacts_cfg=static_cfg, target='expression')
-    no_panel_selected, _, _ = select_artifact_runs(runs, artifacts_cfg=no_panel_cfg, target='expression')
 
-    assert static_selected['run_id'].tolist() == ['static-panel']
-    assert no_panel_selected['run_id'].tolist() == ['static-panel', 'hvg-panel']
-
-
-def test_select_artifact_runs_keeps_single_split_file_layout():
-    artifacts_cfg = ArtifactsConfig(
-        name='hest1k',
-        items=ItemsConfig(name='hescape-breast'),
-        split=SplitConfig(name='hescape-breast'),
-    )
-    runs = pd.DataFrame(
-        [
-            {
-                'run_id': 'single-split',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/hescape-breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/hescape-breast.parquet',
-                'config.data.panel_path': None,
-            },
-            {
-                'run_id': 'wrong-single-split',
-                'config.data.name': 'hest1k',
-                'config.data.items_path': '/data/03_output/hest1k/items/hescape-breast.json',
-                'config.data.metadata_path': '/data/03_output/hest1k/splits/breast.parquet',
-                'config.data.panel_path': None,
-            },
-        ]
-    )
-
-    selected, _, _ = select_artifact_runs(runs, artifacts_cfg=artifacts_cfg, target='expression')
-
-    assert selected['run_id'].tolist() == ['single-split']
-
-
-def test_eval_plot_cli_uses_artifact_config_scope():
-    args = _build_parser().parse_args(
-        ['--config', 'configs/artifacts/hest1k/breast.yaml', '--project', 'xe-hne-fus-expr', '--target', 'expression']
-    ).as_dict()
-
-    assert args['name'] == 'hest1k'
-    assert args['items']['name'] == 'breast'
-    assert args['split']['name'] == 'breast'
-    assert args['project'] == 'xe-hne-fus-expr'
-    assert args['target'] == 'expression'
-    assert args['baseline'] == 'vision'
-    assert 'dataset' not in args
-    assert 'organ' not in args
-    assert 'slugs_path' not in args
+def test_build_plot_output_prefix_requires_panel_path():
+    with pytest.raises(AssertionError, match='Missing panel path'):
+        build_plot_output_prefix(
+            pd.DataFrame([{'config.data.panel_path': None}]),
+            eval_cfg=EvalConfig(
+                project='xe-hne-fus-cells',
+                target='cell_types',
+                name='beat',
+                items_path='cells.json',
+                metadata_dir='cells',
+            ),
+            output_dir=Path('/tmp/eval'),
+        )
 
 
 def test_prepare_plot_table_checks_metrics():
@@ -277,9 +166,9 @@ def test_save_runs_csv_writes_split_metadata_suffix_and_scores(tmp_path: Path):
 def test_build_parameter_table_slugs_morph_encoder_names():
     data = pd.DataFrame(
         [
-            {'model': 'small', 'config.backbone.morph_encoder_name': 'vit_small_patch16_224'},
-            {'model': 'base', 'config.backbone.morph_encoder_name': 'vit_base_patch16_224.augreg_in21k'},
-            {'model': 'loki', 'config.backbone.morph_encoder_name': 'loki'},
+            {'config_id': 'small', 'config.backbone.morph_encoder_name': 'vit_small_patch16_224'},
+            {'config_id': 'base', 'config.backbone.morph_encoder_name': 'vit_base_patch16_224.augreg_in21k'},
+            {'config_id': 'loki', 'config.backbone.morph_encoder_name': 'loki'},
         ]
     )
 

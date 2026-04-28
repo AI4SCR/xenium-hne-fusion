@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 from loguru import logger
 
@@ -63,6 +65,17 @@ def _output_name(eval_cfg: EvalConfig) -> str:
     return '-'.join(_clean_name(p) for p in parts)
 
 
+def build_plot_output_prefix(
+    runs: pd.DataFrame,
+    *,
+    eval_cfg: EvalConfig,
+    output_dir: Path,
+) -> Path:
+    panel_name = _panel_name(runs)
+    split_dir = Path(eval_cfg.metadata_dir)
+    return output_dir / eval_cfg.target / panel_name / split_dir / _output_name(eval_cfg)
+
+
 def _normalize_path(value) -> str | None:
     if _is_missing(value):
         return None
@@ -76,6 +89,19 @@ def _clean_name(value: str) -> str:
 def _assert_columns(runs: pd.DataFrame, columns: list[str]) -> None:
     missing = sorted(set(columns) - set(runs.columns))
     assert not missing, f'Missing W&B columns: {missing}'
+
+
+def _panel_name(runs: pd.DataFrame) -> str:
+    assert 'config.data.panel_path' in runs.columns, 'Missing W&B columns: [config.data.panel_path]'
+
+    panel_names = set()
+    for value in runs['config.data.panel_path']:
+        path = _normalize_path(value)
+        assert path is not None, 'Missing panel path'
+        panel_names.add(Path(path).stem)
+
+    assert len(panel_names) == 1, f'Multiple panel names: {sorted(panel_names)}'
+    return next(iter(panel_names))
 
 
 def _is_missing(value) -> bool:
