@@ -26,6 +26,7 @@ done
 
 ```bash
 N_TOP_GENES=50
+ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     SPLIT_DIR=cells
@@ -39,7 +40,7 @@ for OUTER in 0 1 2 3; do
         --output=$HOME/logs/%j.out \
         --wrap="uv run python scribble/warmup-cache.py \
             --config configs/train/beat/expression/early-fusion.yaml \
-            --items-path expr.json \
+            --items-path ${ITEMS_PATH} \
             --metadata-path ${METADATA_PATH} \
             --panel-path ${PANEL_PATH} \
             --cache-dir expression/${PANEL_NAME}"
@@ -54,6 +55,7 @@ TIME=04:30:00
 MEMORY=64G
 TASK=expression
 N_TOP_GENES=100
+ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
@@ -77,6 +79,7 @@ for OUTER in 0 1 2 3; do
             --job-name=${TASK}-${MODEL}-hvg-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --data.cache_dir=${TASK}/${PANEL_NAME}"
@@ -106,6 +109,7 @@ for OUTER in 0 1 2 3; do
             --job-name=${TASK}-${MODEL}-hvg-concat-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --backbone.fusion_strategy concat \
@@ -136,10 +140,21 @@ for OUTER in 0 1 2 3; do
             --job-name=${TASK}-${MODEL}-hvg-freeze-morph-${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
                 --backbone.freeze_morph_encoder true \
                 --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
+done
+```
+
+## Evaluation
+
+```bash
+for N_TOP_GENES in 50 100; do
+    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}.yaml
+    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}-concat.yaml
+    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}-freeze-morph.yaml
 done
 ```
