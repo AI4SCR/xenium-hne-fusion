@@ -25,7 +25,7 @@ done
 ## Cache Warmup
 
 ```bash
-N_TOP_GENES=100
+N_TOP_GENES=50
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     SPLIT_DIR=cells
