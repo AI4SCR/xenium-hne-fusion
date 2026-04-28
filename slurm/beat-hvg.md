@@ -154,7 +154,5 @@ done
 ```bash
 for N_TOP_GENES in 50 100; do
     uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}.yaml
-    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}-concat.yaml
-    uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}-freeze-morph.yaml
 done
 ```
