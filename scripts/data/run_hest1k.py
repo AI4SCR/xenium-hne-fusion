@@ -26,7 +26,7 @@ from xenium_hne_fusion.metadata import (
 )
 from xenium_hne_fusion.pipeline import (
     compute_all_items_stats,
-    create_all_items,
+    create_items,
     load_ray_module,
     maybe_reset_sample,
     wait_for_ray_samples,
@@ -336,7 +336,7 @@ def finalize_dataset(
         output_path=cfg.paths.processed_dir / "metadata.parquet",
         selected_sample_ids=retained_sample_ids,
     )
-    create_all_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
+    create_items(cfg, kernel_size=kernel_size, overwrite=overwrite)
     compute_all_items_stats(cfg, cell_type_col=cell_type_col, overwrite=overwrite)
 
 
