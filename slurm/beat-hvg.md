@@ -3,12 +3,12 @@
 ## HVG Panel Creation
 
 ```bash
-N_TOP_GENES=100
+N_TOP_GENES=50
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     SPLIT_DIR=cells
     METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-    PANEL_NAME="hvg-{N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}"
+    PANEL_NAME="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}"
     sbatch \
         --cpus-per-task=10 \
         --mem=32G \
