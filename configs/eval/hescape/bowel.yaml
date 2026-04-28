@@ -1,7 +1,16 @@
 project: xe-hne-fus-expr-v0
-target: expression
-name: hest1k
-items_path: all.json
-metadata_dir: hescape/bowel
+output_dir: figures/eval/hescape-bowel-expression
+filters:
+  target: expression
+  name: hest1k
+  items_path: all.json
+  metadata_paths:
+    - hescape/bowel/outer=0-seed=0.parquet
+    - hescape/bowel/outer=1-seed=0.parquet
+    - hescape/bowel/outer=2-seed=0.parquet
+    - hescape/bowel/outer=3-seed=0.parquet
+    - hescape/bowel/outer=4-seed=0.parquet
+  panel_paths:
+    - hescape/bowel.yaml
 baseline: vision
 color_by_splits: false

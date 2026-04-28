@@ -78,11 +78,17 @@ class ArtifactsConfig:
 
 @dataclass
 class EvalConfig:
+    @dataclass
+    class Filters:
+        target: str       # expression / cell_types
+        name: str         # hest1k / beat
+        items_path: str   # filename as in train config, e.g. all.json
+        metadata_paths: list[str] | None = None
+        panel_paths: list[str] | None = None
+
     project: str
-    target: str       # expression / cell_types
-    name: str         # hest1k / beat
-    items_path: str   # filename as in train config, e.g. all.json
-    metadata_dir: str  # dir under splits/ matching metadata parent, e.g. hescape/breast
+    output_dir: Path
+    filters: Filters
     baseline: str = 'vision'
     parameter_columns: list[str] | None = None
     color_by_splits: bool = False

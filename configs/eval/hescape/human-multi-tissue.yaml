@@ -1,7 +1,16 @@
 project: xe-hne-fus-expr-v0
-target: expression
-name: hest1k
-items_path: all.json
-metadata_dir: hescape/human-multi-tissue
+output_dir: figures/eval/hescape-human-multi-tissue-expression
+filters:
+  target: expression
+  name: hest1k
+  items_path: all.json
+  metadata_paths:
+    - hescape/human-multi-tissue/outer=0-seed=0.parquet
+    - hescape/human-multi-tissue/outer=1-seed=0.parquet
+    - hescape/human-multi-tissue/outer=2-seed=0.parquet
+    - hescape/human-multi-tissue/outer=3-seed=0.parquet
+    - hescape/human-multi-tissue/outer=4-seed=0.parquet
+  panel_paths:
+    - hescape/human-multi-tissue.yaml
 baseline: vision
 color_by_splits: false

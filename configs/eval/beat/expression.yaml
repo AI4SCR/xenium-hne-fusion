@@ -1,7 +1,15 @@
 project: xe-hne-fus-expr-v0
-target: expression
-name: beat
-items_path: expr.json
-metadata_dir: expr
+output_dir: figures/eval/expression
+filters:
+  target: expression
+  name: beat
+  items_path: expr.json
+  metadata_paths:
+    - expr/outer=0-inner=0-seed=0.parquet
+    - expr/outer=1-inner=0-seed=0.parquet
+    - expr/outer=2-inner=0-seed=0.parquet
+    - expr/outer=3-inner=0-seed=0.parquet
+  panel_paths:
+    - default.yaml
 baseline: vision
 color_by_splits: false

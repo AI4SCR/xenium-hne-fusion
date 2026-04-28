@@ -5,11 +5,10 @@ from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
 
 from xenium_hne_fusion.config import EvalConfig
-from xenium_hne_fusion.eval.experiments import select_runs
+from xenium_hne_fusion.eval.experiments import resolve_eval_output_dir, select_runs
 from xenium_hne_fusion.eval.plotting import METRIC_LABELS
 from xenium_hne_fusion.eval.stats import DEFAULT_PAIR_KEY, save_paired_t_tests
 from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs, restrict_to_wandb_filter
-from xenium_hne_fusion.utils.getters import get_managed_paths
 
 
 load_dotenv(override=True)
@@ -27,8 +26,8 @@ def main(
     pair_key: str = DEFAULT_PAIR_KEY,
 ) -> None:
     metrics = metrics or list(METRIC_LABELS)
-    cache_dir = cache_dir or default_cache_dir(eval_cfg.name)
-    output_dir = output_dir or get_managed_paths(eval_cfg.name).output_dir / 'figures' / 'eval'
+    cache_dir = cache_dir or default_cache_dir(eval_cfg.filters.name)
+    output_dir = resolve_eval_output_dir(eval_cfg, override=output_dir)
 
     table = load_project_runs(eval_cfg.project, entity=entity, cache_dir=cache_dir, refresh=refresh)
     if wandb_filters:
@@ -59,21 +58,24 @@ def _build_parser() -> ArgumentParser:
     return parser
 
 
-def cli(argv: list[str] | None = None) -> int:
-    namespace = _build_parser().parse_args(argv)
-    args = namespace.as_dict()
-    eval_cfg = EvalConfig(
+def _eval_config_from_args(args: dict) -> EvalConfig:
+    filters = EvalConfig.Filters(**args['filters'])
+    return EvalConfig(
         project=args['project'],
-        target=args['target'],
-        name=args['name'],
-        items_path=args['items_path'],
-        metadata_dir=args['metadata_dir'],
+        output_dir=args['output_dir'],
+        filters=filters,
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
         color_by_splits=args.get('color_by_splits', False),
+        sort_by_score=args.get('sort_by_score', True),
     )
+
+
+def cli(argv: list[str] | None = None) -> int:
+    namespace = _build_parser().parse_args(argv)
+    args = namespace.as_dict()
     main(
-        eval_cfg=eval_cfg,
+        eval_cfg=_eval_config_from_args(args),
         refresh=args.get('refresh', False),
         cache_dir=args.get('cache_dir'),
         output_dir=args.get('output_dir'),

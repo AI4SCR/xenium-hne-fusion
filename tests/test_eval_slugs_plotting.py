@@ -8,49 +8,66 @@ matplotlib.use('Agg')
 
 from xenium_hne_fusion.config import EvalConfig
 from xenium_hne_fusion.eval import plotting
-from xenium_hne_fusion.eval.experiments import build_plot_output_prefix
+from xenium_hne_fusion.eval.experiments import build_plot_output_prefix, resolve_eval_output_dir
 from xenium_hne_fusion.eval.plotting import plot_metrics, prepare_plot_table
+from xenium_hne_fusion.utils.getters import get_managed_paths
 
 
-def test_build_plot_output_prefix_nests_task_panel_and_split_dirs():
-    runs = pd.DataFrame(
-        [
-            {
-                'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast-breast-outer=0-inner=0-seed=0.yaml',
-            },
-        ]
-    )
+def test_build_plot_output_prefix_uses_stable_dataset_target_name():
+    runs = pd.DataFrame([{'config.data.panel_path': '/data/03_output/hest1k/panels/hvg-breast.yaml'}])
     output_prefix = build_plot_output_prefix(
         runs,
         eval_cfg=EvalConfig(
             project='xe-hne-fus-expr',
-            target='expression',
-            name='hest1k',
-            items_path='breast.json',
-            metadata_dir='breast/outer-sweep',
+            output_dir=Path('/tmp/eval'),
+            filters=EvalConfig.Filters(
+                target='expression',
+                name='hest1k',
+                items_path='breast.json',
+                metadata_paths=['breast/outer=0-inner=0-seed=0.parquet'],
+                panel_paths=['breast-hvg-outer=0-inner=0-seed=0.yaml'],
+            ),
         ),
         output_dir=Path('/tmp/eval'),
     )
 
-    assert output_prefix == Path(
-        '/tmp/eval/expression/hvg-breast-breast-outer=0-inner=0-seed=0/breast/outer-sweep/'
-        'hest1k-expression-breast-outer-sweep'
-    )
+    assert output_prefix == Path('/tmp/eval/hest1k-expression')
 
 
-def test_build_plot_output_prefix_requires_panel_path():
-    with pytest.raises(AssertionError, match='Missing panel path'):
-        build_plot_output_prefix(
-            pd.DataFrame([{'config.data.panel_path': None}]),
-            eval_cfg=EvalConfig(
-                project='xe-hne-fus-cells',
+def test_resolve_eval_output_dir_uses_relative_managed_root():
+    resolved = resolve_eval_output_dir(
+        EvalConfig(
+            project='xe-hne-fus-cells',
+            output_dir=Path('figures/eval/beat-expression'),
+            filters=EvalConfig.Filters(
                 target='cell_types',
                 name='beat',
                 items_path='cells.json',
-                metadata_dir='cells',
+                metadata_paths=['cells/outer=0-inner=0-seed=0.parquet'],
+                panel_paths=['default.yaml'],
             ),
-            output_dir=Path('/tmp/eval'),
         )
+    )
+
+    assert resolved == get_managed_paths('beat').output_dir / 'figures/eval/beat-expression'
+
+
+def test_resolve_eval_output_dir_keeps_absolute_path():
+    resolved = resolve_eval_output_dir(
+        EvalConfig(
+            project='xe-hne-fus-cells',
+            output_dir=Path('/tmp/eval'),
+            filters=EvalConfig.Filters(
+                target='cell_types',
+                name='beat',
+                items_path='cells.json',
+                metadata_paths=['cells/outer=0-inner=0-seed=0.parquet'],
+                panel_paths=['default.yaml'],
+            ),
+        )
+    )
+
+    assert resolved == Path('/tmp/eval')
 
 
 def test_prepare_plot_table_checks_metrics():

@@ -12,6 +12,26 @@ from xenium_hne_fusion.eval.tables import prepare_score_latex_table
 METRICS = ['test/spearman_mean', 'test/pearson_mean', 'test/mse_mean']
 
 
+def _eval_cfg(**kwargs) -> EvalConfig:
+    defaults = dict(
+        project='xe-hne-fus-expr-v0',
+        output_dir=Path('figures/eval/test'),
+        filters=EvalConfig.Filters(
+            target='expression',
+            name='hest1k',
+            items_path='breast.json',
+            metadata_paths=['breast/outer=0-inner=0-seed=0.parquet'],
+            panel_paths=None,
+        ),
+        baseline='vision',
+        parameter_columns=None,
+        color_by_splits=False,
+        sort_by_score=True,
+    )
+    defaults.update(kwargs)
+    return EvalConfig(**defaults)
+
+
 def _run(
     *,
     run_id: str,
@@ -110,12 +130,16 @@ def test_score_table_cli_writes_latex_from_cached_runs(monkeypatch: pytest.Monke
     monkeypatch.setattr(plot_wandb_score_tables, 'load_project_runs', lambda *args, **kwargs: runs)
 
     output_dir = tmp_path / 'tables' / 'eval'
-    eval_cfg = EvalConfig(
+    eval_cfg = _eval_cfg(
         project='xe-hne-fus-expr',
-        target='expression',
-        name='hest1k',
-        items_path='breast.json',
-        metadata_dir='breast',
+        output_dir=output_dir,
+        filters=EvalConfig.Filters(
+            target='expression',
+            name='hest1k',
+            items_path='breast.json',
+            metadata_paths=['breast/outer=0-inner=0-seed=0.parquet', 'breast/outer=1-inner=0-seed=0.parquet'],
+            panel_paths=None,
+        ),
         parameter_columns=[],
     )
 
@@ -152,12 +176,55 @@ def test_select_runs_filters_on_logged_task_target():
 
     eval_cfg = EvalConfig(
         project='xe-hne-fus-expr-v0',
-        target='expression',
-        name='beat',
-        items_path='cells.json',
-        metadata_dir='cells',
+        output_dir=Path('figures/eval/test'),
+        filters=EvalConfig.Filters(
+            target='expression',
+            name='beat',
+            items_path='cells.json',
+            metadata_paths=['cells/outer=0-inner=0-seed=0.parquet'],
+            panel_paths=None,
+        ),
     )
 
     selected, _, _ = select_runs(runs, eval_cfg=eval_cfg)
 
     assert selected['run_id'].tolist() == ['expr']
+
+
+def test_select_runs_filters_on_panel_path_when_requested():
+    runs = pd.DataFrame(
+        [
+            {
+                'run_id': 'hvg',
+                'config.task.target': 'expression',
+                'config.data.name': 'beat',
+                'config.data.items_path': '/data/03_output/beat/items/cells.json',
+                'config.data.metadata_path': '/data/03_output/beat/splits/cells/outer=0-inner=0-seed=0.parquet',
+                'config.data.panel_path': '/data/03_output/beat/panels/hvg-50/cells/outer=0-inner=0-seed=0.yaml',
+            },
+            {
+                'run_id': 'default',
+                'config.task.target': 'expression',
+                'config.data.name': 'beat',
+                'config.data.items_path': '/data/03_output/beat/items/cells.json',
+                'config.data.metadata_path': '/data/03_output/beat/splits/cells/outer=0-inner=0-seed=0.parquet',
+                'config.data.panel_path': '/data/03_output/beat/panels/default.yaml',
+            },
+        ]
+    )
+
+    eval_cfg = EvalConfig(
+        project='xe-hne-fus-expr-v0',
+        output_dir=Path('figures/eval/test'),
+        filters=EvalConfig.Filters(
+            target='expression',
+            name='beat',
+            items_path='cells.json',
+            metadata_paths=['cells/outer=0-inner=0-seed=0.parquet'],
+            panel_paths=['hvg-50/cells/outer=0-inner=0-seed=0.yaml'],
+        ),
+    )
+
+    selected, _, _ = select_runs(runs, eval_cfg=eval_cfg)
+
+    assert selected['run_id'].tolist() == ['hvg']
