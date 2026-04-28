@@ -3,10 +3,12 @@
 ## HVG Panel Creation
 
 ```bash
+N_TOP_GENES=100
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_NAME="expr-hvg-${SPLIT_NAME}"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_NAME="hvg-{N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}"
     sbatch \
         --cpus-per-task=10 \
         --mem=32G \
@@ -14,6 +16,7 @@ for OUTER in 0 1 2 3; do
         --output=$HOME/logs/%j.out \
         --wrap="uv run python scripts/artifacts/create_panel.py \
             --config configs/artifacts/beat/unil/expr-hvg.yaml \
+            --panel.n_top_genes ${N_TOP_GENES} \
             --panel.metadata_path ${METADATA_PATH} \
             --panel.name ${PANEL_NAME}"
 done

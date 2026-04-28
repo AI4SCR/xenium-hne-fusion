@@ -164,8 +164,10 @@ done
 #            --backbone.learnable_gate true"
 #  done
 #done
+```
 
-# eval plots
+## Evaluation
 uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression.yaml
 uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/cell_types.yaml
+uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-cells.yaml
 ```

@@ -26,7 +26,7 @@ split:
   group_column_name: sample_id
   random_state: 0
 panel:
-  name: cells-hvg-outer=0-inner=0-seed=0
+  name: hvg-100/cells/outer=0-inner=0-seed=0
   metadata_path: cells/outer=0-inner=0-seed=0.parquet
   n_top_genes: 100
   flavor: seurat_v3
