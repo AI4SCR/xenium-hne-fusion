@@ -25,7 +25,7 @@ done
 ## Cache Warmup
 
 ```bash
-N_TOP_GENES=50
+N_TOP_GENES=100
 ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
@@ -34,9 +34,9 @@ for OUTER in 0 1 2 3; do
     PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
     PANEL_NAME="${PANEL_PATH%.yaml}"
     sbatch \
-        --cpus-per-task=10 \
+        --cpus-per-task=12 \
         --mem=32G \
-        --time=02:00:00 \
+        --time=06:00:00 \
         --output=$HOME/logs/%j.out \
         --wrap="uv run python scribble/warmup-cache.py \
             --config configs/train/beat/expression/early-fusion.yaml \
@@ -54,7 +54,7 @@ PARTITION=gpu-l40
 TIME=04:30:00
 MEMORY=64G
 TASK=expression
-N_TOP_GENES=100
+N_TOP_GENES=50
 ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 
 for OUTER in 0 1 2 3; do
@@ -67,7 +67,8 @@ for OUTER in 0 1 2 3; do
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
         CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
 
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=${TASK}/${PANEL_NAME}
 
         sbatch \
             --cpus-per-task=12 \

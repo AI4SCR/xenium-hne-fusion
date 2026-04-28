@@ -50,6 +50,8 @@ if __name__ == '__main__':
         cache_dir=cfg.data.cache_dir,
         drop_nan_columns=True,
         id_key="id",
+        num_workers=10,
+        batch_size=64
     )
 
     ds_all = TileDataset(**dataset_kws)
