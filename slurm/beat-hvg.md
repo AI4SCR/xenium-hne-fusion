@@ -8,7 +8,7 @@ for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     SPLIT_DIR=cells
     METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-    PANEL_NAME="hvg-{N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}"
+    PANEL_NAME="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}"
     sbatch \
         --cpus-per-task=10 \
         --mem=32G \
@@ -25,10 +25,12 @@ done
 ## Cache Warmup
 
 ```bash
+N_TOP_GENES=100
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
     PANEL_NAME="${PANEL_PATH%.yaml}"
     sbatch \
         --cpus-per-task=10 \
@@ -51,11 +53,13 @@ PARTITION=gpu-l40
 TIME=04:30:00
 MEMORY=64G
 TASK=expression
+N_TOP_GENES=100
 
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
     PANEL_NAME="${PANEL_PATH%.yaml}"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
@@ -82,8 +86,9 @@ done
 # concat
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
     PANEL_NAME="${PANEL_PATH%.yaml}"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token; do
@@ -111,8 +116,9 @@ done
 # freeze_morph_encoder=true
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-    PANEL_PATH="expr-hvg-${SPLIT_NAME}.yaml"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
     PANEL_NAME="${PANEL_PATH%.yaml}"
 
     for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
