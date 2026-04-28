@@ -187,14 +187,14 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
         kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
-        ds_all = dataset_cls(**kws)
+        ds_all = TileDataset(**kws)
         ds_all.setup()
 
-    ds_fit = dataset_cls(**dataset_kws, split="fit")
+    ds_fit = TileDataset(**dataset_kws, split="fit")
     ds_fit.setup()
-    ds_val = dataset_cls(**dataset_kws, split="val")
+    ds_val = TileDataset(**dataset_kws, split="val")
     ds_val.setup()
-    ds_test = dataset_cls(**dataset_kws, split="test")
+    ds_test = TileDataset(**dataset_kws, split="test")
     ds_test.setup()
 
     global_batch_size = cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
