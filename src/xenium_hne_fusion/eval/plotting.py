@@ -207,7 +207,7 @@ def _plot_metric(
     metric_slug = metric.replace('/', '-').replace('_mean', '')
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
     outputs = [
-        output_prefix.with_name(f'{output_prefix.name}-{metric_slug}{suffix}')
+        output_prefix.parent / f'{metric_slug}{suffix}'
         for suffix in ['.pdf', '.png']
     ]
     for output in outputs:

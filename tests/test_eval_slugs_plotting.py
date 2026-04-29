@@ -143,11 +143,12 @@ def test_plot_metrics_smoke(tmp_path: Path):
         runs,
         metrics=['test/pearson_mean'],
         title='Tiny smoke',
-        output_prefix=tmp_path / 'tiny',
+        output_prefix=tmp_path / 'beat-expression',
     )
 
     assert sorted(path.suffix for path in outputs) == ['.pdf', '.png']
     assert all(path.exists() for path in outputs)
+    assert sorted(path.name for path in outputs) == ['test-pearson.pdf', 'test-pearson.png']
 
 
 def test_save_runs_csv_writes_split_metadata_suffix_and_scores(tmp_path: Path):
