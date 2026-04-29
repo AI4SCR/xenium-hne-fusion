@@ -1,7 +1,22 @@
 # Xenium x H&E Fusion
 
-Research code for fusing Xenium spatial transcriptomics with H&E whole-slide images.
-The main dataset family in this repo is `hest1k`; HESCAPE experiments are built as artifact splits and panels on top of `hest1k`.
+Research code for ["Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer"](https://openreview.net/forum?id=h2GcySraTP) (ICLR 2026 Workshop LMRL) — an early-fusion multimodal transformer that integrates subcellular Xenium transcript readouts directly into the ViT token stream to enable fine-grained cross-modal interaction for gene expression prediction.
+
+Primary results are on an internal Xenium cohort (BEAT); we also benchmark on [`hest1k`](https://arxiv.org/abs/2406.16192) using splits and panels from the [HESCAPE](https://arxiv.org/abs/2508.01490) benchmark.
+
+## Citation
+
+If you use this code, please cite:
+
+```bibtex
+@inproceedings{martinelli2026hescape,
+  title     = {Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer},
+  author    = {Adriano Martinelli and Bernd Illing and Isinsu Katircioglu and Alice Driessen and Fei Tang and Robert Berke and Raphael Gottardo and Marianna Rapsomaniki},
+  booktitle = {ICLR 2026 Workshop on Learning and Mining with Representation Learning (LMRL)},
+  year      = {2026},
+  url       = {https://openreview.net/forum?id=h2GcySraTP},
+}
+```
 
 ## Project structure
 
@@ -210,7 +225,7 @@ This produces:
 ### 3. Train one model on that split and panel
 
 Example training config:
-[configs/train/hescape/expression/lung-healthy/vision.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/train/hescape/expression/lung-healthy/vision.yaml)
+[configs/train/hescape/expression/lung-healthy/vision.yaml](configs/train/hescape/expression/lung-healthy/vision.yaml)
 
 Run:
 
@@ -228,7 +243,7 @@ That config trains on:
 - `data.panel_path: hescape/lung-healthy.yaml`
 
 Optional evaluation config:
-[configs/eval/hescape/lung-healthy.yaml](/Users/adrianomartinelli/projects/xenium-hne-fusion/configs/eval/hescape/lung-healthy.yaml)
+[configs/eval/hescape/lung-healthy.yaml](configs/eval/hescape/lung-healthy.yaml)
 
 ## Cluster runs
 
@@ -242,8 +257,8 @@ For dataset creation on a cluster, use the provided wrapper:
 
 It submits one CPU job per sample with `--stage samples`, then one dependent finalization job with `--stage finalize`.
 
-The HESCAPE Slurm experiment reference lives in
-[slurm/hescape.md](/Users/adrianomartinelli/projects/xenium-hne-fusion/slurm/hescape.md).
+The HESCAPE Slurm experiment reference lives in [slurm/hescape.md](slurm/hescape.md).
+Dataset submission commands for HEST-1k and BEAT are in [slurm/hest1k.md](slurm/hest1k.md) and [slurm/beat.md](slurm/beat.md).
 
 ### Ray
 
@@ -260,8 +275,7 @@ For Ray training:
   "python scripts/train/supervised.py --config configs/train/hescape/expression/lung-healthy/vision.yaml"
 ```
 
-The HESCAPE Ray experiment reference lives in
-[ray/hescape.md](/Users/adrianomartinelli/projects/xenium-hne-fusion/ray/hescape.md).
+The HESCAPE Ray experiment reference lives in [ray/hescape.md](ray/hescape.md).
 
 ## Full HESCAPE experiment suite actually run
 
