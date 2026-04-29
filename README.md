@@ -9,7 +9,7 @@ Primary results are on an internal Xenium cohort (BEAT); we also benchmark on [`
 If you use this code, please cite:
 
 ```bibtex
-@inproceedings{martinelli2026hescape,
+@inproceedings{martinelli2026,
   title     = {Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer},
   author    = {Adriano Martinelli and Bernd Illing and Isinsu Katircioglu and Alice Driessen and Fei Tang and Robert Berke and Raphael Gottardo and Marianna Rapsomaniki},
   booktitle = {ICLR 2026 Workshop on Learning and Mining with Representation Learning (LMRL)},
