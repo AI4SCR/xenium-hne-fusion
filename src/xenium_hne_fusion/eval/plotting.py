@@ -144,7 +144,7 @@ def _save_runs_csv(
     if 'metadata' not in table.columns and 'config.data.metadata_path' in table.columns:
         table['metadata'] = table['config.data.metadata_path'].apply(_relative_metadata_path)
 
-    csv_path = output_prefix.with_suffix('.csv')
+    csv_path = output_prefix.parent / 'runs.csv'
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(csv_path, index=False)
     logger.info(f'Saved runs CSV ({len(table)} rows) -> {csv_path}')

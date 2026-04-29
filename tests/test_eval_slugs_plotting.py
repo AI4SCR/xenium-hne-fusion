@@ -167,9 +167,10 @@ def test_save_runs_csv_writes_split_metadata_suffix_and_scores(tmp_path: Path):
 
     csv_path = plotting._save_runs_csv(
         runs,
-        output_prefix=tmp_path / 'scores',
+        output_prefix=tmp_path / 'beat-expression',
     )
 
+    assert csv_path == tmp_path / 'runs.csv'
     table = pd.read_csv(csv_path)
     assert 'model' in table.columns
     assert 'metadata' in table.columns
