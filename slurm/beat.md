@@ -53,8 +53,8 @@ PARTITION=gpu-l40
 TIME=04:30:00
 MEMORY=64G
 
-# TASK=cell_types
-TASK=expression
+TASK=cell_types
+#TASK=expression
 SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
 ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
 PANEL_PATH=default.yaml

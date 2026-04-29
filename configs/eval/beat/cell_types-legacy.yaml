@@ -1,0 +1,15 @@
+project: xe-hne-fus-cell-v0
+output_dir: figures/eval/cell-types-legacy
+filters:
+  target: cell_types
+  name: beat
+  items_path: cells.json
+  metadata_paths:
+    - cells-legacy/outer=0-inner=0-seed=0.parquet
+    - cells-legacy/outer=1-inner=0-seed=0.parquet
+    - cells-legacy/outer=2-inner=0-seed=0.parquet
+    - cells-legacy/outer=3-inner=0-seed=0.parquet
+  panel_paths:
+    - default.yaml
+baseline: vision
+color_by_splits: false

@@ -34,5 +34,5 @@ for OUTER in 0 1 2 3; do
 done
 
 # eval plots
-uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/cell_types.yaml --metadata_dir cells-legacy
+uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/cell_types-legacy.yaml
 ```
