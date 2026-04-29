@@ -37,7 +37,7 @@ Spatially, our predictions closely mirror the true measurements (\autoref{fig:p-
   \centering
   \begin{subfigure}[b]{\textwidth}
     \centering
-    \includegraphics[width=0.65\textwidth]{papers/Fusion/figures/cell-boxplot-marsilea.pdf}
+    \includegraphics[width=0.65\textwidth]{cell-boxplot-marsilea.pdf}
     \caption{\textbf{Cell type composition prediction.}
       Pearson correlation coefficient across all 39 cell types for each tested model configuration.
       Multimodal fusion consistently outperforms unimodal baselines, with early fusion achieving the strongest gains.}
@@ -48,7 +48,7 @@ Spatially, our predictions closely mirror the true measurements (\autoref{fig:p-
 
   \begin{subfigure}[b]{\textwidth}
     \centering
-    \includegraphics[width=0.55\textwidth]{papers/Fusion/figures/gene-pcc-boxplot-marsilea.pdf}
+    \includegraphics[width=0.55\textwidth]{gene-pcc-boxplot-marsilea.pdf}
     \caption{\textbf{Gene expression prediction.}
       Spearman correlation coefficient across all add-on panel genes for each tested model configuration.
       Multimodal fusion consistently outperforms unimodal baselines, demonstrating the complementary nature of morphological and transcriptomic features.}
@@ -63,7 +63,7 @@ Spatially, our predictions closely mirror the true measurements (\autoref{fig:p-
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.95\textwidth]{papers/Fusion/figures/cell-all-pcc-boxplot-marsilea.pdf}
+  \includegraphics[width=0.95\textwidth]{cell-all-pcc-boxplot-marsilea.pdf}
   \caption{\textbf{Cell type prediction performance stratified by input gene panel.}
   Pearson correlation for models trained on the full panel, the core panel, and the add-on panel as transcript input.
   Core-panel models closely match full-panel performance, while add-on-only models degrade substantially,
@@ -71,7 +71,7 @@ Spatially, our predictions closely mirror the true measurements (\autoref{fig:p-
   \label{fig:p-fus:cell-panel}
 \end{figure}
 
-\input{papers/Fusion/tables/clip-v2}
+\input{tables/clip-v2}
 
 \paragraph{Model Capacity Matters}
 \label{par:model-capacity}
@@ -102,21 +102,21 @@ Together, these patterns provide a mechanistic rationale for early-add fusion th
 
 \begin{figure}
     \centering
-    \includegraphics[width=\textwidth]{papers/Fusion/figures/cell_type_level_pearson_boxplot-early-only-all-cells.pdf}
+  \includegraphics[width=\textwidth]{cell_type_level_pearson_boxplot-early-only-all-cells.pdf}
 \caption{\textbf{Per-cell-type Pearson correlation for the early-add model across all 39 cell types.} Cell types are ordered by decreasing abundance from left to right. Correlations are high and consistent for the majority of abundant cell types, with 14 of the top 15 most abundant populations exceeding 0.8. Performance declines for rarer populations toward the right, with regulatory T showing the lowest, collapse-like correlations.}
     \label{fig:p-fus:sample-level-pearson}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{papers/Fusion/figures/cell_type_level_pearson_boxplot-target-models-filtered.pdf}
+  \includegraphics[width=\textwidth]{cell_type_level_pearson_boxplot-target-models-filtered.pdf}
 \caption{\textbf{Per-cell-type Pearson correlation for early-add and unimodal configurations on a representative filtered subset of cell types.} Boxes show the distribution of Pearson correlations across test splits for early-add (orange), expression-only (blue), and morphology-only (green). Early-add correlations are consistently higher across all cell types. Morph-only correlations collapse markedly for plasmacytoid dendritic cells, expr-only for natural killer cells. Unimodal correlations are markedly lower for regulatory T, ciliated epithelial, club, and mesothelial cells, compared to the fusion variant.}
   \label{fig:p-fus:cell-type-level}
 \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.5\linewidth]{papers/Fusion/figures/XE_1G11.03_HNE_1G1103.pdf}
+    \includegraphics[width=0.5\linewidth]{XE_1G11.03_HNE_1G1103.pdf}
     \caption{\textbf{Spatial cell type abundance predictions for a representative sample.}
     Predicted versus true cell type abundances mapped onto the tissue section
     for selected cell types, demonstrating that the multimodal model captures
@@ -133,7 +133,7 @@ Together, these patterns provide a mechanistic rationale for early-add fusion th
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{papers/Fusion/figures/UMAPs.pdf}
+  \includegraphics[width=\linewidth]{UMAPs.pdf}
   \caption{\textbf{Learned embeddings capture rich morpho-molecular descriptions of the tumor microenvironment.} (\textbf{A}) Leiden clustering of image/tile embeddings for a single sample across models. For fairness, embeddings are reduced by PCA to 31 dimensions (matching the MLP bottleneck capacity; MLP uses 32) and clustered with fixed Leiden resolutions (0.5 and 1.0) without per-model tuning. Expr-only yields granular, noisy clusters reflecting fine-grained transcriptomic variation; Morph-only produces larger coherent regions with potential under-clustering; early fusion better reflects transcript-driven heterogeneity while remaining spatially coherent; late fusion closely mirrors Morph-only patterns. Cluster colors are not aligned across methods.
 (\textbf{B}) Corresponding UMAP visualizations of the embeddings colored by the Leiden clusters from (A), summarizing global neighborhood structure under identical dimensionality reduction and clustering settings. The UMAP projections reveal how different fusion strategies organize tissue regions in embedding space.}
   \label{fig:p-fus:umaps}
