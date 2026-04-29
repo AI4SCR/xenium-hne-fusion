@@ -3,30 +3,21 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/model_overview.pdf}
+  \includegraphics[width=\textwidth]{papers/Fusion/figures/model_overview.pdf}
 \caption{\textbf{Model architecture for multimodal prediction of spatial gene expression and cell type composition.}
 \textit{Left:} A representative $512 \times 512$ pixel tile cropped from a whole-slide H\&E image, overlaid with the Vision Transformer (ViT) patch grid. Each grid cell corresponds to a $16 \times 16$ pixel image patch that is encoded as a single token. Coloured crosses mark a subset of spatially aligned Xenium transcripts, demonstrating the co-localisation of transcriptomic measurements with the ViT token grid.
-\textit{Right:} The multimodal model processes two aligned token sequences. Image patches are embedded by the \emph{Morph Encoder} into a sequence of morphological token embeddings $\mathbf{h}_{\mathrm{img}}^{(i)}$. In parallel, transcripts aggregated within each ViT patch position are encoded by the \emph{Expr Encoder} and projected to the same embedding dimensionality, yielding a spatially aligned sequence of transcriptomic token embeddings $\mathbf{h}_{\mathrm{core}}^{(i)}$. The two token sequences are fused by either concatenation or element-wise addition (\emph{early fusion}), and a learnable classification token (\texttt{[CLS]}) is prepended to the combined sequence. The resulting sequence is processed by the remaining ViT transformer layers, which allow all tokens to interact via self-attention. The \texttt{[CLS]} token aggregates information across both modalities and spatial positions into a single tile-level representation, which is passed to a linear prediction head to predict either add-on panel gene expression or cell type abundances.}
+\textit{Right:} The multimodal model processes two aligned token sequences. Image patches are embedded by the \emph{Vision Token Encoder} ({\emph{Morph Encoder}}) into a sequence of morphological token embeddings $\mathbf{h}_{\mathrm{img}}^{(i)}$. In parallel, transcripts aggregated within each ViT patch position are encoded by the \emph{Expr Encoder} and projected to the same embedding dimensionality, yielding a spatially aligned sequence of transcriptomic token embeddings $\mathbf{h}_{\mathrm{core}}^{(i)}$. The two token sequences are fused by either concatenation or element-wise addition (\emph{Early Fusion}), and a learnable classification token (\texttt{[CLS]}) is prepended to the combined sequence. The resulting sequence is processed by the remaining ViT transformer layers, which allow all tokens to interact via self-attention. The \texttt{[CLS]} token thereby aggregates information across both modalities and spatial positions into a single tile-level representation, which is passed to a linear prediction head to predict either add-on panel gene expression ($\mathbf{y}_{G_1}, \mathbf{y}_{G_2}, \ldots, \mathbf{y}_{G_{\mathrm{add}}}$, green) or cell type abundances.}
   \label{fig:p-fus:architecture}
 \end{figure}
 
-In this section, we describe our approach for predicting spatial gene expression and cell type composition from histopathology images and partial transcriptomic data. We detail our data processing pipeline, formalize the two prediction tasks, present the model architectures, and describe our training and evaluation protocols.
+In this section, we describe our approach for predicting spatial gene expression and cell type composition from histopathology images and partial transcriptomic data. We begin by detailing our data processing pipeline, including spatial alignment of H\&E images with Xenium transcriptomics and cell phenotyping procedures. We then formalize the problem setup for both prediction tasks. Next, we present our model architecture, which integrates morphological features from H\&E-stained tissue with spatial transcriptomics data through a vision transformer-based framework. Finally, we describe the baseline methods we compare against and our training and evaluation protocols.
 
 \paragraph{Terminology.}
-Throughout this paper we use the following terms consistently. A \emph{whole-slide image} (WSI) refers to a high-resolution digital scan of a histological tissue section, typically captured at $0.25$--$0.5\,\mu\text{m}$ per pixel. A \emph{tile} is a fixed-size, spatially localized crop of the WSI; we work with $512 \times 512$ pixel tiles at $0.5\,\mu\text{m}/\text{px}$, corresponding to a $256 \times 256\,\mu\text{m}$ tissue area. Within the ViT architecture, each tile is further divided into a regular grid of non-overlapping $16 \times 16$ pixel sub-regions called \emph{patches}. Each patch is mapped to a \emph{token}, a $d$-dimensional vector that is the fundamental unit of computation in the transformer. Transcript and morphology features are both represented as token sequences, with one token per ViT patch position, enabling direct spatial alignment between the two modalities.
-
-\paragraph{Model naming.}
-We use the following names consistently throughout the paper:
-\begin{itemize}
-  \item \textbf{vision}: morphology-only ViT trained end-to-end; the primary variant uses ViT-S, with ViT-B evaluated as a capacity ablation.
-  \item \textbf{CONCH}: frozen H\&E foundation model baseline~\cite{lu_multimodalgenerativeai_2024}, evaluated as a representative pretrained vision encoder.
-  \item \textbf{expr-tile}: expression-only model with tile-level transcript aggregation.
-  \item \textbf{expr-token}: expression-only model with token-level transcript aggregation.
-  \item \textbf{Geneformer}: frozen expression foundation model baseline~\cite{theodoris_transferlearningenables_2023}.
-  \item \textbf{early-fusion-add} / \textbf{early-fusion-concat}: early fusion with element-wise addition or concatenation of transcript tokens into the ViT stream.
-  \item \textbf{late-fusion-tile-add} / \textbf{late-fusion-tile-concat}: late fusion with tile-level transcript embeddings combined by addition or concatenation.
-  \item \textbf{late-fusion-token-add} / \textbf{late-fusion-token-concat}: late fusion with token-level (pooled) transcript embeddings combined by addition or concatenation.
-\end{itemize}
+Throughout this chapter we use the following terms consistently. A \emph{whole-slide image} (WSI) refers to a high-resolution digital scan of a histological tissue section, typically captured at $0.25$--$0.5\,\mu\text{m}$ per pixel. A \emph{tile} is a fixed-size, spatially localized crop of the WSI; we work with $512 \times 512$ pixel tiles at $0.5\,\mu\text{m}/\text{px}$, corresponding to a $256 \times 256\,\mu\text{m}$ tissue area. Within the ViT architecture, each tile is further divided into a regular grid of non-overlapping $16 \times 16$ 
+pixel sub-regions called patches. Here we use a ViT-S/B (Small or Base variant of the Vision Transformer), 
+and each patch is being mapped to a \emph{token}, a $d$-dimensional vector that is the fundamental unit of computation 
+in the transformer. Transcript and morphology features are both represented as token sequences, with one token 
+per ViT patch position, enabling direct spatial alignment between the two modalities.
 
 \subsection*{Data Processing}
 \label{sec:data-processing}
@@ -36,133 +27,185 @@ We use the following names consistently throughout the paper:
 
 We register the H\&E whole-slide image (WSI) to the Xenium coordinate system using the DAPI channel and manually selected landmark correspondences. These landmarks are used to estimate an affine transformation that maps Xenium transcript coordinates into H\&E pixel space. To account for local tissue deformations, we partition each tissue section into regions and estimate a separate affine transform per region if necessary. Finally, we crop the WSI to the transcript-containing area to restrict downstream tiling to regions with Xenium measurements.
 
-We tile each WSI into $512\times512$ pixel tiles with a stride of 256 pixels at a resolution of $0.5\,\mu$m per pixel. The 50\% overlap ensures that tissue structures near tile boundaries are captured across multiple tiles, reducing information loss from cells split at edges. Each tile is resized to $224\times224$ pixels prior to inference, after which the vision transformer tokenizes it into $16\times16$ pixel patches. At the resulting effective resolution of approximately $1.14\,\mu$m per pixel, each patch spans roughly $18\,\mu$m, approximately the diameter of a human lung cell~\cite{crapo_cellnumbercell_1982}.
+We tile each WSI into $512\times512$ pixel tiles with a stride of 256 pixels at 
+a resolution of $0.5\,\mu$m per pixel, yielding a total of 344{,}328 tiles. The 
+50\% overlap ensures that tissue structures near tile boundaries are captured 
+across multiple tiles, reducing information loss from cells split at edges. Each 
+tile is resized to $224\times224$ pixels prior to inference, after which the 
+vision transformer tokenizes it into $16\times16$ pixel patches. At the resulting 
+effective resolution of approximately $1.14\,\mu$m per pixel, each patch spans 
+roughly $18\,\mu$m, approximately the diameter of a human lung cell
+\cite{crapo_cellnumbercell_1982}.
 
-To ensure sufficient signal for downstream modeling, we apply task-specific quality filters. For gene expression prediction, we filter tiles to contain at least 1,000 transcripts. For cell type count prediction, we filter tiles to contain at least 20 cells. Cell density per tile does not correlate with whole-slide image size, supporting the validity of cross-sample comparisons.
+To ensure sufficient signal for downstream modeling, we apply task-specific quality filters. For gene expression prediction, we filter tiles to contain at least 1{,}000 transcripts to ensure sufficient transcriptomic signal for models that rely on it (\autoref{fig:p-fus:num-genes-tiles}). Similarly, for cell type count prediction, we filter tiles to contain at least 20 cells to ensure adequate cellular representation for composition analysis. Cell density per tile does not correlate with whole-slide image size (\autoref{fig:p-fus:tiles-vs-density}), supporting the validity of cross-sample comparisons. This filtering step results in our final dataset of 338{,}662 tiles for analysis for the gene prediction task.
 
 \subsubsection{Cell Phenotyping}
 \label{sec:p-fus:cell-phenotyping}
 
-Cell type annotations were provided by collaborators at the Biomedical Data Science Center at CHUV (Daria Buszta, Jonathan Bac, and Senbai Kang) using a reference-based deconvolution approach. Matched single-nucleus RNA-seq (snRNA-seq) data were generated from FFPE tissue sections adjacent to those used for Xenium profiling, processed with CellRanger and Seurat~\cite{bilous_transcriptscellsdissecting_2025}. Cell type labels were transferred to Xenium profiles using Robust Cell Type Decomposition (RCTD)~\cite{cable_robustdecompositioncell_2022} in doublet mode. Cells with fewer than 10 transcripts or 5 detected genes were excluded; annotation was performed per sample, with malignant cell references restricted to donor-matched profiles where available.
-
-\subsubsection{Datasets}
-\label{sec:datasets}
-
-\paragraph{BEAT.}
-Our primary dataset is an internal cancer cohort comprising 159 patients with paired H\&E histology and Xenium spatial transcriptomics measurements. The Xenium panel includes the core Human Immuno-Oncology Panel ($G_{\text{core}} = 380$ genes) and a custom add-on panel ($G_{\text{add}} = 100$ genes) selected for relevance to cancer biology and treatment response. Of the 159 patients, 153 have cell type annotations derived as described above. The dataset provides a challenging and realistic testbed reflecting the complexity and heterogeneity of tumor microenvironments.
-
-\paragraph{HEST1k.}
-We additionally evaluate on HEST-1k~\cite{jaume_hest1kdatasetspatial_2024}, a large-scale public compendium of paired H\&E and spatial transcriptomics data spanning diverse tissues and platforms. Samples are preprocessed following the standard HEST pipeline and evaluated using HVG-50 as prediction targets. The broad tissue diversity tests cross-dataset generalization of all model variants.
-
-\paragraph{HESCAPE.}
-HESCAPE~\cite{gindra_largescalebenchmarkcrossmodal_2025} defines a curated benchmark subset of HEST1k samples with a standardized gene panel. We use HESCAPE both as a dataset and as a panel definition; experiments on this subset allow direct comparison to prior cross-modal representation learning benchmarks.
+Cell typing was performed by collaborators\footnote{Cell type annotations were provided by Daria Buszta, Jonathan Bac, and Senbai Kang from the Biomedical Data Science Center at CHUV.}. Cell type annotations were assigned using a reference-based deconvolution approach that leverages matched single-nucleus RNA-seq (snRNA-seq) data to accurately identify cell types while accounting for technical differences between platforms and potential signal contamination from transcript diffusion. Matched snRNA-seq data were generated from FFPE tissue sections adjacent to those used for Xenium profiling. Single-nucleus sequencing was performed using the 10x Genomics Chromium platform following standard protocols. Raw sequencing data were processed using CellRanger, quality control filters were applied to retain high-quality nuclei: cells with at least 200 detected genes and fewer than 20\% of reads mapping to mitochondrial genes were retained. Cell type labels were transferred from the snRNA-seq reference to Xenium single-cell profiles using Robust Cell Type Decomposition (RCTD)~\cite{cable_robustdecompositioncell_2022}
 
 \subsection*{Problem Formulation}
 \label{sec:problem-formulation}
 
+%\subsubsection{Gene Panel Partitioning}
+%\label{sec:gene-panel-partitioning}
+
+%The Xenium spatial transcriptomics panel is divided into two complementary subsets to simulate a realistic gene expression prediction scenario. The first subset, termed the \emph{core panel}, comprises $G_{\text{core}}$ genes and represents the transcriptomic features that are available as input to our models. The second subset, the \emph{add-on panel}, contains $G_{\text{add}}$ genes and serves as the prediction target. This partitioning allows us to evaluate how well models can predict unmeasured gene expression using available histological and partial transcriptomic information.
+
+%\subsubsection{Prediction Tasks and Target Definition}
+%\label{sec:prediction-tasks-and-target-definition}
+
+% We evaluate our multimodal framework on two complementary prediction tasks that assess different aspects of tissue biology: gene expression prediction and cell type composition prediction. Both tasks share the same spatial alignment strategy and model architecture, differing primarily in their prediction targets.
+
 \paragraph{Gene Expression Prediction.}
-For each tile, our objective is to predict the add-on gene expression vector $\mathbf{y}\in\mathbb{R}^{G_{\text{add}}}$ given H\&E histology and/or transcripts from the core gene panel. We aggregate all transcripts within each tile's spatial boundaries and apply a log$_{1+}$p transformation. We evaluate two target panel configurations: the 50 most highly variable genes (HVG-50) and the HESCAPE panel genes.
+The Xenium spatial transcriptomics panel is divided into two complementary subsets, as provided by the Xenium 
+platform and discussed in \autoref{sec:from-gene-prediction-to-phenotyping}, to simulate a realistic gene 
+expression prediction scenario. The first subset, termed the \emph{core panel}, comprises $G_{\text{core}}$ genes and represents the transcriptomic features that are available as input to our models. The second subset, the \emph{add-on panel}, contains $G_{\text{add}}$ genes and serves as the prediction target. This partitioning allows us to evaluate how well models can predict unmeasured gene expression using available histological and partial transcriptomic information. For each spatial location corresponding to a tile, our primary objective is to predict the \emph{add-on} gene expression vector $\mathbf{y}\in\mathbb{R}^{G_{\text{add}}}$ given the available inputs: H\&E histology and/or transcripts from the core gene panel (see \autoref{fig:p-fus:architecture}).
+
+To construct the gene expression targets, we aggregate all add-on panel transcripts that fall within each tile's spatial boundaries. The raw transcript counts are then transformed using a log1p transformation (i.e., $\log(1 + x)$) to obtain the target vector $\mathbf{y}$. This transformation helps to stabilize variance and normalize the distribution of gene expression values, which typically exhibit high dynamic range and right-skewed distributions.
+%(Figure~\ref{fig:p-fus:num-transcripts-in-tiles}.)
 
 \paragraph{Cell Type Count Prediction.}
-For each tile, we predict a vector $\mathbf{c}\in\mathbb{R}^{39}$ representing the log$_{1+}$p-transformed counts of 39 cell types across the cohort. This task complements gene expression prediction by requiring models to capture cellular phenotypes and their spatial distributions from histological and transcriptomic features.
+For each tile, we predict a vector $\mathbf{c}\in\mathbb{R}^{39}$ representing the counts of the 39 identified cell types across the cohort. This task complements gene expression prediction by directly assessing whether models can capture cellular phenotypes and their spatial distributions from histological and transcriptomic features. Cell type targets are derived from the phenotyping pipeline described in Section~\ref{sec:p-fus:cell-phenotyping} (or the subsection above). Similar to gene expression targets, we aggregate cell counts within each tile and apply a log1p transformation to obtain the final target vector $\mathbf{c}$. Tiles with more cells tend to capture greater cell type diversity as shown in (\autoref{fig:p-fus:cell-types-count}).
+
+%The model architecture, training procedures, and evaluation metrics remain consistent across both prediction tasks, allowing for direct comparison of performance and assessment of which tissue characteristics are most readily predictable from multimodal data.
 
 \subsection*{Model Architecture}
 \label{sec:model-architecture}
 
-Our architecture integrates visual and transcriptomic modalities through a ViT backbone that processes spatially aligned tokens from both data types.
+Our architecture integrates visual and transcriptomic modalities through a vision transformer (ViT) backbone that processes spatially aligned tokens from both data types. We describe the processing of each modality and their fusion below.
 
 \subsubsection{Image Encoding}
 \label{sec:image-encoding}
 
-Each H\&E tile is resized from $512\times512$ to $224\times224$ pixels and processed by the vision token encoder component of a ViT, which we refer to as the \emph{Morph Encoder}. This yields $N$ patch token embeddings plus a classification (CLS) token: $\mathbf{H}_{\text{img}}\in\mathbb{R}^{(N+1)\times d}$, where $d$ is the embedding dimension.
+Each H\&E tile undergoes preprocessing and encoding to generate morphological features. First, tiles are resized from their original $512\times512$ pixels to $224\times224$ pixels to match the input requirements of standard vision transformer architectures. Each resized tile is then processed by the vision token encoder component of a ViT, which we refer to as the \emph{Morph Encoder} (\autoref{fig:p-fus:architecture}).
+
+The vision token encoder partitions the input image into a grid of non-overlapping patches and tokenizes them. This process yields $N$ patch tokens, plus a classification (CLS) token that provides a global image representation. The encoder outputs a sequence of token embeddings $\mathbf{H}_{\text{img}}\in\mathbb{R}^{(N+1)\times d}$, where $d$ is the embedding dimension. Individual patch-token embeddings are denoted by $\mathbf{h}_{\text{img}}^{(i)}\in\mathbb{R}^{d}$ for $i\in\{1,\dots,N\}$, where each embedding captures local morphological features corresponding to a specific spatial region of the patch.
 
 \subsubsection{Transcript Encoding}
 \label{sec:transcript-encoding}
 
-We explore two transcript representation strategies:
+To leverage the spatial transcriptomics data from the core panel, we explore two distinct representation strategies that differ in their level of spatial granularity:
 
-\textbf{Tile-level aggregation.} All core panel transcripts within a tile are aggregated into a single vector $\mathbf{x}_{\text{core}}\in\mathbb{R}^{G_{\text{core}}}$, discarding within-tile spatial heterogeneity.
+\textbf{Tile-level aggregation.} In this approach, we aggregate all core panel transcripts within a tile into a single feature vector $\mathbf{x}_{\text{core}}\in\mathbb{R}^{G_{\text{core}}}$ that summarizes the overall gene expression profile of the tile. This representation is analogous to how we define prediction targets and provides a global view of the tile's transcriptomic state. However, it discards information about within-tile spatial heterogeneity of gene expression.
 
-\textbf{Token-level aggregation.} Transcripts are aggregated at the resolution of individual ViT patch positions, yielding a spatially aligned sequence $\{\mathbf{x}_{\text{core}}^{(i)}\}_{i=1}^{N}$. Each token is encoded by a learned MLP projection $f_{\boldsymbol{\theta}}$:
+\textbf{Token-level aggregation.} To preserve fine-grained spatial information, we also consider a token-level representation that aligns with the ViT's patch grid. Using the spatial coordinates of each ViT patch in the original image space, we aggregate core panel transcripts that fall within each patch region. This yields a sequence of transcript feature vectors $\mathbf{x}_{\text{core}}^{(i)}\in\mathbb{R}^{G_{\text{core}}}$ for $i\in\{1,\dots,N\}$, where each vector is spatially aligned with its corresponding image patch embedding $\mathbf{h}_{\text{img}}^{(i)}$. 
+
+These token-level transcript features are then embedded into the same dimensional space as the image tokens through a learned projection $f_{\boldsymbol{\theta}}$, parameterized by a multi-layer perceptron (MLP):
+%
 \begin{equation}
     \mathbf{h}_{\text{core}}^{(i)} = f_{\boldsymbol{\theta}}\!\left(\mathbf{x}_{\text{core}}^{(i)}\right),
 \end{equation}
-where $f_{\boldsymbol{\theta}} : \mathbb{R}^{G_{\text{core}}} \to \mathbb{R}^{d}$ constitutes our \emph{Expr Encoder}.
+%
+where $f_{\boldsymbol{\theta}} : \mathbb{R}^{G_{\text{core}}} \to \mathbb{R}^{d}$ constitutes our \emph{Expr Encoder}. We collect all encoded transcript tokens into a sequence $\mathbf{H}_{\text{core}}\in\mathbb{R}^{N\times d}$. This token-level representation enables the model to learn spatial correspondences between local morphology and gene expression patterns within each tile.
 
-\subsection*{Unimodal Baselines}
+\subsection*{Baseline Methods}
 \label{sec:baseline-methods}
 
-\subsubsection{Vision Models}
-\label{sec:vision-models}
+To comprehensively evaluate the contributions of different modalities and fusion strategies, we benchmark a range of unimodal and multimodal baseline approaches.
 
-The \textbf{vision} model is a ViT fine-tuned end-to-end on the target task. The primary configuration uses ViT-S; ViT-B is evaluated as part of the capacity ablation. \textbf{CONCH}~\cite{lu_multimodalgenerativeai_2024} is a visual-language foundation model pretrained on diverse histopathology images and biomedical text, used as a frozen feature extractor with a task-specific linear head. We additionally report results for Phikon~\cite{filiot_phikonv2largepublic_2024} and the OmiCLIP/Loki image encoder~\cite{chen_visualomicsfoundation_2025} in the appendix.
+\subsubsection{Morphology-Only Models (Morph-only)}
+\label{sec:morphology-only-models-morph-only}
 
-\subsubsection{Expression Models}
-\label{sec:expression-models}
+For models that rely solely on H\&E histology, we evaluate several pretrained foundation models as frozen feature extractors. These include CONCH \cite{lu_multimodalgenerativeai_2024}, a visual-language foundation model developed using diverse sources of histopathology images, biomedical text; Phikon \cite{filiot_phikonv2largepublic_2024}, a self-supervised ViT trained on 460 million pathology tiles covering more than 30 cancer sites; and the OmiCLIP/Loki image encoder \cite{chen_visualomicsfoundation_2025}, which was pretrained on multimodal histology-transcriptomics data. 
 
-\textbf{expr-tile} and \textbf{expr-token} are transcript-only models that predict targets from core panel measurements using tile-level and token-level transcript aggregation, respectively; for \textbf{expr-token}, the token embeddings are globally averaged before the prediction head. \textbf{Geneformer}~\cite{theodoris_transferlearningenables_2023} (\texttt{gf-12L-38M-i4096} checkpoint, 12 layers, 38M parameters) is used as a frozen expression foundation model baseline.
+Additionally, we evaluate a ViT-S (small) backbone from the \texttt{timm} library under two training regimes: (i) frozen feature extraction, where the pretrained weights are fixed and only the prediction head is trained, and (ii) end-to-end fine-tuning, where all model parameters are updated during training. These comparisons allow us to assess the value of different pretraining strategies and the benefit of task-specific fine-tuning.
+
+\subsubsection{Expression-Only Models (Expr-only)}
+\label{sec:expression-only-models-expr-only}
+
+For transcript-only baselines, we train lightweight models that predict either \emph{add-on} gene expression or cell type counts from core panel measurements alone.
+
+\paragraph{Transcript representation.}
+A key design choice across all transcript-based models is how the spatial structure of the core panel measurements is represented. In the \emph{tile-level} representation, all core panel transcripts within a tile are aggregated into a single vector $\mathbf{x}_{\text{core}} \in \mathbb{R}^{G_{\text{core}}}$, which is then encoded to obtain a tile-level transcript embedding $\mathbf{z}_{\text{core}} = f_{\boldsymbol{\theta}}(\mathbf{x}_{\text{core}}) \in \mathbb{R}^{d}$, discarding any within-tile spatial information. In the \emph{token-level} representation, transcripts are instead aggregated at the resolution of individual ViT patch positions, yielding a spatially resolved sequence $\{\mathbf{x}^{(i)}_{\text{core}}\}_{i=1}^{N}$ as described in Section~\ref{sec:transcript-encoding}. Each patch token is encoded independently by $f_{\boldsymbol{\theta}}$ and the resulting embeddings are globally averaged,
+%
+\begin{equation}
+    \mathbf{z}_{\text{core}} = \frac{1}{N}\sum_{i=1}^{N}f_{\boldsymbol{\theta}}\!\left(\mathbf{x}_{\text{core}}^{(i)}\right) = \frac{1}{N}\sum_{i=1}^{N} \mathbf{h}_{\text{core}}^{(i)},
+\end{equation}
+%
+to obtain a single tile-level transcript embedding. This distinction carries through to all downstream models: tile-level representations are used in late fusion, while token-level representations are used in both the tokenized late fusion variant and early fusion (Sections~\ref{sec:late-fusion}--\ref{sec:early-fusion}).
+
+In experiments involving late fusion (Section~\ref{sec:late-fusion}), we additionally consider an alternative transcript encoder based on Geneformer~\cite{theodoris_transferlearningenables_2023}, a pretrained transformer model for gene expression data. We use the \texttt{gf-12L-38M-i4096} checkpoint, comprising 12 transformer layers and 38 million parameters with a context length of 4096 tokens, employed as a frozen feature extractor without task-specific fine-tuning.
 
 \subsubsection{Minimum-MAE Baseline}
 \label{sec:minimum-mae-baseline}
 
-For each target gene $t$, this baseline identifies the single core gene that best predicts $t$ on the training set by MAE:
+As a simple reference method that operates purely on transcript data, establishing what can be achieved
+by univariate gene-to-gene regression alone without any spatial or morphological context, we implement a 
+\textbf{Min-MAE baseline}. For each target gene $t\in G_{\text{add}}$, this baseline identifies the single core gene $s^{\ast}(t)\in G_{\text{core}}$ that best predicts the target gene on the training set, as measured by mean absolute error (MAE):
 \begin{equation}
-s^{\ast}(t)=\arg\min_{s\in G_{\text{core}}}\mathrm{MAE}\!\left(y_{\cdot,t},x_{\cdot,s}\right).
+s^{\ast}(t)=\arg\min_{s\in\{1,\dots,G_{\text{core}}\}}\mathrm{MAE}\!\left(y_{\cdot,t},x_{\cdot,s}\right)
 \end{equation}
-The prediction is the direct expression value of $s^{*}(t)$. This baseline quantifies how much can be explained by simple cross-panel gene--gene correlations.
+The prediction for gene $t$ is then simply the expression of gene $s^{\ast}(t)$ from the core panel. This is equivalent to a constrained linear model with exactly one nonzero coefficient per target gene, fixed to the value of 1. This baseline provides insight into how much information can be extracted from simple gene-gene correlations without learning complex patterns.
 
 \subsection*{Multimodal Fusion Strategies}
 \label{sec:multimodal-fusion-strategies}
 
+We explore two primary strategies for integrating morphological and transcriptomic information: early fusion and late fusion. These approaches differ in where and how the modalities are combined in the model architecture.
+
 \subsubsection{Early Fusion}
 \label{sec:early-fusion}
 
-Early fusion integrates transcript tokens directly into the ViT token stream before any transformer processing. Given image embeddings $\mathbf{H}_{\text{img}}\in\mathbb{R}^{(N+1)\times d}$ and token-level transcript embeddings $\mathbf{H}_{\text{core}}\in\mathbb{R}^{N\times d}$:
+Early fusion integrates transcript information directly into the ViT's token stream before the transformer layers process the combined sequence (\autoref{fig:p-fus:architecture}). This allows the model to learn joint representations and cross-modal interactions through self-attention mechanisms.
+
+Given the image token embeddings $\mathbf{H}_{\text{img}}\in\mathbb{R}^{(N+1)\times d}$ and token-level transcript embeddings $\mathbf{H}_{\text{core}}\in\mathbb{R}^{N\times d}$, we test two fusion operations:
 
 \begin{itemize}
-\item \textbf{early-fusion-add}: $\mathbf{h}_{\text{fused}}^{(i)} = \mathbf{h}_{\text{img}}^{(i)} + \mathbf{h}_{\text{core}}^{(i)}$ for each spatial position $i$; the CLS token is unchanged.
-\item \textbf{early-fusion-concat}: image and transcript token sequences are concatenated along the sequence dimension, yielding a combined sequence of length $2N+1$.
+\item \textbf{Element-wise addition:} For each spatial location $i$, we add the corresponding image and transcript token embeddings: $\mathbf{h}_{\text{fused}}^{(i)} = \mathbf{h}_{\text{img}}^{(i)} + \mathbf{h}_{\text{core}}^{(i)}$. The CLS token remains unchanged.
+
+\item \textbf{Concatenation:} We concatenate the image and transcript token sequences along the sequence dimension. The concatenated sequence length is $2N+1$.
 \end{itemize}
 
-The fused sequence is processed by the remaining ViT layers via self-attention, and a linear head maps the CLS token to predictions.
+The resulting fused token sequence is then passed through the remaining layers of the ViT. The transformer's self-attention mechanism processes all tokens jointly, enabling the model to learn complex interactions between morphological and transcriptomic features at different spatial locations. Finally, a linear prediction head maps the CLS token to the target predictions $\hat{\mathbf{y}}$ (for gene expression) or $\hat{\mathbf{c}}$ (for cell type counts).
+
+\paragraph{Encoder capacity.}
+We consider two capacity levels that are paired consistently across all models. The \emph{low capacity} configuration combines a ViT-S backbone with a single-layer \emph{Expr Encoder} MLP of 32 hidden units. The \emph{high capacity} configuration pairs a ViT-B backbone with a two-layer \emph{Expr Encoder} MLP of 128 hidden units per layer and ReLU activations.
+
 
 \subsubsection{Late Fusion}
 \label{sec:late-fusion}
 
-In late fusion, each modality is encoded independently and the resulting embeddings are combined at the embedding level. Let $\mathbf{z}_{\text{img}}\in\mathbb{R}^{d}$ be the image CLS embedding and $\mathbf{z}_{\text{core}}\in\mathbb{R}^{d}$ be a pooled transcript embedding.
+In \emph{vanilla} late fusion approaches, each modality is processed independently through its respective encoder, and the resulting representations are combined at the embedding level before making predictions. 
+
+Let $\mathbf{z}_{\text{img}}\in\mathbb{R}^{d}$ denote the image embedding (CLS token). Similarly, let $\mathbf{z}_{\text{core}}\in\mathbb{R}^{d}$ represent a pooled transcript embedding that summarizes the core expression profile. We test two operations:
 
 \begin{itemize}
-\item \textbf{late-fusion-tile-add} / \textbf{late-fusion-tile-concat}: tile-level transcript aggregation; combined by addition or concatenation.
-\item \textbf{late-fusion-token-add} / \textbf{late-fusion-token-concat}: token-level transcript aggregation (mean-pooled); combined by addition or concatenation.
+\item \textbf{Concatenation:} The embeddings are concatenated along the feature dimension to form $[\mathbf{z}_{\text{img}}; \mathbf{z}_{\text{core}}]\in\mathbb{R}^{2d}$, which is then passed through the prediction head.
+\item \textbf{Element-wise addition:} The embeddings are summed element-wise to produce $\mathbf{z}_{\text{img}} + \mathbf{z}_{\text{core}}\in\mathbb{R}^{d}$.
 \end{itemize}
 
-Comparing tile- and token-level late fusion isolates whether preserving within-tile spatial structure during encoding improves predictive performance, even when spatial information is discarded before the prediction head.
+\paragraph{Tokenized Late Fusion.}\label{per:p-fus:tokenization}
+To isolate the effect of using spatially resolved versus spatially pooled transcript features (\autoref{per:p-fus:tokenization}), we introduce a tokenized variant of late fusion, for which token-level transcript embeddings $\mathbf{h}_{\text{core}}^{(i)}$ are pooled and fused with the image embedding via concatenation or addition, as described above. Comparing this variant to \emph{vanilla} late fusion allows us to assess whether preserving within-tile spatial structure during encoding improves predictive performance, even when that spatial information is ultimately discarded before prediction.
 
-\paragraph{Encoder capacity.}
-We evaluate two capacity levels applied consistently across all models:
-\begin{itemize}
-  \item \textbf{Low capacity}: ViT-S backbone; 1-layer \emph{Expr Encoder} MLP.
-  \item \textbf{High capacity}: ViT-B backbone; 2-layer \emph{Expr Encoder} MLP of 128 hidden units per layer with ReLU activations.
-\end{itemize}
 
 \subsection*{Contrastive Pretraining}
 \label{sec:contrastive-pretraining}
 
-To further investigate token-level versus tile-level transcript representations, we conduct CLIP-style contrastive pretraining~\cite{radford_learningtransferablevisual_2021}. Given a batch of $B$ paired tiles, let $\mathbf{z}_{\text{img}}^{(i)}$ and $\mathbf{z}_{\text{core}}^{(i)}$ be $\ell_2$-normalized image and transcript embeddings. The symmetric InfoNCE loss is:
+To further investigate the impact of token-level versus tile-level transcript representations, we conduct \textbf{CLIP-style contrastive pretraining} \cite{radford_learningtransferablevisual_2021} experiments on our dataset. CLIP pretraining learns aligned embeddings across modalities by maximizing agreement between paired samples while minimizing agreement with non-paired samples within each minibatch.
+
+\paragraph{Contrastive loss.}
+Given a batch of $B$ paired tiles, let $\mathbf{z}_{\text{img}}^{(i)}\in\mathbb{R}^{d}$ and $\mathbf{z}_{\text{core}}^{(i)}\in\mathbb{R}^{d}$ denote the $\ell_2$-normalized image and transcript embeddings for tile $i$, respectively. We define the pairwise cosine similarity matrix $\mathbf{S}\in\mathbb{R}^{B\times B}$ with entries
+\begin{equation}
+  S_{ij} = \frac{{\mathbf{z}_{\text{img}}^{(i)}}^\top \mathbf{z}_{\text{core}}^{(j)}}{\tau},
+\end{equation}
+where $\tau > 0$ is a learnable temperature parameter. The symmetric InfoNCE loss is then
 \begin{equation}
   \mathcal{L}_{\text{CLIP}} = -\frac{1}{2B}\sum_{i=1}^{B}\left[
-    \log \frac{e^{S_{ii}/\tau}}{\sum_{j} e^{S_{ij}/\tau}}
+    \log \frac{e^{S_{ii}}}{\sum_{j=1}^{B} e^{S_{ij}}}
     +
-    \log \frac{e^{S_{ii}/\tau}}{\sum_{j} e^{S_{ji}/\tau}}
-  \right],
+    \log \frac{e^{S_{ii}}}{\sum_{j=1}^{B} e^{S_{ji}}}
+  \right].
   \label{eq:clip-loss}
 \end{equation}
-where $S_{ij} = {\mathbf{z}_{\text{img}}^{(i)}}^\top \mathbf{z}_{\text{core}}^{(j)}$ and $\tau>0$ is a learnable temperature. We compare \textbf{CLIP-tile} (tile-aggregated transcript embedding) against \textbf{CLIP-token} (mean-pooled token-level embeddings).
+This objective encourages the embeddings of matched image--transcript pairs ($i=j$) to be more similar than embeddings of any non-matched pair in the batch, simultaneously from the image-to-transcript and transcript-to-image directions.
 
-\subsection*{Downstream Clinical Evaluation via MIL}
-\label{sec:mil-evaluation}
+\paragraph{CLIP-tile pretraining.}
+In this variant, we contrast the global image embedding $\mathbf{z}_{\text{img}}$ against the tile-aggregated core transcript embedding $\mathbf{z}_{\text{core}}$. This approach treats each tile as having a single, unified transcriptomic signature.
 
-To assess the clinical utility of the learned representations, we extract tile-level embeddings from each model variant and train multiple-instance learning (MIL) aggregators on two tasks: (i)~\textbf{histology classification} and (ii)~\textbf{survival prediction}. We use an attention-based MIL (ABMIL) aggregator~\cite{ilse_attentionbaseddeeplearning_2018} with fixed, frozen tile embeddings, so that differences in downstream performance directly reflect the quality of the learned representations. Experiments are conducted on the BEAT cohort and extended to HEST1k and HESCAPE where labels are available.
+\paragraph{CLIP-token pretraining.}
+Here, we contrast the global image embedding $\mathbf{z}_{\text{img}}$ against the mean-pooled token-level embeddings $\mathbf{h}_{\text{core}}^{(i)}$.
+
+By comparing these two pretraining strategies, we can assess whether CLIP-style contrastive training, the dominant paradigm for multimodal pretraining~\cite{radford_learningtransferablevisual_2021}, benefits from spatially granular transcript representations.
 
 \subsection*{Training and Evaluation}
 \label{sec:training-and-evaluation}
@@ -170,27 +213,47 @@ To assess the clinical utility of the learned representations, we extract tile-l
 \subsubsection{Loss Function}
 \label{sec:loss-function}
 
-All models are trained with mean squared error (MSE):
+All models are trained using mean squared error (MSE) as the training objective. For gene expression prediction, the loss is computed over all add-on genes:
 \begin{equation}
-\mathcal{L} = \frac{1}{G}\sum_{g=1}^{G} (\hat{y}_g - y_g)^2,
+\mathcal{L}_{\text{expr}} = \frac{1}{G_{\text{add}}}\sum_{g=1}^{G_{\text{add}}} (\hat{y}_g - y_g)^2
 \end{equation}
-where $G$ is the number of target genes or cell types.
+where $\hat{y}_g$ and $y_g$ are the predicted and true log1p-transformed expression values for gene $g$, respectively. For cell type count prediction, the loss is analogously computed over all cell types:
+\begin{equation}
+\mathcal{L}_{\text{type}} = \frac{1}{K}\sum_{k=1}^{K} (\hat{c}_k - c_k)^2
+\end{equation}
+where $\hat{c}_k$ and $c_k$ are the predicted and true log1p-transformed counts for cell type $k$, respectively. The MSE loss is well-suited for these regression tasks and provides stable gradients during training.
 
 \subsubsection{Training Protocol}
 \label{sec:training-protocol}
 
-Models were implemented in PyTorch and PyTorch Lightning. Training was performed on NVIDIA A100 GPUs (40\,GB) using mixed-precision (FP16). Each configuration was trained for up to 35 epochs with early stopping on validation performance. We used AdamW with a differential learning rate ($10^{-4}$ for the prediction head, $10^{-5}$ for backbone parameters), weight decay $10^{-3}$, global batch size 256--512, gradient clipping to norm 1.0, and a cosine learning rate schedule with 5-epoch linear warmup.
+All models were implemented in PyTorch and PyTorch Lightning to ensure reproducibility and consistency across experiments. Training was performed on NVIDIA A100 GPUs (40\,GB memory) using mixed-precision arithmetic (FP16) to accelerate computation and reduce memory consumption. Each model configuration was trained for up to 35 epochs, corresponding to approximately 2--7 hours of wall-clock time depending on model size and complexity. 
+%(Table~\ref{tab:p-fus:model-complexity}). 
+We employed early stopping based on validation performance to prevent overfitting and reduce unnecessary computation.
 
-Data were split into training, validation, and test partitions at the patient level. Details are provided in \autoref{tab:p-fus:cohort}.
+\paragraph{Optimization and hyperparameters.}
+We used the AdamW optimizer for all experiments. Unless stated otherwise, we applied a differential learning rate strategy: $10^{-4}$ for the prediction head parameters and $10^{-5}$ for the backbone parameters. This two-tier approach allows faster adaptation of the task-specific prediction head while making more conservative updates to pretrained backbone features. Weight decay was set to $10^{-3}$ to provide moderate L2 regularization. The global batch size ranged between 256 and 512 depending on memory requirements of specific model architectures. To stabilize training, gradients were clipped to a maximum norm of 1.0.
+
+We employed a cosine learning rate schedule with a linear warmup phase. The learning rate increased linearly from 0 to the target rate over the first 5 epochs (warmup phase), followed by cosine annealing that gradually reduced the learning rate to a minimum of $10^{-6}$ by the end of training. This schedule promotes stable optimization in early training while enabling fine-grained convergence in later epochs.
+
+\paragraph{Data splitting and model selection.}
+Data were split into fixed training, validation, and test partitions at the patient level, ensuring that all tiles from a given patient are assigned exclusively to one partition. The specific split configuration and patient-level assignments are detailed in \autoref{tab:p-fus:cohort}.
 
 \subsubsection{Evaluation Metrics}
 \label{sec:evaluation-metrics}
 
-Following prior work~\cite{chen_visualomicsfoundation_2025,gindra_largescalebenchmarkcrossmodal_2025}, we report per-gene (or per-cell-type) metrics averaged across all targets:
+Following prior work in spatial transcriptomics prediction~\cite{chen_visualomicsfoundation_2025,gindra_largescalebenchmarkcrossmodal_2025}, we compute metrics on a per-gene basis and then average across all genes in the \emph{add-on} panel. For cell type count prediction, we compute the same metrics on a per-cell-type basis and average across all cell types. Specifically, we report:
+
 \begin{itemize}
-\item \textbf{Pearson correlation (PCC)}: linear relationship between predicted and true values across tiles.
-\item \textbf{Spearman correlation (SCC)}: rank-based correlation, robust to non-linear transformations.
-\item \textbf{MSE}: average squared deviation between predictions and ground truth.
+\item \textbf{Pearson correlation coefficient:} Measures the linear relationship between predicted and true values, capturing how well the model preserves relative patterns across spatial locations.
+
+\item \textbf{Spearman correlation coefficient:} Assesses monotonic relationships using rank-based correlation, making it robust to outliers and non-linear transformations.
+
+\item \textbf{Mean squared error (MSE):} Quantifies the average squared deviation between predictions and ground truth, penalizing larger errors more heavily.
 \end{itemize}
 
-Because samples differ widely in tile count, tile-weighted averages may be dominated by large WSIs. We therefore additionally report an \textbf{equal-weighted sample-level score}: we compute the metric for each sample independently (aggregating its tiles) and average uniformly across samples. This score reflects per-patient predictive performance and is complementary to tile-level metrics.
+\subsection*{Dataset and Experimental Setup}
+\label{sec:dataset-and-experimental-setup}
+
+All experiments were conducted on an internal cancer dataset comprising 159 patients (153 with cell type annotations derived as described in \autoref{sec:p-fus:app-cell-phenotyping}) with paired H\&E histology and Xenium spatial transcriptomics measurements. The Xenium panel includes both the core Human Immuno-Oncology Panel and a custom add-on panel. The core panel consists of $G_{\text{core}} = 380$ genes that cover key immune and cancer-related pathways, while the add-on panel contains $G_{\text{add}} = 100$ custom genes selected for their relevance to cancer biology and treatment response of the cohort.
+
+This dataset provides a challenging and realistic testbed for evaluating multimodal integration approaches, as it reflects the complexity and heterogeneity of tumor microenvironments.

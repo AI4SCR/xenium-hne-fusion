@@ -277,16 +277,9 @@ For Ray training:
 
 The HESCAPE Ray experiment reference lives in [ray/hescape.md](ray/hescape.md).
 
-## Full HESCAPE experiment suite actually run
+## Task tracking
 
-The tracked HESCAPE experiment matrix in `slurm/hescape.md` and `ray/hescape.md` covers:
-
-- Organ groups: `breast`, `bowel`, `lung-healthy`, `human-immuno-oncology`, `human-multi-tissue`
-- Predefined split folds: `outer=0` through `outer=4` under `data/03_output/hest1k/splits/hescape/<organ>/`
-- Base model families: `early-fusion`, `late-fusion-tile`, `late-fusion-token`, `vision`, `expr-tile`, `expr-token`
-- Fusion ablation: `--backbone.fusion_strategy concat` for the fusion models
-- Gating ablation: `--backbone.learnable_gate true` for the fusion models
-- Freeze-morph ablation: `--backbone.freeze_morph true` for `early-fusion`, `late-fusion-tile`, `late-fusion-token`, and `vision`
-- Evaluation: `scripts/eval/plot_wandb_scores.py` and `scripts/eval/paired_t_tests.py` with `configs/eval/hescape/<organ>.yaml`
+Current experiment status and next tasks live in
+[tasks.md](/Users/adrianomartinelli/projects/xenium-hne-fusion/tasks.md).
 
 Use the markdown files under `slurm/` and `ray/` as the exact cluster command reference.
