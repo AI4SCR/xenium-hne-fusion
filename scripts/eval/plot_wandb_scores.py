@@ -37,7 +37,6 @@ def main(
         output_prefix=build_plot_output_prefix(runs, eval_cfg=eval_cfg, output_dir=output_dir),
         sort_by_score=eval_cfg.sort_by_score,
         parameter_columns=eval_cfg.parameter_columns,
-        color_by_split=eval_cfg.color_by_splits,
     )
 
 
@@ -62,7 +61,6 @@ def _eval_config_from_args(args: dict) -> EvalConfig:
         filters=filters,
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
-        color_by_splits=args.get('color_by_splits', False),
         sort_by_score=args.get('sort_by_score', True),
     )
 

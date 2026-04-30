@@ -20,4 +20,5 @@ parameter_columns:
   - config.backbone.fusion_strategy
   - config.backbone.freeze_morph_encoder
   - config.data.expr_pool
-color_by_splits: true
+  - config.backbone.morph_encoder_name
+  - config.backbone.expr_encoder_name

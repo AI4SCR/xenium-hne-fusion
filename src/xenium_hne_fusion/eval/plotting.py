@@ -109,7 +109,6 @@ def plot_metrics(
     output_prefix: Path,
     sort_by_score: bool = True,
     parameter_columns: list[str] | None = None,
-    color_by_split: bool = False,
 ) -> list[Path]:
     scores = prepare_scores_table(runs, metrics=metrics)
     if parameter_columns is None:
@@ -127,7 +126,6 @@ def plot_metrics(
                 title=title,
                 output_prefix=output_prefix,
                 sort_by_score=sort_by_score,
-                color_by_split=color_by_split,
             )
         )
     return outputs
@@ -159,7 +157,6 @@ def _plot_metric(
     title: str,
     output_prefix: Path,
     sort_by_score: bool,
-    color_by_split: bool,
 ) -> list[Path]:
     data = data.copy()
     config_columns = _config_columns(parameter_columns)
@@ -172,28 +169,13 @@ def _plot_metric(
     pdat = data.assign(rep=lambda df: df.groupby('config_id').cumcount()).pivot(
         index='rep', columns='config_id', values=metric
     ).reindex(columns=configs)
-    split_data = None
-    split_palette = None
-    if color_by_split:
-        assert 'metadata' in data.columns, 'Missing split metadata'
-        assert data['metadata'].notna().all(), 'Missing split metadata'
-        split_data = data.assign(rep=lambda df: df.groupby('config_id').cumcount()).pivot(
-            index='rep', columns='config_id', values='metadata'
-        ).reindex(columns=configs)
-        split_palette = _split_palette(data['metadata'])
 
     board = ma.ClusterBoard(pdat, height=3.0, margin=0.4)
     board.add_layer(
         mp.Box(pdat, hue=modalities, palette=modality_colors, fill=True, showfliers=False, linewidth=0.7),
         name='boxplot',
     )
-    if color_by_split:
-        board.add_layer(
-            mp.Strip(pdat, hue=split_data, palette=split_palette, jitter=0.25, size=4, alpha=0.75),
-            name='stripplot',
-        )
-    else:
-        board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
+    board.add_layer(mp.Strip(pdat, jitter=0.25, color='black', size=4, alpha=0.75), name='stripplot')
     board.group_cols(configs, order=configs, spacing=0)
     _add_annotation_rows(board, annotations, configs)
     board.add_legends()
@@ -215,12 +197,6 @@ def _plot_metric(
         logger.info(f'Saved plot -> {output}')
     plt.close(board.figure)
     return outputs
-
-
-def _split_palette(metadata: pd.Series) -> dict[str, tuple[float, float, float, float]]:
-    splits = sorted(metadata.astype(str).unique())
-    cmap = plt.get_cmap('tab20', len(splits))
-    return {split: cmap(i) for i, split in enumerate(splits)}
 
 
 def _config_columns(parameter_columns: list[str]) -> list[str]:

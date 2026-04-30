@@ -12,4 +12,3 @@ filters:
   panel_paths:
     - default.yaml
 baseline: vision
-color_by_splits: false

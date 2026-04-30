@@ -13,4 +13,3 @@ filters:
   panel_paths:
     - hescape/human-multi-tissue.yaml
 baseline: vision
-color_by_splits: false

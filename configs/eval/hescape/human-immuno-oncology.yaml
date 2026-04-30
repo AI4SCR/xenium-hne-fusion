@@ -13,4 +13,3 @@ filters:
   panel_paths:
     - hescape/human-immuno-oncology.yaml
 baseline: vision
-color_by_splits: false

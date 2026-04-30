@@ -62,7 +62,6 @@ def _eval_config_from_args(args: dict) -> EvalConfig:
         filters=filters,
         baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
-        color_by_splits=args.get('color_by_splits', False),
         sort_by_score=args.get('sort_by_score', True),
     )
 

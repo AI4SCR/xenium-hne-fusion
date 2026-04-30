@@ -94,6 +94,7 @@ def extract_run_config(run) -> dict | None:
     cfg = run.config
 
     metadata_path = cfg.get("data", {}).get("metadata_path")
+    items_path = cfg.get("data", {}).get("items_path")
     panel_path = cfg.get("data", {}).get("panel_path")
     task = cfg.get("task", {}).get("target")
     model = cfg.get("wandb", {}).get("name")
@@ -139,6 +140,7 @@ def extract_run_config(run) -> dict | None:
     return {
         "config": config_path,
         "metadata_path": metadata_path,
+        "items_path": items_path,
         "panel_path": panel_path,
         "dataset_name": dataset_name,
         "organ": organ,
@@ -163,9 +165,10 @@ def make_group_key(params: dict) -> tuple[str, str]:
     """
     payload = {
         "dataset_name": params["dataset_name"],
-        "organ": params["organ"],
         "task": params["task"],
         "model": params["model"],
+        "items_path": params["items_path"],
+        "metadata_path": params["metadata_path"],
         "panel_path": params["panel_path"],
         "outer": params["outer"],
         "fusion_stage": params["fusion_stage"],
