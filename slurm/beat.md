@@ -3,23 +3,55 @@
 
 ## Data Preparation
 
+Steps must run in order; each stage depends on the previous one.
+
 ```bash
-# NOTE: transfer and process cell annotations
+# 1. Transfer cell annotations into the raw data directory.
 chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
+
+# 2. Structure raw BEAT data into 01_structured/<name>/.
 uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml
-./scribble/sbatch_process_beat_cells.sh --config configs/data/remote/beat.yaml
-uv run scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml
 
-# copy default panel
-uv run mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+# 3. Tile slides, extract transcripts and cell annotations — one job per sample.
+#    Cell annotations are included automatically when cells.parquet is present.
+JOB_IDS=()
+for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/beat.yaml); do
+    JOB_ID=$(sbatch --parsable \
+        --cpus-per-task=8 --mem=64G --time=08:00:00 \
+        --output=$HOME/logs/%j.out \
+        --job-name=beat_${SAMPLE_ID} \
+        --wrap="uv run python scripts/data/run_beat.py \
+            --config configs/data/remote/beat.yaml \
+            --executor serial --stage samples \
+            --filter.include_ids [${SAMPLE_ID}] --filter.exclude_ids null")
+    JOB_IDS+=($JOB_ID)
+    echo "Submitted ${SAMPLE_ID}: ${JOB_ID}"
+done
 
+# 4. Finalize (create_items + compute_all_items_stats) after all sample jobs complete.
+DEPENDENCY=$(IFS=:; echo "afterok:${JOB_IDS[*]}")
+sbatch --dependency=${DEPENDENCY} \
+    --cpus-per-task=8 --mem=32G --time=02:00:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=beat_finalize \
+    --wrap="uv run python scripts/data/run_beat.py \
+        --config configs/data/remote/beat.yaml \
+        --executor serial --stage finalize"
+
+# 5. Copy the default gene panel into the managed output directory.
+mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+
+# 6. Create filtered item sets and cross-validated splits.
+#    expr:            expression task items and splits
+#    expr-with-cells: expression task with cell-type features
+#    cells:           cell-type prediction items and splits (also used as the canonical split for expr)
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
-# warmup cache
+# 7. Warmup cache (optional — pre-populates tile feature cache before GPU training).
 TASK=expression
-ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
+ITEMS_PATH=cells.json  # cells items/splits are used for both tasks for consistency
 PANEL_PATH=default.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
 sbatch \
@@ -27,11 +59,11 @@ sbatch \
     --mem=32G \
     --time=02:00:00 \
     --output=$HOME/logs/%j.out \
-    --wrap="uv run python scribble/warmup-cache.py \
+    --wrap="uv run python scripts/artifacts/warmup_cache.py \
         --config configs/train/beat/${TASK}/early-fusion.yaml \
-        --items-path ${ITEMS_PATH} \
-        --panel-path ${PANEL_PATH} \
-        --cache-dir ${TASK}/${PANEL_NAME}"
+        --data.items_path ${ITEMS_PATH} \
+        --data.panel_path ${PANEL_PATH} \
+        --data.cache_dir=${TASK}/${PANEL_NAME}"
 
 TASK=cell_types
 sbatch \
@@ -39,11 +71,11 @@ sbatch \
     --mem=32G \
     --time=02:00:00 \
     --output=$HOME/logs/%j.out \
-    --wrap="uv run python scribble/warmup-cache.py \
+    --wrap="uv run python scripts/artifacts/warmup_cache.py \
         --config configs/train/beat/${TASK}/early-fusion.yaml \
-        --items-path ${ITEMS_PATH} \
-        --panel-path ${PANEL_PATH} \
-        --cache-dir ${TASK}/${PANEL_NAME}"
+        --data.items_path ${ITEMS_PATH} \
+        --data.panel_path ${PANEL_PATH} \
+        --data.cache_dir=${TASK}/${PANEL_NAME}"
 ```
 
 ## Model Training
