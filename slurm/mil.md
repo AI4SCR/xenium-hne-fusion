@@ -115,7 +115,8 @@ for RUN_ID in \
         --output=$HOME/logs/%j.out \
         --job-name=mil-cache-${RUN_ID} \
         --wrap="uv run python scripts/artifacts/cache_predictions.py \
-            --config configs/mil/beat/${RUN_ID}.yaml")
+            --config ${CONFIG} \
+            --pretrained.run_id ${RUN_ID}")
 
     for AGGREGATOR in mean max min simple_attention attention; do
         sbatch \
