@@ -1,0 +1,47 @@
+debug: false
+
+pretrained:
+  entity: chuv
+  project: xe-hne-fus-cell-v0
+  run_id: "saib5muk"
+
+data:
+  name: beat
+  metadata_path: cells/outer=0-inner=0-seed=0.parquet
+  clinical_path: artifacts/mil/cells/clinical.parquet
+  batch_size: 4
+  num_workers: 10
+  prefetch_factor: 4
+
+task:
+  kind: classification
+
+aggregator:
+  name: attention
+  hidden_dim: 128
+  gated: false
+
+head:
+  num_hidden_layers: 0
+  hidden_dim: 32
+  dropout: 0.1
+
+lit:
+  target_key: metadata.7
+  lr_head: 1.0e-3
+  lr_aggregator: 1.0e-4
+  weight_decay: 1.0e-2
+  schedule: cosine
+  num_warmup_epochs: 10
+  loss: mse
+
+trainer:
+  max_epochs: 100
+  max_time: "00:04:00:00"
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+
+wandb:
+  project: xe-hne-fus-mil
+  name: null
+  tags: [beat, mil]
