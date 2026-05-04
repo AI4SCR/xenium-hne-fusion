@@ -36,6 +36,9 @@ def _validate_config(
 
     assert not (morph_encoder is None and global_pool == 'token'), f'If no morph_encoder is provided, global_pool cannot be `token`.'
 
+    if fusion_strategy is not None:
+        assert fusion_stage in {'early', 'late'}, f'fusion_stage must be one of [early, late], got {fusion_stage}'
+
     if morph_token_pool is not None:
         assert fusion_stage == 'late', f'morph_token_pool is only used for late fusion.'
     if expr_token_pool is not None:
@@ -336,7 +339,7 @@ class FusionModel(nn.Module):
                 features = self.forward_late_fusion(morph_features=morph_features, expr_features=expr_features)
 
         # UNI-MODAL
-        if route == 'morph_only':
+        elif route == 'morph_only':
             images = glom(batch, self.morph_key)
             features = self.forward_morph(images)
         elif route == 'expr_only':

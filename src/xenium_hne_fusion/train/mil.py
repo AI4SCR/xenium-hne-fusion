@@ -8,6 +8,9 @@ from typing import Any
 import lightning as L
 import pandas as pd
 import wandb
+from ai4bmr_learn.callbacks.log_model_checkpoint_paths import LogCheckpointPathsCallback
+from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
+from ai4bmr_learn.callbacks.log_wandb_run_metadata import LogWandbRunMetadataCallback
 from ai4bmr_learn.datasets import BagsDataset, pad_bags_collate
 from ai4bmr_learn.data.splits import Split
 from ai4bmr_learn.lit.mil import ClassificationMILLit, RegressionMILLit
@@ -125,6 +128,7 @@ def build_sample_level_mil_metadata(
         sample_metadata[target_column] = categorical.codes.astype("int64")
     else:
         numeric = pd.to_numeric(sample_metadata[target_column], errors="raise")
+        assert numeric.notna().all(), "regression target has NaN"
         sample_metadata[target_column] = numeric.astype("float32")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -135,13 +139,11 @@ def build_sample_level_mil_metadata(
 
 def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
     assert cfg.data.name is not None, "cfg.data.name"
-    assert cfg.data.metadata_path is not None, "cfg.data.metadata_path"
     managed = get_managed_paths(cfg.data.name)
     output_dir = managed.output_dir
 
     run_dir = output_dir / "mil" / cfg.pretrained.run_id
 
-    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir / "splits")
     cfg.data.clinical_path = _resolve_path(cfg.data.clinical_path, root=output_dir)
     cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=run_dir / "cache", default=run_dir / "cache")
 
@@ -204,10 +206,13 @@ def train(cfg: MILConfig):
         cfg.data.num_workers = 0
         cfg.data.prefetch_factor = None
 
-    cfg, run_dir = resolve_mil_paths(cfg)
     resolved_run = resolve_pretrained_run(cfg.pretrained)
+    cfg, run_dir = resolve_mil_paths(cfg)
     if cfg.wandb.name is None:
         cfg.wandb.name = resolved_run.source_config.wandb.name
+
+    metadata_path = Path(resolved_run.source_config.data.metadata_path)
+    assert metadata_path.exists(), f"source metadata_path not found: {metadata_path}"
 
     cache_subdir = "debug" if cfg.debug else "predictions"
     mil_items_path = run_dir / cache_subdir / "bags.json"
@@ -216,7 +221,7 @@ def train(cfg: MILConfig):
         "Run scripts/artifacts/cache_predictions.py first."
     )
     sample_metadata_path = build_sample_level_mil_metadata(
-        metadata_path=cfg.data.metadata_path,
+        metadata_path=metadata_path,
         target_key=cfg.lit.target_key,
         task_kind=cfg.task.kind,
         output_path=run_dir / "sample-metadata.parquet",
@@ -268,11 +273,17 @@ def train(cfg: MILConfig):
         **asdict(cfg.wandb),
         config={**asdict(cfg), "pretrained_run_id": cfg.pretrained.run_id},
     )
+    callbacks = [
+        LogModelStats(),
+        LogWandbRunMetadataCallback(),
+        LogCheckpointPathsCallback(),
+    ]
     trainer = L.Trainer(
         accelerator="auto",
         devices="auto",
         precision="16-mixed",
         logger=wb_logger,
+        callbacks=callbacks,
         default_root_dir=run_dir,
         **asdict(cfg.trainer),
     )
