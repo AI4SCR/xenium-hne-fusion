@@ -43,3 +43,8 @@
 - UMAP embeddings for different models with visualization on WSI
 - WSI visualizations of true vs. predicted (tile-level overlay, not UMAP)
 - MIL attention scores on tile
+
+### Future work
+
+- Implement flexible input-output modules for flexible input and prediction panels
+- Token/cell level tasks
