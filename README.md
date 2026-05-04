@@ -35,7 +35,6 @@ xenium-hne-fusion/
 ├── ray/                     # Ray submission helpers and command references
 ├── tests/                   # pytest suite
 ├── data/                    # default DATA_DIR (machine-specific; set in .env)
-└── results/                 # local outputs, not tracked dataset artifacts
 ```
 
 ## Quickstart
