@@ -1,12 +1,119 @@
 # Xenium x H&E Fusion
 
-Research code for ["Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer"](https://openreview.net/forum?id=h2GcySraTP) (ICLR 2026 Workshop LMRL) — an early-fusion multimodal transformer that integrates subcellular Xenium transcript readouts directly into the ViT token stream to enable fine-grained cross-modal interaction for gene expression prediction.
+Research code for ["Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer"](https://openreview.net/forum?id=h2GcySraTP) (ICLR 2026 Workshop LMRL) — an early-fusion multimodal transformer that integrates subcellular Xenium transcript readouts directly into the ViT token stream for gene expression prediction and downstream patient-level MIL tasks.
 
 Primary results are on an internal Xenium cohort (BEAT); we also benchmark on [`hest1k`](https://arxiv.org/abs/2406.16192) using splits and panels from the [HESCAPE](https://arxiv.org/abs/2508.01490) benchmark.
 
-## Citation
+## Pipeline overview
 
-If you use this code, please cite:
+```
+raw data
+  └─► structure + process (scripts/data/)
+        └─► items + splits + panels (scripts/artifacts/)
+              └─► supervised training (scripts/train/supervised.py)
+                    └─► prediction cache (scripts/artifacts/cache_predictions.py)
+                          └─► MIL training (scripts/train/mil.py)
+```
+
+Each stage writes managed outputs under `DATA_DIR/03_output/<name>/`. All paths in configs are relative to that root.
+
+## Project structure
+
+```text
+xenium-hne-fusion/
+├── src/xenium_hne_fusion/   # reusable package code
+├── scripts/data/            # dataset structuring and processing entrypoints
+├── scripts/artifacts/       # items, splits, panels, stats, and MIL cache/metadata
+├── scripts/train/           # training entrypoints (supervised and MIL)
+├── scripts/eval/            # W&B score plots and paired tests
+├── configs/data/            # dataset processing configs
+├── configs/artifacts/       # artifact generation configs
+├── configs/train/           # supervised training configs
+├── configs/mil/             # MIL training configs
+├── configs/eval/            # evaluation configs
+├── slurm/                   # Slurm experiment command references
+├── ray/                     # Ray submission helpers and command references
+├── tests/                   # pytest suite
+├── data/                    # managed raw / structured / processed / output data
+└── results/                 # local outputs, not tracked dataset artifacts
+```
+
+## Quickstart
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone <repo> && cd xenium-hne-fusion
+uv sync
+cp .env.example .env   # then fill in the values
+```
+
+Use `uv run ...` for all entrypoints — it loads `.env` automatically.
+
+### `.env` variables
+
+| Variable | Description |
+|----------|-------------|
+| `HF_TOKEN` | HuggingFace token for gated HEST-1k assets |
+| `WANDB_API_KEY` | W&B key for training tracking and eval plots |
+| `ACCOUNT` | Slurm account (cluster only) |
+| `DATA_DIR` | Root for `00_raw/`, `01_structured/`, `02_processed/`, `03_output/` |
+| `HEST1K_RAW_DIR` | Raw HEST-1k location |
+| `BEAT_RAW_DIR` | Raw BEAT location (internal dataset) |
+
+## Key scripts
+
+| Script | What it does |
+|--------|-------------|
+| `scripts/data/structure_<dataset>.py` | Download + validate raw data, build `01_structured/` |
+| `scripts/data/process_<dataset>.py` | Tile slides, extract per-tile artifacts, build `02_processed/` |
+| `scripts/data/create_items.py` | Build `03_output/<name>/items/all.json` tile inventory |
+| `scripts/artifacts/create_artifacts.py` | Filter items, create splits and gene panels |
+| `scripts/train/supervised.py` | Train a supervised tile-level model (expression / cell types) |
+| `scripts/artifacts/create_mil_metadata.py` | Join items with clinical labels for MIL |
+| `scripts/artifacts/cache_predictions.py` | Run pretrained model inference; write per-patient bags (GPU) |
+| `scripts/train/mil.py` | Train a MIL aggregator on top of cached embeddings |
+| `scripts/eval/plot_wandb_scores.py` | Fetch W&B runs and produce score plots + paired tests |
+
+## Datasets
+
+### BEAT (internal)
+
+Internal Xenium + H&E cohort. Data access is institutional. Preparation and training commands: [slurm/beat.md](slurm/beat.md).
+
+### HEST-1k / HESCAPE
+
+Public Xenium + H&E benchmark. Requires `HF_TOKEN`. HESCAPE uses fixed outer-fold splits and gene panels from the [HESCAPE benchmark](https://arxiv.org/abs/2508.01490). Commands: [slurm/hescape.md](slurm/hescape.md) and [slurm/hest1k.md](slurm/hest1k.md).
+
+## Configs
+
+Configs are YAML files loaded via `jsonargparse`. Individual fields can be overridden on the CLI:
+
+```bash
+uv run python scripts/train/supervised.py \
+    --config configs/train/beat/cell_types/early-fusion.yaml \
+    --debug true
+```
+
+Key training paths (`data.items_path`, `data.metadata_path`, `data.panel_path`, `data.cache_dir`) are relative to `DATA_DIR/03_output/<name>/` and resolved at runtime.
+
+## Cluster runs
+
+All exact submission commands live in the referenced `.md` files — use them as the authoritative command reference, not this README.
+
+| File | Contents |
+|------|----------|
+| [slurm/beat.md](slurm/beat.md) | BEAT data prep, supervised training, evaluation |
+| [slurm/hescape.md](slurm/hescape.md) | HESCAPE artifact creation and training sweep |
+| [slurm/hest1k.md](slurm/hest1k.md) | HEST-1k data structuring and processing |
+| [slurm/mil.md](slurm/mil.md) | MIL pipeline: chained cache → training jobs for all run IDs and aggregators |
+| [ray/hescape.md](ray/hescape.md) | Ray equivalents for HESCAPE training |
+| [ray/beat.md](ray/beat.md) | Ray equivalents for BEAT training |
+
+## Task tracking
+
+Current experiment status and next tasks: [tasks.md](tasks.md).
+
+## Citation
 
 ```bibtex
 @inproceedings{martinelli2026,
@@ -17,308 +124,3 @@ If you use this code, please cite:
   url       = {https://openreview.net/forum?id=h2GcySraTP},
 }
 ```
-
-## Project structure
-
-```text
-xenium-hne-fusion/
-├── src/xenium_hne_fusion/   # reusable package code
-├── scripts/data/            # dataset structuring and processing entrypoints
-├── scripts/artifacts/       # items, splits, panels, stats, and MIL cache/metadata
-├── scripts/train/           # training entrypoints (supervised and MIL)
-├── scripts/eval/            # W&B plots and paired tests
-├── configs/data/            # dataset processing configs
-├── configs/artifacts/       # artifact generation configs
-├── configs/train/           # supervised training configs
-├── configs/mil/             # MIL training configs
-├── configs/eval/            # evaluation configs
-├── slurm/                   # Slurm wrappers and experiment command refs
-├── ray/                     # Ray submission helpers and command refs
-├── tests/                   # pytest suite
-├── data/                    # managed raw / structured / processed / output data
-└── results/                 # local outputs, not managed dataset artifacts
-```
-
-## Managed data layout
-
-All managed paths are derived from `DATA_DIR` and the dataset `name`.
-For `name: hest1k`, the pipeline uses:
-
-```text
-DATA_DIR/00_raw/hest1k/
-DATA_DIR/01_structured/hest1k/
-DATA_DIR/02_processed/hest1k/
-DATA_DIR/03_output/hest1k/
-```
-
-The important outputs are:
-
-```text
-data/
-├── 00_raw/hest1k/
-│   ├── HEST_v1_3_0.csv
-│   ├── wsis/
-│   └── transcripts/
-├── 01_structured/hest1k/
-│   ├── metadata.csv|metadata.parquet
-│   └── <sample_id>/
-│       ├── wsi.tiff
-│       ├── transcripts.parquet
-│       ├── wsi.png
-│       ├── transcripts.png
-│       ├── tissues.parquet
-│       └── tiles/<tile_px>_<stride_px>.parquet
-├── 02_processed/hest1k/
-│   ├── metadata.parquet
-│   └── <sample_id>/<tile_px>_<stride_px>/<tile_id>/
-│       ├── tile.pt
-│       ├── transcripts.parquet
-│       └── expr-kernel_size=16.parquet
-└── 03_output/hest1k/
-    ├── items/all.json
-    ├── items/<items_name>.json
-    ├── statistics/*.parquet
-    ├── splits/<split_name>/*.parquet
-    ├── panels/<panel_name>.yaml
-    ├── figures/
-    └── cache/
-```
-
-`items/all.json` is the full tile inventory. Artifact configs filter that into task-specific item sets, create split metadata, and create or validate gene panels under `03_output/hest1k/panels/`.
-
-## Environment with `uv`
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone <repo>
-cd xenium-hne-fusion
-uv sync
-cp .env.example .env
-```
-
-Use `uv run ...` for all entrypoints. It loads `.env` automatically.
-
-```bash
-uv run pytest
-uv run python scripts/data/run_hest1k.py --config configs/data/local/hest1k.yaml --executor serial
-uv add <pkg>
-uv add --dev <pkg>
-```
-
-For notebooks or ad hoc Python sessions:
-
-```python
-from dotenv import load_dotenv
-
-load_dotenv()
-```
-
-## `.env` setup
-
-`.env.example` contains the required machine-specific values:
-
-```bash
-HF_TOKEN=hf_...
-WANDB_API_KEY=
-
-# SLURM
-ACCOUNT=
-
-DATA_DIR=data
-HEST1K_RAW_DIR=
-BEAT_RAW_DIR=
-```
-
-What each variable does:
-
-- `HF_TOKEN`: required to download gated HEST-1k assets.
-- `WANDB_API_KEY`: needed for tracked training and evaluation plots.
-- `ACCOUNT`: used by cluster-specific Slurm wrappers.
-- `DATA_DIR`: root for `00_raw`, `01_structured`, `02_processed`, and `03_output`.
-- `HEST1K_RAW_DIR`: raw HEST-1k location.
-- `BEAT_RAW_DIR`: raw BEAT location if you use that dataset.
-
-## Config files
-
-The repo is driven by YAML configs in four layers.
-
-- `configs/data/{local,remote}/hest1k.yaml`: dataset processing config. Defines `name`, tile settings, and sample filters. `local` is for direct workstation runs; `remote` is the broad cluster version.
-- `configs/artifacts/hescape/lung-healthy.yaml`: artifact config. Defines the HESCAPE item subset and split name for the lung-healthy panel.
-- `configs/train/hescape/expression/lung-healthy/*.yaml`: training configs. One file per model family.
-- `configs/eval/hescape/lung-healthy.yaml`: evaluation config for W&B score plots and paired tests.
-
-The key training paths stay relative to `DATA_DIR/03_output/<name>/`:
-
-- `data.items_path`
-- `data.metadata_path`
-- `data.panel_path`
-- `data.cache_dir`
-
-## One concrete example: HESCAPE `lung-healthy`
-
-This is the simplest end-to-end path to keep in mind.
-
-### 1. Create the base `hest1k` data
-
-```bash
-# Download missing raw HEST-1k files and build the structured dataset layout.
-uv run python scripts/data/structure_hest1k.py \
-  --config configs/data/local/hest1k.yaml
-
-# Detect tissues, tile each slide, and write per-tile processed artifacts.
-uv run python scripts/data/process_hest1k.py \
-  --config configs/data/local/hest1k.yaml
-
-# Normalize sample metadata into the canonical processed parquet.
-uv run python scripts/data/process_metadata.py \
-  --config configs/data/local/hest1k.yaml
-
-# Build the tile-level training item list at data/03_output/hest1k/items/all.json.
-uv run python scripts/data/create_items.py \
-  --config configs/data/local/hest1k.yaml
-
-# Compute dataset-wide item statistics and summary plots.
-uv run python scripts/data/compute_all_items_stats.py \
-  --config configs/data/local/hest1k.yaml
-```
-
-This makes the pipeline stages explicit:
-
-- `structure_hest1k.py`: downloads missing HEST-1k samples, validates MPP, and builds `data/01_structured/hest1k/`
-- `process_hest1k.py`: detects tissues, tiles slides, extracts tile crops, and writes per-tile processed artifacts under `data/02_processed/hest1k/`
-- `process_metadata.py`: writes cleaned sample metadata to `data/02_processed/hest1k/metadata.parquet`
-- `create_items.py`: builds `data/03_output/hest1k/items/all.json`
-- `compute_all_items_stats.py`: writes the base item statistics used by downstream artifact steps
-
-### 2. Create HESCAPE lung-healthy artifacts
-
-`configs/artifacts/hescape/lung-healthy.yaml` defines:
-
-- `items.name: hescape/lung-healthy`
-- `split.name: hescape/lung-healthy`
-- the explicit lung-healthy sample IDs
-
-Run:
-
-```bash
-# Filter all.json down to the lung-healthy HESCAPE subset.
-uv run python scripts/artifacts/filter_items.py \
-  --config configs/artifacts/hescape/lung-healthy.yaml
-
-# Materialize the fixed HESCAPE outer-fold split parquet files.
-uv run python scripts/artifacts/create_hescape_splits.py
-
-# Build the HESCAPE source/target panel YAML from the split feature universe.
-uv run python scripts/artifacts/create_hescape_panels.py
-
-# Compute subset-specific item statistics and plots.
-uv run python scripts/artifacts/compute_items_stats.py \
-  --config configs/artifacts/hescape/lung-healthy.yaml
-```
-
-This produces:
-
-- `data/03_output/hest1k/items/hescape/lung-healthy.json`
-- `data/03_output/hest1k/splits/hescape/lung-healthy/outer=0-seed=0.parquet`
-- `data/03_output/hest1k/panels/hescape/lung-healthy.yaml`
-- item stats under `data/03_output/hest1k/statistics/` and item-stat figures under `data/03_output/hest1k/figures/items/stats/`
-
-### 3. Train one model on that split and panel
-
-Example training config:
-[configs/train/hescape/expression/lung-healthy/vision.yaml](configs/train/hescape/expression/lung-healthy/vision.yaml)
-
-Run:
-
-```bash
-# Train the vision-only baseline on the lung-healthy split and panel.
-uv run python scripts/train/supervised.py \
-  --config configs/train/hescape/expression/lung-healthy/vision.yaml
-```
-
-That config trains on:
-
-- `data.name: hest1k`
-- `data.items_path: all.json`
-- `data.metadata_path: hescape/lung-healthy/outer=0-seed=0.parquet`
-- `data.panel_path: hescape/lung-healthy.yaml`
-
-Optional evaluation config:
-[configs/eval/hescape/lung-healthy.yaml](configs/eval/hescape/lung-healthy.yaml)
-
-## MIL downstream pipeline
-
-MIL (Multiple Instance Learning) runs on top of a pretrained supervised model and operates at
-the patient/sample level. The pipeline has three stages:
-
-### 1. Clinical artifact (once per dataset / items variant)
-
-```bash
-uv run python scripts/artifacts/create_mil_metadata.py --config configs/mil/beat/classification.yaml
-```
-
-Joins tile-level items with sample-level metadata to produce a `clinical.parquet` file used as
-the MIL target source.
-
-### 2. Prediction cache (once per pretrained run, requires GPU)
-
-```bash
-uv run python scripts/artifacts/cache_predictions.py --config configs/mil/beat/classification.yaml
-```
-
-Runs the pretrained model over all tiles, groups embeddings by `sample_id`, and writes
-`bags.json` plus one `<sample_id>.pt` per bag. **Stage 3 will fail immediately if this step was
-skipped.**
-
-### 3. MIL training
-
-```bash
-uv run python scripts/train/mil.py \
-    --config configs/mil/beat/classification.yaml \
-    --pretrained.run_id <run_id> \
-    --aggregator.name attention
-```
-
-`configs/mil/<dataset>/<task>.yaml` binds to a specific pretrained W&B run via
-`pretrained.run_id`. For cluster submission with automatic job chaining (cache → training), see
-[slurm/mil.md](slurm/mil.md).
-
-## Cluster runs
-
-### Slurm
-
-For dataset creation on a cluster, use the provided wrapper:
-
-```bash
-./slurm/run_hest1k.sh --config configs/data/remote/hest1k.yaml
-```
-
-It submits one CPU job per sample with `--stage samples`, then one dependent finalization job with `--stage finalize`.
-
-The HESCAPE Slurm experiment reference lives in [slurm/hescape.md](slurm/hescape.md).
-Dataset submission commands for HEST-1k and BEAT are in [slurm/hest1k.md](slurm/hest1k.md) and [slurm/beat.md](slurm/beat.md).
-The MIL experiment reference (chained cache + training jobs) lives in [slurm/mil.md](slurm/mil.md).
-
-### Ray
-
-For Ray data processing:
-
-```bash
-./ray/scripts/run_data.sh --config configs/data/remote/hest1k.yaml
-```
-
-For Ray training:
-
-```bash
-./ray/submit.sh --entrypoint-num-gpus 1 --entrypoint-num-cpus 12 \
-  "python scripts/train/supervised.py --config configs/train/hescape/expression/lung-healthy/vision.yaml"
-```
-
-The HESCAPE Ray experiment reference lives in [ray/hescape.md](ray/hescape.md).
-
-## Task tracking
-
-Current experiment status and next tasks live in
-[tasks.md](tasks.md).
-
-Use the markdown files under `slurm/` and `ray/` as the exact cluster command reference.
