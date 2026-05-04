@@ -192,6 +192,28 @@ You are an expert coding assistant for research code in computer vision, followi
 - Do not use root-level `results/` or ad hoc folders for managed dataset outputs that belong under `DATA_DIR/03_output/<name>/`.
 - Do not run full, expensive data/training pipelines as verification unless requested. Prefer targeted unit tests, parser checks, and small debug/fast-dev-run paths.
 
+## jsonargparse CLI pattern
+
+For scripts that take a single config dataclass, use `add_class_arguments` with `nested_key=None`
+to flatten all fields to the top level. This lets `--config` load the YAML and individual fields
+like `--debug true` override without any prefix:
+
+```python
+if __name__ == "__main__":
+    from jsonargparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("--config", action="config")
+    parser.add_class_arguments(MILConfig, None)   # None = no prefix
+
+    cfg = parser.parse_args()
+    init = parser.instantiate_classes(cfg)
+    raise SystemExit(main(init))
+```
+
+`main` receives the instantiated config object directly (e.g. `main(init)` where `init` is already
+a `MILConfig`). Do not use `auto_parser` — it wraps args under a `--cfg.` prefix tied to the
+parameter name, which is confusing and inconsistent with `--config`.
+
 ## Preferred tools
 
 Usually prefer these libraries in this project when they fit the task:
