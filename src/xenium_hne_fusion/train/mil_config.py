@@ -17,7 +17,6 @@ class PretrainedConfig:
 @dataclass
 class MILDataConfig:
     name: str | None = None
-    metadata_path: Path | None = None
     clinical_path: Path | None = None
     cache_dir: Path | None = None
     batch_size: int = 8

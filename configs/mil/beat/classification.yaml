@@ -7,7 +7,6 @@ pretrained:
 
 data:
   name: beat
-  metadata_path: cells/outer=0-inner=0-seed=0.parquet
   clinical_path: artifacts/mil/cells/clinical.parquet
   batch_size: 4
   num_workers: 10
