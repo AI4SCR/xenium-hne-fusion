@@ -40,12 +40,23 @@ xenium-hne-fusion/
 
 ## Quickstart
 
+This repo depends on [`ai4bmr-learn`](https://github.com/AI4SCR/ai4bmr-learn), which is installed as a local editable dependency. Clone it first and keep it on the latest `main`:
+
+```bash
+git clone git@github.com:AI4SCR/ai4bmr-learn.git
+cd ai4bmr-learn && git pull origin main && cd ..
+```
+
+Then clone and set up this repo:
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone <repo> && cd xenium-hne-fusion
+git clone git@github.com:AI4SCR/xenium-hne-fusion.git && cd xenium-hne-fusion
 uv sync
 cp .env.example .env   # then fill in the values
 ```
+
+`uv sync` resolves `ai4bmr-learn` from the sibling directory via the editable path in `pyproject.toml`. If it can't be found, check that both repos are cloned at the same level.
 
 Use `uv run ...` for all entrypoints — it loads `.env` automatically.
 
