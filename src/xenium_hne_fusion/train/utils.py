@@ -102,6 +102,7 @@ def set_fast_dev_run_settings(cfg: Config) -> Config:
     cfg.trainer.limit_train_batches = 2
     cfg.trainer.limit_val_batches = 2
     cfg.trainer.limit_test_batches = 2
+    cfg.trainer.limit_predict_batches = 2
     cfg.lit.num_warmup_epochs = 2
     return cfg
 
