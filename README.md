@@ -24,12 +24,13 @@ If you use this code, please cite:
 xenium-hne-fusion/
 ├── src/xenium_hne_fusion/   # reusable package code
 ├── scripts/data/            # dataset structuring and processing entrypoints
-├── scripts/artifacts/       # items, splits, panels, and stats
-├── scripts/train/           # training entrypoints
+├── scripts/artifacts/       # items, splits, panels, stats, and MIL cache/metadata
+├── scripts/train/           # training entrypoints (supervised and MIL)
 ├── scripts/eval/            # W&B plots and paired tests
 ├── configs/data/            # dataset processing configs
 ├── configs/artifacts/       # artifact generation configs
-├── configs/train/           # training configs
+├── configs/train/           # supervised training configs
+├── configs/mil/             # MIL training configs
 ├── configs/eval/            # evaluation configs
 ├── slurm/                   # Slurm wrappers and experiment command refs
 ├── ray/                     # Ray submission helpers and command refs
@@ -245,6 +246,43 @@ That config trains on:
 Optional evaluation config:
 [configs/eval/hescape/lung-healthy.yaml](configs/eval/hescape/lung-healthy.yaml)
 
+## MIL downstream pipeline
+
+MIL (Multiple Instance Learning) runs on top of a pretrained supervised model and operates at
+the patient/sample level. The pipeline has three stages:
+
+### 1. Clinical artifact (once per dataset / items variant)
+
+```bash
+uv run python scripts/artifacts/create_mil_metadata.py --config configs/mil/beat/classification.yaml
+```
+
+Joins tile-level items with sample-level metadata to produce a `clinical.parquet` file used as
+the MIL target source.
+
+### 2. Prediction cache (once per pretrained run, requires GPU)
+
+```bash
+uv run python scripts/artifacts/cache_predictions.py --config configs/mil/beat/classification.yaml
+```
+
+Runs the pretrained model over all tiles, groups embeddings by `sample_id`, and writes
+`bags.json` plus one `<sample_id>.pt` per bag. **Stage 3 will fail immediately if this step was
+skipped.**
+
+### 3. MIL training
+
+```bash
+uv run python scripts/train/mil.py \
+    --config configs/mil/beat/classification.yaml \
+    --pretrained.run_id <run_id> \
+    --aggregator.name attention
+```
+
+`configs/mil/<dataset>/<task>.yaml` binds to a specific pretrained W&B run via
+`pretrained.run_id`. For cluster submission with automatic job chaining (cache → training), see
+[slurm/mil.md](slurm/mil.md).
+
 ## Cluster runs
 
 ### Slurm
@@ -259,6 +297,7 @@ It submits one CPU job per sample with `--stage samples`, then one dependent fin
 
 The HESCAPE Slurm experiment reference lives in [slurm/hescape.md](slurm/hescape.md).
 Dataset submission commands for HEST-1k and BEAT are in [slurm/hest1k.md](slurm/hest1k.md) and [slurm/beat.md](slurm/beat.md).
+The MIL experiment reference (chained cache + training jobs) lives in [slurm/mil.md](slurm/mil.md).
 
 ### Ray
 
@@ -280,6 +319,6 @@ The HESCAPE Ray experiment reference lives in [ray/hescape.md](ray/hescape.md).
 ## Task tracking
 
 Current experiment status and next tasks live in
-[tasks.md](/Users/adrianomartinelli/projects/xenium-hne-fusion/tasks.md).
+[tasks.md](tasks.md).
 
 Use the markdown files under `slurm/` and `ray/` as the exact cluster command reference.
