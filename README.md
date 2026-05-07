@@ -83,6 +83,7 @@ Use `uv run ...` for all entrypoints — it loads `.env` automatically.
 | `scripts/artifacts/cache_predictions.py` | Run pretrained model inference; write per-patient bags (GPU) |
 | `scripts/train/mil.py` | Train a MIL aggregator on top of cached embeddings |
 | `scripts/eval/plot_wandb_scores.py` | Fetch W&B runs and produce score plots + paired tests |
+| `scripts/artifacts/warmup_cache.py` | Pre-populate tile feature cache before GPU training |
 
 ## Datasets
 

@@ -1,9 +1,36 @@
 # HEST1K Slurm Commands
 
-```bash
-uv run python scripts/data/create_items.py --config configs/data/remote/hest1k.yaml
-uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/hest1k.yaml
+Steps must run in order; each stage depends on the previous one.
 
+```bash
+# 1. Download HEST-1k samples into 01_structured/<name>/.
+uv run python scripts/data/structure_hest1k.py --config configs/data/remote/hest1k.yaml
+
+# 2. Tile slides and process per-sample artifacts — one job per sample.
+JOB_IDS=()
+for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/hest1k.yaml); do
+    JOB_ID=$(sbatch --parsable \
+        --cpus-per-task=8 --mem=64G --time=08:00:00 \
+        --output=$HOME/logs/%j.out \
+        --job-name=hest1k_${SAMPLE_ID} \
+        --wrap="uv run python scripts/data/process_hest1k.py \
+            --config configs/data/remote/hest1k.yaml \
+            --filter.include_ids [${SAMPLE_ID}] --filter.exclude_ids null")
+    JOB_IDS+=($JOB_ID)
+    echo "Submitted ${SAMPLE_ID}: ${JOB_ID}"
+done
+
+# 3. Build tile inventory and compute stats after all sample jobs complete.
+DEPENDENCY=$(IFS=:; echo "afterok:${JOB_IDS[*]}")
+sbatch --dependency=${DEPENDENCY} \
+    --cpus-per-task=8 --mem=32G --time=02:00:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=hest1k_finalize \
+    --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/hest1k.yaml && \
+            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/hest1k.yaml"
+
+# 4. Per-organ artifact creation (filter items, compute stats, check panel overlap, create splits and panels).
+#    Run after finalize completes.
 for ORGAN in bowel breast lung pancreas; do
     sbatch \
         --cpus-per-task=4 \

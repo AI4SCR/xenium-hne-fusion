@@ -223,7 +223,7 @@ def test_structure_hest1k_validates_mpp_after_download(monkeypatch: pytest.Monke
     monkeypatch.setattr(module, 'download_sample', fake_download_sample)
     monkeypatch.setattr(module, 'validate_hest_sample_mpp', fake_validate_hest_sample_mpp)
     monkeypatch.setattr(module, 'create_structured_symlinks', fake_create_structured_symlinks)
-    monkeypatch.setattr(module, 'resolve_samples', lambda cfg, metadata_csv: ['NCBI783'])
+    monkeypatch.setattr(module, 'resolve_hest1k_samples', lambda cfg, metadata_csv: ['NCBI783'])
 
     module.main(load_processing_config(config_path))
 

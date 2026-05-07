@@ -19,20 +19,21 @@
   - `bowel`
   - `breast`
   - `human-multi-tissue`
-
-### 🟡 Running
-
-- `BEAT`: runs with `50` HVG genes
-- `BEAT`: runs with `100` HVG genes
+  - `BEAT`: runs with `50` HVG genes
+  - `BEAT`: runs with `100` HVG genes
+- Implementation MIL for regression
+- Implementation MIL for classification (`histology`)
 
 ### 🟠 In preparation
 
-- MIL for regression
-- MIL for survival
-- MIL for classification (`histology`)
+- MIL for survival (check ai4bmr-learn:main)
+- MIL evaluation plots (sample-level predictions, metric curves, attention heatmaps)
+- Thorough review of MIL training code
+- MIL training optimization (batch size, aggregators, padding strategy)
 
 ### 🔴 Open
 
+- Integrate SPLIT data: add dataset specific process_split.py function and slurm/split.md that adapts the commands as needed.
 - Re-run `cell_types` predictions with **unfrozen** `morph_encoder` — model checkpoints needed for MIL experiments (previous runs on Ray cluster did not save checkpoints)
 - Re-run unimodal and late-fusion experiments for **frozen** foundation model encoders: `UNI`, `CONCH`, `BIOPTIMUS`, `GENEFORMER` — code exists, needs smoke-test; path forward is to add configs that set `morph_encoder` to each foundation model. Known hiccup: `PHIKON` checkpoint needs to be downloaded. Likely other small hiccups (missing checkpoints, env vars, etc.) but no major code changes should be necessary.
 - Transfer CLIP training from `meso` repo — check `dev` branch of `ai4bmr-learn` for shared dependencies before porting
@@ -43,6 +44,7 @@
 - UMAP embeddings for different models with visualization on WSI
 - WSI visualizations of true vs. predicted (tile-level overlay, not UMAP)
 - MIL attention scores on tile
+- Randomization experiments (mismatch Xenium and HnE information)
 
 ### Future work
 

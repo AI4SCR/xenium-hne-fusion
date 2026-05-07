@@ -129,9 +129,9 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     )
     monkeypatch.setattr(
         module,
-        "resolve_samples",
+        "resolve_hest1k_samples",
         lambda cfg, metadata_path_arg: (
-            calls.append(("resolve_samples", cfg.filter.include_ids, cfg.filter.exclude_ids, cfg.filter.species, cfg.filter.organ, metadata_path_arg)),
+            calls.append(("resolve_hest1k_samples", cfg.filter.include_ids, cfg.filter.exclude_ids, cfg.filter.species, cfg.filter.organ, metadata_path_arg)),
             ["B1", "L1"],
         )[1],
     )
@@ -198,7 +198,7 @@ def test_run_hest1k_runs_full_pipeline_with_unified_config(
     structured_dir = data_dir / "01_structured" / "hest1k"
     assert calls == [
         ("structured_metadata", metadata_path, structured_dir.resolve()),
-        ("resolve_samples", ["NCBI783", "NCBI856"], None, "Homo sapiens", None, metadata_path),
+        ("resolve_hest1k_samples", ["NCBI783", "NCBI856"], None, "Homo sapiens", None, metadata_path),
         ("filter_hest_samples_by_tile_mpp", ["B1", "L1"], metadata_path),
         ("ensure", "B1"),
         ("validate", "B1"),
@@ -321,7 +321,7 @@ def test_run_hest1k_ray_chains_samples_and_finalizes_after_barrier(
     monkeypatch.setattr(module, "load_ray_module", lambda: fake_ray)
     monkeypatch.setattr(module, "get_hest_metadata_path", lambda raw_dir_arg: raw_dir / "HEST_v1_3_0.csv")
     monkeypatch.setattr(module, "create_structured_metadata_symlink", lambda metadata_path_arg, structured_dir_arg: None)
-    monkeypatch.setattr(module, "resolve_samples", lambda cfg, metadata_path_arg: ["DONE", "L1", "P1"])
+    monkeypatch.setattr(module, "resolve_hest1k_samples", lambda cfg, metadata_path_arg: ["DONE", "L1", "P1"])
     monkeypatch.setattr(module, "filter_hest_samples_by_tile_mpp", lambda cfg, sample_ids, metadata_path_arg: sample_ids)
     monkeypatch.setattr(module, "can_extract_sample_at_tile_mpp", lambda cfg, sample_id, metadata_path_arg: True)
     monkeypatch.setattr(module, "ensure_hest_sample_downloaded", lambda sample_id, raw_dir_arg: calls.append(("ensure", sample_id)))

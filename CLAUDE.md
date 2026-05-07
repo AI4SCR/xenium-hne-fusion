@@ -191,6 +191,7 @@ You are an expert coding assistant for research code in computer vision, followi
 - Do not add broad `try/except` wrappers around data processing. Let the violated assumption surface.
 - Do not use root-level `results/` or ad hoc folders for managed dataset outputs that belong under `DATA_DIR/03_output/<name>/`.
 - Do not run full, expensive data/training pipelines as verification unless requested. Prefer targeted unit tests, parser checks, and small debug/fast-dev-run paths.
+- Do not use `add_class_arguments` with per-nested-key registration and manual namespace assembly. Use `add_class_arguments(Config, None)` with `instantiate_classes` and `Config(**d)` where `d = vars(init)` with `config` popped. (`scripts/train/supervised.py` predated this rule and has been migrated.)
 
 ## jsonargparse CLI pattern
 
