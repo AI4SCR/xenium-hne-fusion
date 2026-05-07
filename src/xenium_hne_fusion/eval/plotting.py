@@ -26,10 +26,31 @@ ANNOTATION_PALETTES = {
     'expr_encoder': {'mlp': '#D7BDE2', 'gf': '#F4D35E'},
     'freeze_morph': {'False': '#F5D2D2', 'True': '#B0C4DE'},
     'freeze_expr': {'False': '#F5D2D2', 'True': '#B0C4DE'},
+    # MIL-specific
+    'task': {'regression': '#C5E3C9', 'classification': '#AACFDB'},
+    'aggregator': {'attention': '#FAE0B3', 'simple_attention': '#F5C08A', 'mean': '#D5E5D5', 'max': '#ADB2D4'},
+    'gated': {'False': '#F5D2D2', 'True': '#B0C4DE'},
 }
 MODALITY_PALETTE = {'uni-modal': '#A8C8E8', 'multi-modal': '#F5C08A'}
 NA_COLOR = '#E0E0E0'
 
+MIL_ANNOTATION_SOURCES = [
+    ('task',       'config.task.kind'),
+    ('aggregator', 'config.aggregator.name'),
+    ('gated',      'config.aggregator.gated'),
+    ('target',     'config.lit.target_key'),
+    ('source',     'config.pretrained.project'),
+]
+MIL_DEFAULT_PARAMETER_COLUMNS = [src for _, src in MIL_ANNOTATION_SOURCES]
+MIL_METRIC_LABELS = {
+    'test/mae':      'MAE',
+    'test/mse':      'MSE',
+    'test/rmse':     'RMSE',
+    'test/r2':       'R²',
+    'test/cindex':   'C-index',
+    'test/f1-macro': 'F1 (macro)',
+    'test/roc_auc':  'AUROC',
+}
 _ANNOTATION_SOURCES = [
     ('stage', 'config.backbone.fusion_stage'),
     ('strategy', 'config.backbone.fusion_strategy'),
@@ -41,7 +62,10 @@ _ANNOTATION_SOURCES = [
     ('freeze_expr', 'config.backbone.freeze_expr_encoder'),
 ]
 DEFAULT_PARAMETER_COLUMNS = [src_col for _, src_col in _ANNOTATION_SOURCES]
-_PARAMETER_LABELS = {src_col: label for label, src_col in _ANNOTATION_SOURCES}
+_PARAMETER_LABELS = {
+    **{src_col: label for label, src_col in _ANNOTATION_SOURCES},
+    **{src: label for label, src in MIL_ANNOTATION_SOURCES},
+}
 _MORPH_ENCODER_SLUGS = {
     'vit_small_patch16_224': 'ViT-S',
     'vit_base_patch16_224': 'ViT-B',
@@ -179,7 +203,7 @@ def _plot_metric(
     board.group_cols(configs, order=configs, spacing=0)
     _add_annotation_rows(board, annotations, configs)
     board.add_legends()
-    metric_label = METRIC_LABELS.get(metric, metric)
+    metric_label = {**METRIC_LABELS, **MIL_METRIC_LABELS}.get(metric, metric)
     board.add_title(top=title, fontsize=10, pad=0.5)
     board.render()
     _set_metric_ylabel(board, metric_label)

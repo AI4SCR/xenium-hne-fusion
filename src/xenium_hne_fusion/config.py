@@ -94,4 +94,20 @@ class EvalConfig:
     sort_by_score: bool = True
 
 
+@dataclass
+class MILEvalConfig:
+    @dataclass
+    class Filters:
+        name: str                            # dataset name, e.g. 'beat'
+        items_path: str                      # filename as in train config, e.g. all.json
+        aggregator: str                      # e.g. 'attention'
+        metadata_paths: list[str] | None = None
+
+    project: str
+    output_dir: Path
+    filters: Filters
+    parameter_columns: list[str] | None = None
+    sort_by_score: bool = True
+
+
 ProcessingConfig = DataConfig

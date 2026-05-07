@@ -4,17 +4,17 @@ from pathlib import Path
 from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
 
-from xenium_hne_fusion.config import EvalConfig
-from xenium_hne_fusion.eval.experiments import build_plot_output_prefix, resolve_eval_output_dir, select_runs
-from xenium_hne_fusion.eval.plotting import METRIC_LABELS, plot_metrics
-from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, load_project_runs, restrict_to_wandb_filter
+from xenium_hne_fusion.config import MILEvalConfig
+from xenium_hne_fusion.eval.experiments import build_plot_output_prefix, resolve_eval_output_dir, select_mil_runs
+from xenium_hne_fusion.eval.plotting import DEFAULT_PARAMETER_COLUMNS, MIL_METRIC_LABELS, plot_metrics
+from xenium_hne_fusion.eval.wandb import DEFAULT_ENTITY, default_cache_dir, enrich_with_pretrain_config, load_project_runs, restrict_to_wandb_filter
 
 
 load_dotenv(override=True)
 
 
 def main(
-    eval_cfg: EvalConfig,
+    eval_cfg: MILEvalConfig,
     refresh: bool = False,
     cache_dir: Path | None = None,
     output_dir: Path | None = None,
@@ -22,28 +22,30 @@ def main(
     entity: str = DEFAULT_ENTITY,
     wandb_filters: dict | None = None,
 ) -> None:
-    metrics = metrics or list(METRIC_LABELS)
+    metrics = metrics or list(MIL_METRIC_LABELS)
     cache_dir = cache_dir or default_cache_dir(eval_cfg.filters.name)
     output_dir = resolve_eval_output_dir(eval_cfg, override=output_dir)
 
     table = load_project_runs(eval_cfg.project, entity=entity, cache_dir=cache_dir, refresh=refresh)
+    table = enrich_with_pretrain_config(table, entity=entity)
     if wandb_filters:
         table = restrict_to_wandb_filter(table, eval_cfg.project, entity=entity, filters=wandb_filters)
-    runs, title, output_name = select_runs(table, eval_cfg=eval_cfg)
+    runs, title, output_name = select_mil_runs(table, eval_cfg=eval_cfg)
+    parameter_columns = eval_cfg.parameter_columns or [c for c in DEFAULT_PARAMETER_COLUMNS if c in runs.columns]
     plot_metrics(
         runs,
         metrics=metrics,
         title=title,
         output_prefix=build_plot_output_prefix(output_name, output_dir=output_dir),
         sort_by_score=eval_cfg.sort_by_score,
-        parameter_columns=eval_cfg.parameter_columns,
+        parameter_columns=parameter_columns,
     )
 
 
 def _build_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument('--config', action='config')
-    parser.add_class_arguments(EvalConfig, nested_key=None)
+    parser.add_class_arguments(MILEvalConfig, nested_key=None)
     parser.add_argument('--refresh', type=bool, default=False)
     parser.add_argument('--cache-dir', type=Path, default=None)
     parser.add_argument('--output-dir', type=Path, default=None)
@@ -53,13 +55,12 @@ def _build_parser() -> ArgumentParser:
     return parser
 
 
-def _eval_config_from_args(args: dict) -> EvalConfig:
-    filters = EvalConfig.Filters(**args['filters'])
-    return EvalConfig(
+def _eval_config_from_args(args: dict) -> MILEvalConfig:
+    filters = MILEvalConfig.Filters(**args['filters'])
+    return MILEvalConfig(
         project=args['project'],
         output_dir=args['output_dir'],
         filters=filters,
-        baseline=args.get('baseline', 'vision'),
         parameter_columns=args.get('parameter_columns'),
         sort_by_score=args.get('sort_by_score', True),
     )

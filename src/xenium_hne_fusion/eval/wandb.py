@@ -80,6 +80,22 @@ def run_to_row(run, *, entity: str, project: str) -> dict[str, Any]:
     return row
 
 
+def enrich_with_pretrain_config(runs: pd.DataFrame, *, entity: str) -> pd.DataFrame:
+    assert 'config.pretrained.run_id' in runs.columns
+    assert 'config.pretrained.project' in runs.columns
+    api = wandb.Api()
+    pretrain_rows: dict[str, dict] = {}
+    pairs = runs[['config.pretrained.project', 'config.pretrained.run_id']].drop_duplicates()
+    for project, run_id in pairs.itertuples(index=False):
+        run = api.run(f'{entity}/{project}/{run_id}')
+        flat = pd.json_normalize(run.config).iloc[0].to_dict()
+        pretrain_rows[run_id] = {f'config.{k}': _clean_value(v) for k, v in flat.items()}
+    pretrain_df = pd.DataFrame.from_dict(pretrain_rows, orient='index')
+    pretrain_df.index.name = 'config.pretrained.run_id'
+    new_cols = [c for c in pretrain_df.columns if c not in runs.columns]
+    return runs.join(pretrain_df[new_cols], on='config.pretrained.run_id')
+
+
 def restrict_to_wandb_filter(
     table: pd.DataFrame,
     project: str,
