@@ -20,23 +20,21 @@ for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/d
         --cpus-per-task=8 --mem=64G --time=08:00:00 \
         --output=$HOME/logs/%j.out \
         --job-name=beat_${SAMPLE_ID} \
-        --wrap="uv run python scripts/data/run_beat.py \
+        --wrap="uv run python scripts/data/process_beat.py \
             --config configs/data/remote/beat.yaml \
-            --executor serial --stage samples \
             --filter.include_ids [${SAMPLE_ID}] --filter.exclude_ids null")
     JOB_IDS+=($JOB_ID)
     echo "Submitted ${SAMPLE_ID}: ${JOB_ID}"
 done
 
-# 4. Finalize (create_items + compute_all_items_stats) after all sample jobs complete.
+# 4. Build tile inventory and compute stats after all sample jobs complete.
 DEPENDENCY=$(IFS=:; echo "afterok:${JOB_IDS[*]}")
 sbatch --dependency=${DEPENDENCY} \
     --cpus-per-task=8 --mem=32G --time=02:00:00 \
     --output=$HOME/logs/%j.out \
     --job-name=beat_finalize \
-    --wrap="uv run python scripts/data/run_beat.py \
-        --config configs/data/remote/beat.yaml \
-        --executor serial --stage finalize"
+    --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/beat.yaml && \
+            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml"
 
 # 5. Copy the default gene panel into the managed output directory.
 mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
