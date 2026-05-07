@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import lightning as L
-import pandas as pd
 import wandb
 from ai4bmr_learn.callbacks.log_model_checkpoint_paths import LogCheckpointPathsCallback
 from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
@@ -37,7 +36,6 @@ from xenium_hne_fusion.utils.getters import get_managed_paths
 class ResolvedPretrainedRun:
     checkpoint_path: Path
     source_config: SupervisedConfig
-    raw_config: dict[str, Any]
 
 
 class MILBagsDataset(BagsDataset):
@@ -76,65 +74,8 @@ def resolve_pretrained_run(pretrained_cfg) -> ResolvedPretrainedRun:
     return ResolvedPretrainedRun(
         checkpoint_path=checkpoint_path,
         source_config=SupervisedConfig.from_dict(raw_config),
-        raw_config=raw_config,
     )
 
-
-def build_sample_level_mil_metadata(
-    *,
-    metadata_path: Path,
-    target_key: str,
-    task_kind: str,
-    output_path: Path,
-    clinical_path: Path | None = None,
-) -> Path:
-    assert target_key.startswith("metadata."), target_key
-    target_column = target_key.removeprefix("metadata.")
-    assert target_column, "target_column"
-
-    metadata = pd.read_parquet(metadata_path)
-    assert "sample_id" in metadata.columns, "sample_id"
-    assert Split.COLUMN_NAME.value in metadata.columns, Split.COLUMN_NAME.value
-
-    if target_column not in metadata.columns:
-        assert clinical_path is not None, f"target column '{target_column}' not in split metadata and no clinical_path provided"
-        clinical = pd.read_parquet(clinical_path)
-        assert "sample_id" in clinical.columns, "clinical sample_id"
-        assert target_column in clinical.columns, f"target column '{target_column}' not in clinical metadata"
-        metadata = metadata.merge(clinical[["sample_id", target_column]], on="sample_id", how="left")
-
-    assert target_column in metadata.columns, target_column
-
-    excluded = {"tile_id", "tile_dir"}
-    kept_columns = [column for column in metadata.columns if column not in excluded]
-    metadata = metadata[kept_columns].copy()
-
-    grouped = metadata.groupby("sample_id", sort=False, dropna=False)
-    for column in [column for column in metadata.columns if column != "sample_id"]:
-        nunique = grouped[column].nunique(dropna=False)
-        bad = nunique[nunique > 1]
-        assert bad.empty, f"inconsistent {column}: {bad.index.tolist()}"
-
-    sample_metadata = grouped.first().reset_index()
-    sample_metadata = sample_metadata.set_index("sample_id", drop=True)
-    sample_metadata.index = sample_metadata.index.astype(str)
-
-    if task_kind == "classification":
-        labels = sample_metadata[target_column]
-        assert labels.notna().all(), "target_nan"
-        categories = sorted(labels.astype(str).unique().tolist())
-        categorical = pd.Categorical(labels.astype(str), categories=categories)
-        assert (categorical.codes >= 0).all(), "target_codes"
-        sample_metadata[target_column] = categorical.codes.astype("int64")
-    else:
-        numeric = pd.to_numeric(sample_metadata[target_column], errors="raise")
-        assert numeric.notna().all(), "regression target has NaN"
-        sample_metadata[target_column] = numeric.astype("float32")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    sample_metadata.to_parquet(output_path)
-    logger.info(f"Saved MIL sample metadata -> {output_path}")
-    return output_path
 
 
 def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
@@ -144,7 +85,6 @@ def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
 
     run_dir = output_dir / "mil" / cfg.pretrained.run_id
 
-    cfg.data.clinical_path = _resolve_path(cfg.data.clinical_path, root=output_dir)
     cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=run_dir / "cache", default=run_dir / "cache")
 
     return cfg, run_dir
@@ -199,7 +139,9 @@ def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None 
     return RegressionMILLit(num_outputs=1, loss=cfg.lit.loss, **common_kws)
 
 
-def train(cfg: MILConfig):
+def train(cfg: MILConfig, config_path: str | None = None):
+    L.seed_everything(0)
+
     if cfg.debug or cfg.trainer.fast_dev_run:
         cfg = set_fast_dev_run_settings(cfg)
         cfg.data.batch_size = 2
@@ -211,26 +153,20 @@ def train(cfg: MILConfig):
     if cfg.wandb.name is None:
         cfg.wandb.name = resolved_run.source_config.wandb.name
 
-    metadata_path = Path(resolved_run.source_config.data.metadata_path)
-    assert metadata_path.exists(), f"source metadata_path not found: {metadata_path}"
-
     cache_subdir = "debug" if cfg.debug else "predictions"
-    mil_items_path = run_dir / cache_subdir / "bags.json"
-    assert mil_items_path.exists(), (
-        f"bags.json not found at {mil_items_path}. "
+    cfg.data.items_path = run_dir / cache_subdir / "bags.json"
+    assert cfg.data.items_path.exists(), (
+        f"bags.json not found at {cfg.data.items_path}. "
         "Run scripts/artifacts/cache_predictions.py first."
     )
-    sample_metadata_path = build_sample_level_mil_metadata(
-        metadata_path=metadata_path,
-        target_key=cfg.lit.target_key,
-        task_kind=cfg.task.kind,
-        output_path=run_dir / "sample-metadata.parquet",
-        clinical_path=cfg.data.clinical_path,
+    assert cfg.data.metadata_path is not None and cfg.data.metadata_path.exists(), (
+        f"metadata_path not found: {cfg.data.metadata_path}. "
+        "Run scripts/artifacts/create_mil_metadata.py first."
     )
 
     dataset_kws = dict(
-        items_path=mil_items_path,
-        metadata_path=sample_metadata_path,
+        items_path=cfg.data.items_path,
+        metadata_path=cfg.data.metadata_path,
         num_workers=cfg.data.num_workers,
         batch_size=cfg.data.batch_size,
     )
@@ -243,12 +179,9 @@ def train(cfg: MILConfig):
 
     example_bag = ds_fit[0]["bag"]
     input_dim = int(example_bag.shape[1])
-    num_classes = None
+    num_classes = cfg.task.num_classes
     if cfg.task.kind == "classification":
-        target_column = cfg.lit.target_key.removeprefix("metadata.")
-        fit_targets = ds_fit.metadata.loc[ds_fit.bag_ids, target_column]
-        num_classes = int(fit_targets.nunique())
-        assert num_classes > 1, "num_classes"
+        assert num_classes is not None and num_classes > 1, "task.num_classes must be set for classification"
     mil_lit = build_mil_module(cfg=cfg, input_dim=input_dim, num_classes=num_classes)
 
     dataloader_kws = dict(
@@ -271,7 +204,11 @@ def train(cfg: MILConfig):
         entity=cfg.pretrained.entity,
         save_dir=logs_dir,
         **asdict(cfg.wandb),
-        config={**asdict(cfg), "pretrained_run_id": cfg.pretrained.run_id},
+        config={
+            "slurm_job_id": os.getenv("SLURM_JOB_ID"),
+            "config_path": config_path,
+            **asdict(cfg),
+        },
     )
     callbacks = [
         LogModelStats(),
@@ -294,8 +231,6 @@ def train(cfg: MILConfig):
 
     return {
         "resolved_run": resolved_run,
-        "mil_items_path": mil_items_path,
-        "sample_metadata_path": sample_metadata_path,
         "trainer": trainer,
         "lit": mil_lit,
         "ds_fit": ds_fit,
@@ -304,8 +239,8 @@ def train(cfg: MILConfig):
     }
 
 
-def main(cfg: MILConfig) -> None:
-    train(cfg)
+def main(cfg: MILConfig, config_path: str | None = None) -> None:
+    train(cfg, config_path=config_path)
 
 
 def _resolve_path(path: Path | None, *, root: Path | None = None, default: Path | None = None) -> Path | None:

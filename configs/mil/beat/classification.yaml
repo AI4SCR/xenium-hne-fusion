@@ -7,13 +7,14 @@ pretrained:
 
 data:
   name: beat
-  clinical_path: artifacts/mil/cells/clinical.parquet
+  metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/artifacts/mil/cells/clinical.parquet
   batch_size: 4
   num_workers: 10
   prefetch_factor: 4
 
 task:
   kind: classification
+  num_classes: 2
 
 aggregator:
   name: attention
@@ -32,7 +33,7 @@ lit:
   weight_decay: 1.0e-2
   schedule: cosine
   num_warmup_epochs: 10
-  loss: mse
+  metric_names: [balanced_accuracy, f1_macro, roc_auc]
 
 trainer:
   max_epochs: 100

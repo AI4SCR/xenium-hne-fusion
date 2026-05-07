@@ -3,13 +3,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import torch
-from ai4bmr_learn.data.splits import Split
-
 from xenium_hne_fusion.train.config import Config, HeadConfig, TrainerConfig, WandbConfig
 from xenium_hne_fusion.train.mil import (
     MILBagsDataset,
     build_mil_module,
-    build_sample_level_mil_metadata,
     resolve_pretrained_run,
 )
 from xenium_hne_fusion.train.mil_config import (
@@ -118,120 +115,6 @@ def test_resolve_pretrained_run_requires_best_model_path(monkeypatch: pytest.Mon
     with pytest.raises(AssertionError, match="best_model_path"):
         resolve_pretrained_run(PretrainedConfig(project="mil-proj", run_id="run-123"))
 
-
-# --- build_sample_level_mil_metadata ------------------------------------------
-
-
-def test_build_sample_level_mil_metadata_collapses_tile_rows(tmp_path: Path):
-    split_path = tmp_path / "split.parquet"
-    pd.DataFrame(
-        [
-            {
-                "sample_id": "S1",
-                "tile_id": 0,
-                "tile_dir": "/tmp/a",
-                Split.COLUMN_NAME.value: Split.FIT.value,
-                "response": 1.5,
-                "site": "A",
-            },
-            {
-                "sample_id": "S1",
-                "tile_id": 1,
-                "tile_dir": "/tmp/b",
-                Split.COLUMN_NAME.value: Split.FIT.value,
-                "response": 1.5,
-                "site": "A",
-            },
-            {
-                "sample_id": "S2",
-                "tile_id": 0,
-                "tile_dir": "/tmp/c",
-                Split.COLUMN_NAME.value: Split.TEST.value,
-                "response": 2.5,
-                "site": "B",
-            },
-        ]
-    ).to_parquet(split_path, index=False)
-
-    output_path = build_sample_level_mil_metadata(
-        metadata_path=split_path,
-        target_key="metadata.response",
-        task_kind="regression",
-        output_path=tmp_path / "sample.parquet",
-    )
-    result = pd.read_parquet(output_path)
-
-    assert list(result.index.astype(str)) == ["S1", "S2"]
-    assert result.loc["S1", Split.COLUMN_NAME.value] == Split.FIT.value
-    assert result.loc["S1", "response"] == pytest.approx(1.5)
-    assert "tile_id" not in result.columns
-    assert "tile_dir" not in result.columns
-
-
-def test_build_sample_level_mil_metadata_rejects_inconsistent_sample_values(tmp_path: Path):
-    split_path = tmp_path / "split.parquet"
-    pd.DataFrame(
-        [
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "label": "A"},
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.TEST.value, "label": "A"},
-        ]
-    ).to_parquet(split_path, index=False)
-
-    with pytest.raises(AssertionError, match="inconsistent split"):
-        build_sample_level_mil_metadata(
-            metadata_path=split_path,
-            target_key="metadata.label",
-            task_kind="classification",
-            output_path=tmp_path / "sample.parquet",
-        )
-
-
-def test_build_sample_level_mil_metadata_converts_classification_target_in_place(tmp_path: Path):
-    split_path = tmp_path / "split.parquet"
-    pd.DataFrame(
-        [
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value, "label": "A"},
-            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.TEST.value, "label": "B"},
-        ]
-    ).to_parquet(split_path, index=False)
-
-    output_path = build_sample_level_mil_metadata(
-        metadata_path=split_path,
-        target_key="metadata.label",
-        task_kind="classification",
-        output_path=tmp_path / "sample.parquet",
-    )
-    result = pd.read_parquet(output_path)
-
-    assert result.loc["S1", "label"] == 0
-    assert result.loc["S2", "label"] == 1
-
-
-def test_build_sample_level_mil_metadata_joins_clinical_path(tmp_path: Path):
-    split_path = tmp_path / "split.parquet"
-    pd.DataFrame(
-        [
-            {"sample_id": "S1", Split.COLUMN_NAME.value: Split.FIT.value},
-            {"sample_id": "S2", Split.COLUMN_NAME.value: Split.TEST.value},
-        ]
-    ).to_parquet(split_path, index=False)
-
-    clinical_path = tmp_path / "clinical.parquet"
-    pd.DataFrame(
-        [{"sample_id": "S1", "grade": 1.0}, {"sample_id": "S2", "grade": 2.0}]
-    ).to_parquet(clinical_path, index=False)
-
-    output_path = build_sample_level_mil_metadata(
-        metadata_path=split_path,
-        target_key="metadata.grade",
-        task_kind="regression",
-        output_path=tmp_path / "sample.parquet",
-        clinical_path=clinical_path,
-    )
-    result = pd.read_parquet(output_path)
-
-    assert result.loc["S1", "grade"] == pytest.approx(1.0)
-    assert result.loc["S2", "grade"] == pytest.approx(2.0)
 
 
 # --- build_supervised_builders ------------------------------------------------

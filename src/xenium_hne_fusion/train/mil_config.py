@@ -17,7 +17,8 @@ class PretrainedConfig:
 @dataclass
 class MILDataConfig:
     name: str | None = None
-    clinical_path: Path | None = None
+    items_path: Path | None = None
+    metadata_path: Path | None = None
     cache_dir: Path | None = None
     batch_size: int = 8
     num_workers: int = 10
@@ -27,6 +28,7 @@ class MILDataConfig:
 @dataclass
 class MILTaskConfig:
     kind: Literal["regression", "classification"] = "regression"
+    num_classes: int | None = None
 
 
 @dataclass

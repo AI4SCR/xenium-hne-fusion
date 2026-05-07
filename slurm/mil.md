@@ -86,11 +86,11 @@ Key fields in the config:
 | Field | Description |
 |-------|-------------|
 | `pretrained.entity/project/run_id` | W&B run of the pretrained supervised model |
-| `data.metadata_path` | Tile-level split parquet (relative to `03_output/<name>/splits/`) |
-| `data.clinical_path` | Sample-level clinical labels (relative to `03_output/<name>/`) |
+| `data.metadata_path` | Absolute path to sample-level clinical parquet produced by `create_mil_metadata.py` |
 | `data.num_workers` | Workers used for both prediction and MIL training dataloaders |
 | `lit.target_key` | Column to predict, prefixed with `metadata.` (e.g. `metadata.7`) |
 | `task.kind` | `classification` or `regression` |
+| `task.num_classes` | Number of classes for classification tasks (required when `task.kind=classification`) |
 
 
 ### SLURM submission
