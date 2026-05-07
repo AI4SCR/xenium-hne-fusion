@@ -16,7 +16,7 @@ from xenium_hne_fusion.download import (
     validate_hest_sample_mpp,
 )
 from xenium_hne_fusion.processing_cli import parse_data_args
-from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_hest1k_samples
 
 
 def get_hest_metadata_path(raw_dir: Path) -> Path:
@@ -39,7 +39,7 @@ def main(data_cfg: DataConfig) -> None:
     cfg = build_pipeline_config(data_cfg)
     metadata_csv = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_csv, cfg.paths.structured_dir)
-    samples = resolve_samples(cfg, metadata_csv)
+    samples = resolve_hest1k_samples(cfg, metadata_csv)
     for sample_id in samples:
         ensure_hest_sample_downloaded(sample_id, cfg.raw_dir)
         validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_csv)

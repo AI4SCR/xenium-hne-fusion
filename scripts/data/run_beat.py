@@ -41,17 +41,8 @@ from xenium_hne_fusion.utils.getters import (
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
-    select_sample_ids,
+    resolve_beat_samples,
 )
-
-
-def get_raw_sample_ids(cfg: PipelineConfig) -> list[str]:
-    return sorted(path.name for path in cfg.raw_dir.iterdir() if path.is_dir())
-
-
-def resolve_beat_samples(cfg: PipelineConfig) -> list[str]:
-    raw_sample_ids = get_raw_sample_ids(cfg)
-    return select_sample_ids(raw_sample_ids, cfg.data.filter)
 
 
 def structure_beat_metadata(cfg: PipelineConfig) -> None:

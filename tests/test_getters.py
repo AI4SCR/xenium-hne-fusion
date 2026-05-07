@@ -6,7 +6,7 @@ from xenium_hne_fusion.utils.getters import (
     build_pipeline_config,
     load_dataset_config,
     load_pipeline_config,
-    resolve_samples,
+    resolve_hest1k_samples,
     select_sample_ids,
 )
 
@@ -130,7 +130,7 @@ def test_build_pipeline_config_rejects_non_canonical_name(
         build_pipeline_config(load_dataset_config(config_path))
 
 
-def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
+def test_resolve_hest1k_samples_supports_hest_metadata_columns(tmp_path: Path):
     config_path = tmp_path / 'hest1k.yaml'
     metadata_path = tmp_path / 'HEST_v1_3_0.csv'
     config_path.write_text(
@@ -154,7 +154,7 @@ def test_resolve_samples_supports_hest_metadata_columns(tmp_path: Path):
 
     cfg = load_dataset_config(config_path)
 
-    assert resolve_samples(cfg, metadata_path) == ['TENX95']
+    assert resolve_hest1k_samples(cfg, metadata_path) == ['TENX95']
 
 
 def test_load_processing_config_loads_split_name_and_panel(tmp_path: Path):

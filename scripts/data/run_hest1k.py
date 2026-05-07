@@ -44,20 +44,15 @@ from xenium_hne_fusion.utils.getters import (
     DEFAULT_CELL_TYPE_COL,
     PipelineConfig,
     build_pipeline_config,
+    filter_hest_samples_by_tile_mpp,
+    get_hest_metadata_path,
     is_sample_processed,
     is_sample_structured,
     mark_sample_processed,
     mark_sample_structured,
     processed_sample_dir,
-    resolve_samples,
+    resolve_hest1k_samples,
 )
-
-
-def get_hest_metadata_path(raw_dir: Path) -> Path:
-    metadata_path = raw_dir / "HEST_v1_3_0.csv"
-    if metadata_path.exists():
-        return metadata_path
-    return download_hest_metadata(raw_dir)
 
 
 def ensure_hest_sample_downloaded(sample_id: str, raw_dir: Path) -> None:
@@ -114,21 +109,6 @@ def process_sample(
         process_cells(tiles, processed_dir, img_size=img_size, cell_type_col=cell_type_col)
 
 
-def can_extract_sample_at_tile_mpp(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> bool:
-    slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
-    if slide_mpp > cfg.data.tiles.mpp:
-        logger.warning(f"Skipping {sample_id}: slide_mpp={slide_mpp:.4f} is coarser than tile_mpp={cfg.data.tiles.mpp:.4f}")
-        return False
-    return True
-
-
-def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], metadata_path: Path) -> list[str]:
-    eligible_sample_ids = []
-    for sample_id in sample_ids:
-        if can_extract_sample_at_tile_mpp(cfg, sample_id, metadata_path):
-            eligible_sample_ids.append(sample_id)
-    return eligible_sample_ids
-
 
 def _run(
     data_cfg: DataConfig,
@@ -182,7 +162,7 @@ def prepare_driver_context(config: DataConfig) -> tuple[PipelineConfig, Path, li
 
     metadata_path = get_hest_metadata_path(cfg.raw_dir)
     create_structured_metadata_symlink(metadata_path, cfg.paths.structured_dir)
-    sample_ids = resolve_samples(cfg, metadata_path)
+    sample_ids = resolve_hest1k_samples(cfg, metadata_path)
     eligible_sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     logger.info(f"Running HEST1K pipeline for {len(eligible_sample_ids)} eligible human Xenium samples")
     return cfg, metadata_path, eligible_sample_ids
@@ -191,7 +171,8 @@ def prepare_driver_context(config: DataConfig) -> tuple[PipelineConfig, Path, li
 def structure_sample(cfg: PipelineConfig, sample_id: str, metadata_path: Path) -> None:
     ensure_hest_sample_downloaded(sample_id, cfg.raw_dir)
     validate_hest_sample_mpp(sample_id, cfg.raw_dir, metadata_path)
-    assert can_extract_sample_at_tile_mpp(cfg, sample_id, metadata_path), f"Ineligible sample: {sample_id}"
+    slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
+    assert slide_mpp <= cfg.data.tiles.mpp, f"Ineligible sample {sample_id}: slide_mpp={slide_mpp:.4f} > tile_mpp={cfg.data.tiles.mpp:.4f}"
     create_structured_symlinks(sample_id, cfg.raw_dir, cfg.paths.structured_dir)
     mark_sample_structured(cfg, sample_id)
 

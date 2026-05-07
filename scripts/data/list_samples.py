@@ -7,11 +7,14 @@ from dotenv import load_dotenv
 from jsonargparse import ArgumentParser
 from loguru import logger
 
-from xenium_hne_fusion.utils.getters import build_pipeline_config, load_data_config, resolve_samples
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+from xenium_hne_fusion.utils.getters import (
+    build_pipeline_config,
+    filter_hest_samples_by_tile_mpp,
+    get_hest_metadata_path,
+    load_data_config,
+    resolve_beat_samples,
+    resolve_hest1k_samples,
+)
 
 load_dotenv()
 logger.remove()
@@ -23,14 +26,10 @@ def main(config: Path) -> None:
     cfg = build_pipeline_config(data_cfg)
 
     if data_cfg.name == "hest1k":
-        from scripts.data.run_hest1k import filter_hest_samples_by_tile_mpp, get_hest_metadata_path
-
         metadata_path = get_hest_metadata_path(cfg.raw_dir)
-        sample_ids = resolve_samples(cfg, metadata_path)
+        sample_ids = resolve_hest1k_samples(cfg, metadata_path)
         sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     elif data_cfg.name == "beat":
-        from scripts.data.run_beat import resolve_beat_samples
-
         sample_ids = resolve_beat_samples(cfg)
     else:
         raise AssertionError(f"Unsupported dataset: {data_cfg.name}")

@@ -369,7 +369,35 @@ def apply_filter(stats: pd.DataFrame, cfg: ItemsConfig) -> pd.Series:
     return mask
 
 
-def resolve_samples(cfg: DataConfig | PipelineConfig, metadata_path: Path) -> list[str]:
+def get_hest_metadata_path(raw_dir: Path) -> Path:
+    from xenium_hne_fusion.download import download_hest_metadata
+    metadata_path = raw_dir / "HEST_v1_3_0.csv"
+    if metadata_path.exists():
+        return metadata_path
+    return download_hest_metadata(raw_dir)
+
+
+def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], metadata_path: Path) -> list[str]:
+    from xenium_hne_fusion.download import get_hest_sample_mpp
+    eligible = []
+    for sample_id in sample_ids:
+        slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)
+        if slide_mpp > cfg.data.tiles.mpp:
+            logger.warning(f"Skipping {sample_id}: slide_mpp={slide_mpp:.4f} is coarser than tile_mpp={cfg.data.tiles.mpp:.4f}")
+        else:
+            eligible.append(sample_id)
+    return eligible
+
+
+def get_beat_raw_sample_ids(cfg: PipelineConfig) -> list[str]:
+    return sorted(path.name for path in cfg.raw_dir.iterdir() if path.is_dir())
+
+
+def resolve_beat_samples(cfg: PipelineConfig) -> list[str]:
+    return select_sample_ids(get_beat_raw_sample_ids(cfg), cfg.data.filter)
+
+
+def resolve_hest1k_samples(cfg: DataConfig | PipelineConfig, metadata_path: Path) -> list[str]:
     filter_cfg = cfg.data.filter if isinstance(cfg, PipelineConfig) else cfg.filter
     validate_filter_ids(filter_cfg)
 

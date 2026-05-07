@@ -14,7 +14,7 @@ from xenium_hne_fusion.metadata import (
     read_metadata_table,
 )
 from xenium_hne_fusion.processing_cli import parse_data_args
-from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_samples, select_sample_ids
+from xenium_hne_fusion.utils.getters import build_pipeline_config, resolve_hest1k_samples, select_sample_ids
 
 
 def main(data_cfg: DataConfig) -> None:
@@ -22,7 +22,7 @@ def main(data_cfg: DataConfig) -> None:
     dataset = cfg.dataset
     metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
     if dataset == 'hest1k':
-        selected_sample_ids = resolve_samples(cfg, metadata_path)
+        selected_sample_ids = resolve_hest1k_samples(cfg, metadata_path)
     else:
         metadata = read_metadata_table(metadata_path)
         if 'sample_id' not in metadata.columns:

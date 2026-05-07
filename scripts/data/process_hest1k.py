@@ -15,7 +15,7 @@ from xenium_hne_fusion.metadata import get_structured_metadata_path
 from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
 from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL, build_pipeline_config, resolve_samples
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL, build_pipeline_config, resolve_hest1k_samples
 
 
 def main(
@@ -26,7 +26,7 @@ def main(
     assert data_cfg.name == "hest1k", f"Expected dataset='hest1k', got {data_cfg.name!r}"
     cfg = build_pipeline_config(data_cfg)
     metadata_path = get_structured_metadata_path(cfg.paths.structured_dir)
-    sample_ids = resolve_samples(cfg, metadata_path)
+    sample_ids = resolve_hest1k_samples(cfg, metadata_path)
     tiles_cfg = cfg.data.tiles
     assert tiles_cfg.img_size is not None, "tiles.img_size is required"
     img_size = tiles_cfg.img_size
