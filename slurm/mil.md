@@ -3,29 +3,25 @@
 ## Overview
 
 MIL (Multiple Instance Learning) training runs on top of a pretrained supervised model.
-The pipeline has three stages:
+The pipeline has two stages:
 
-1. **Clinical artifact** — join `cells.json` items with structured sample-level metadata
-   to produce `artifacts/mil/cells/clinical.parquet`. This file maps each `sample_id` to
-   its clinical labels and is used as the target source during MIL training.
-
-2. **Prediction cache** — the pretrained model runs inference over all tiles (all splits)
+1. **Prediction cache** — the pretrained model runs inference over all tiles (all splits)
    and caches per-tile embeddings. Embeddings are regrouped by `sample_id` and written to
    `bags.json` — one entry per patient bag with a `path` pointing to a stacked `.pt` file.
    This step must be run before training and is submitted as a GPU job.
 
-3. **MIL training** — `MILBagsDataset` loads `bags.json`, filters bags by split, joins
-   clinical labels from `clinical.parquet`, and trains an attention aggregator + head with
-   PyTorch Lightning. Bags are collated with padding (`pad_bags_collate`) to handle
-   variable bag sizes. Training asserts `bags.json` exists and fails early if step 2 was skipped.
+2. **MIL training** — on first run, `train()` automatically builds `metadata.parquet` in the
+   run directory by joining the pretrained run's supervised split parquet with structured
+   sample-level metadata from `01_structured/metadata.parquet`. This file carries `split` and
+   all clinical columns. `MILBagsDataset` loads `bags.json`, filters bags by split, joins
+   clinical labels, and trains an attention aggregator + head with PyTorch Lightning. Bags are
+   collated with padding (`pad_bags_collate`) to handle variable bag sizes. Training asserts
+   `bags.json` exists and fails early if step 1 was skipped.
 
 ## Data Preparation
 
 ```bash
-# Step 1 — clinical artifact (run once per dataset / items variant)
-uv run python scripts/artifacts/create_mil_metadata.py --config configs/mil/beat/classification.yaml
-
-# Step 2 — prediction cache (run once per pretrained run)
+# Step 1 — prediction cache (run once per pretrained run)
 PARTITION=gpu-l40
 ACCOUNT=mrapsoma_prometex
 sbatch \
@@ -41,70 +37,40 @@ sbatch \
         --config configs/mil/beat/classification.yaml"
 ```
 
-Step 2 writes `bags.json` and `<sample_id>.pt` files to `DATA_DIR/03_output/beat/mil/<run_name>/predictions/`.
+Step 1 writes `bags.json` and `<sample_id>.pt` files to `DATA_DIR/03_output/beat/mil/<run_id>/predictions/`.
 
-## Model Training
+## SLURM Submission
 
-```bash
-PARTITION=gpu-l40
-ACCOUNT=mrapsoma_prometex
-CONFIG=configs/mil/beat/classification.yaml
-
-for RUN_ID in \
-    2d8h8hr7 9ej3jw59 dvc1qwis lrqyfqta \
-    0bt8b9ov hntkhq7e f2nbmz9r y2m7ge73 \
-    6vutoy7v waqirmiu 8lu2tzqi xp3znjz0 \
-    saib5muk uq3oth9w w9v9kgtn 59xu56ws; do
-    for AGGREGATOR in mean max min simple_attention attention; do
-        sbatch \
-            --account=${ACCOUNT} \
-            --cpus-per-task=12 \
-            --mem=64G \
-            --gres=gpu:1 \
-            --partition=${PARTITION} \
-            --time=04:30:00 \
-            --output=$HOME/logs/%j.out \
-            --job-name=mil-${RUN_ID}-${AGGREGATOR} \
-            --wrap="uv run python scripts/train/mil.py \
-                --config ${CONFIG} \
-                --pretrained.run_id ${RUN_ID} \
-                --aggregator.name ${AGGREGATOR}"
-    done
-done
-```
-
-Training will fail immediately if `bags.json` does not exist (step 2 not yet run).
-
-## Config Layout
-
-```
-configs/mil/<dataset>/<task>.yaml
-```
-
-Key fields in the config:
-
-| Field | Description |
-|-------|-------------|
-| `pretrained.entity/project/run_id` | W&B run of the pretrained supervised model |
-| `data.metadata_path` | Absolute path to sample-level clinical parquet produced by `create_mil_metadata.py` |
-| `data.num_workers` | Workers used for both prediction and MIL training dataloaders |
-| `lit.target_key` | Column to predict, prefixed with `metadata.` (e.g. `metadata.7`) |
-| `task.kind` | `classification` or `regression` |
-| `task.num_classes` | Number of classes for classification tasks (required when `task.kind=classification`) |
-
-
-### SLURM submission
+Run cache + training for all pretrained runs. Cache and training jobs are chained with
+`afterok` dependency — training starts automatically once the cache is ready.
 
 ```bash
 PARTITION=gpu-l40
 ACCOUNT=mrapsoma_prometex
 CONFIG=configs/mil/beat/classification.yaml
 
-for RUN_ID in \
-    2d8h8hr7 9ej3jw59 dvc1qwis lrqyfqta \
-    0bt8b9ov hntkhq7e f2nbmz9r y2m7ge73 \
-    6vutoy7v waqirmiu 8lu2tzqi xp3znjz0 \
-    saib5muk uq3oth9w w9v9kgtn 59xu56ws; do
+# xe-hne-fus-cell-v1 finished runs — one per (model, outer fold, freeze) combination
+# freeze=False
+RUN_IDS_UNFREEZE=(
+    40utmvmw j5x4suw2 owzcohia fif5wuld   # early-fusion       outer 0-3
+    lzj2k6yd n69cixtr bp2la5tg oblzes57   # expr-tile          outer 0-3
+    m886lfhu 3pqmw7gh yeqi6amk jr7uo9ng   # expr-token         outer 0-3
+    w7olnchy lbwctiyq p4feamts 5zwl441m   # late-fusion-tile   outer 0-3
+    w91hb1aw as1wwjmf vur2wcn3 uglyuryw   # late-fusion-token  outer 0-3
+    icxsfpqf ua31ay2l cdr1rg1u gnre6bzb   # vision             outer 0-3
+)
+
+# freeze=True (multimodal models only)
+RUN_IDS_FREEZE=(
+    6irt7oje lb031j0q rw1fei6z a4oj0ra0   # early-fusion       outer 0-3
+    y5sz738k ga578srh 1gjis6ut vjxjk7uv   # late-fusion-tile   outer 0-3
+    4a5wzxi5 6p2905h9 4cl2unb7 ck706f0j   # late-fusion-token  outer 0-3
+    bwqxlmkm oa90ekqc 0glswn1l t27q3v41   # vision             outer 0-3
+)
+
+RUN_IDS=("${RUN_IDS_UNFREEZE[@]}" "${RUN_IDS_FREEZE[@]}")
+
+for RUN_ID in "${RUN_IDS[@]}"; do
     CACHE_JID=$(sbatch --parsable \
         --account=${ACCOUNT} \
         --cpus-per-task=12 \
@@ -123,10 +89,10 @@ for RUN_ID in \
             --dependency=afterok:${CACHE_JID} \
             --account=${ACCOUNT} \
             --cpus-per-task=12 \
-            --mem=128G \
+            --mem=64G \
             --gres=gpu:1 \
             --partition=${PARTITION} \
-            --time=04:30:00 \
+            --time=02:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=mil-${RUN_ID}-${AGGREGATOR} \
             --wrap="uv run python scripts/train/mil.py \
@@ -137,7 +103,23 @@ for RUN_ID in \
 done
 ```
 
-Each cache job writes `bags.json` and `<sample_id>.pt` files to
+Each cache job writes `bags.json` and `<sample_id>.pt` to
 `DATA_DIR/03_output/beat/mil/<run_id>/predictions/`.
 Training jobs are held in `(Dependency)` state until the cache job completes successfully.
 
+## Config Layout
+
+```
+configs/mil/<dataset>/<task>.yaml
+```
+
+Key fields in the config:
+
+| Field | Description |
+|-------|-------------|
+| `pretrained.entity/project/run_id` | W&B run of the pretrained supervised model |
+| `data.metadata_path` | Optional absolute path to custom sample-level metadata (with `split` column). If `null`, built automatically from supervised split parquet + `01_structured/metadata.parquet`. |
+| `data.num_workers` | Workers used for both prediction and MIL training dataloaders |
+| `lit.target_key` | Column to predict, prefixed with `metadata.` (e.g. `metadata.7`) |
+| `task.kind` | `classification` or `regression` |
+| `task.num_classes` | Number of classes for classification tasks (required when `task.kind=classification`) |

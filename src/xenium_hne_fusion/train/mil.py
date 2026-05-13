@@ -78,6 +78,55 @@ def resolve_pretrained_run(pretrained_cfg) -> ResolvedPretrainedRun:
 
 
 
+def build_mil_metadata(source_cfg: SupervisedConfig, run_dir: Path) -> Path:
+    import pandas as pd
+    from xenium_hne_fusion.train.utils import resolve_training_paths
+
+    output_path = run_dir / "metadata.parquet"
+    if output_path.exists():
+        logger.info(f"Reusing existing MIL metadata -> {output_path}")
+        return output_path
+
+    src_cfg, _ = resolve_training_paths(source_cfg)
+    assert src_cfg.data.metadata_path is not None and src_cfg.data.metadata_path.exists(), \
+        f"supervised split parquet not found: {src_cfg.data.metadata_path}"
+
+    # Assert each sample belongs to exactly one split before deduplicating
+    split_df = pd.read_parquet(src_cfg.data.metadata_path, columns=["sample_id", "split"])
+    splits_per_sample = split_df.groupby("sample_id")["split"].nunique()
+    assert (splits_per_sample == 1).all(), \
+        f"samples belong to multiple splits: {splits_per_sample[splits_per_sample > 1].index.tolist()}"
+    sample_splits = split_df.drop_duplicates("sample_id").set_index("sample_id")["split"]
+
+    # Join with structured (clinical) metadata
+    managed = get_managed_paths(src_cfg.data.name)
+    structured_path = managed.structured_dir / "metadata.parquet"
+    assert structured_path.exists(), f"structured metadata not found: {structured_path}"
+
+    metadata = pd.read_parquet(structured_path)
+    if "sample_id" not in metadata.columns:
+        metadata = metadata.reset_index()
+    assert "sample_id" in metadata.columns, "sample_id missing from structured metadata"
+
+    merged = sample_splits.reset_index().merge(metadata, on="sample_id", how="left")
+    merged = merged.set_index("sample_id")
+    assert not merged.index.duplicated().any(), "duplicate sample_ids after merge"
+
+    # Drop columns with any NaN
+    valid_cols = [col for col in merged.columns if not merged[col].isna().any()]
+    merged = merged[valid_cols]
+
+    logger.warning(
+        "MIL metadata uses supervised splits — not stratified on MIL target. "
+        "Set metadata_path in config to provide custom stratified splits."
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    merged.to_parquet(output_path)
+    logger.info(f"Saved MIL metadata -> {output_path} {merged.shape}, columns: {merged.columns.tolist()}")
+    return output_path
+
+
 def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
     assert cfg.data.name is not None, "cfg.data.name"
     managed = get_managed_paths(cfg.data.name)
@@ -159,10 +208,11 @@ def train(cfg: MILConfig, config_path: str | None = None):
         f"bags.json not found at {cfg.data.items_path}. "
         "Run scripts/artifacts/cache_predictions.py first."
     )
-    assert cfg.data.metadata_path is not None and cfg.data.metadata_path.exists(), (
-        f"metadata_path not found: {cfg.data.metadata_path}. "
-        "Run scripts/artifacts/create_mil_metadata.py first."
-    )
+    if cfg.data.metadata_path is None:
+        cfg.data.metadata_path = build_mil_metadata(resolved_run.source_config, run_dir)
+    else:
+        assert cfg.data.metadata_path.exists(), f"metadata_path not found: {cfg.data.metadata_path}"
+        logger.info(f"Using custom MIL metadata -> {cfg.data.metadata_path}")
 
     dataset_kws = dict(
         items_path=cfg.data.items_path,
