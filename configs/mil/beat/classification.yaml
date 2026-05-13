@@ -42,6 +42,6 @@ trainer:
   gradient_clip_val: 1.0
 
 wandb:
-  project: xe-hne-fus-mil
+  project: xe-hne-fus-mil-v0
   name: null
   tags: [beat, mil]

@@ -22,8 +22,8 @@ The pipeline has two stages:
 
 ```bash
 # Step 1 — prediction cache (run once per pretrained run)
-PARTITION=gpu-l40
-ACCOUNT=mrapsoma_prometex
+PARTITION=gpu-h100  # previously gpu-l40
+ACCOUNT=rgottar1_spatial  # previously mrapsoma_prometex (poor fairshare)
 sbatch \
     --account=${ACCOUNT} \
     --cpus-per-task=12 \
@@ -45,8 +45,8 @@ Run cache + training for all pretrained runs. Cache and training jobs are chaine
 `afterok` dependency — training starts automatically once the cache is ready.
 
 ```bash
-PARTITION=gpu-l40
-ACCOUNT=mrapsoma_prometex
+PARTITION=gpu-h100  # previously gpu-l40
+ACCOUNT=rgottar1_spatial  # previously mrapsoma_prometex (poor fairshare)
 CONFIG=configs/mil/beat/classification.yaml
 
 # xe-hne-fus-cell-v1 finished runs — one per (model, outer fold, freeze) combination
