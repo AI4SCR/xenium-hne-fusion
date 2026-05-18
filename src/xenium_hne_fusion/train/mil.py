@@ -21,6 +21,7 @@ from ai4bmr_learn.models.mil import (
     SimpleAttentionAggregation,
 )
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from loguru import logger
 import torch
 from torch.utils.data import DataLoader
@@ -111,7 +112,7 @@ def build_aggregator(cfg: MILConfig, input_dim: int):
 
 def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None = None):
     aggregator = build_aggregator(cfg, input_dim=input_dim)
-    output_dim = 1 if cfg.task.kind == "regression" else int(num_classes or 0)
+    output_dim = int(num_classes or 0) if cfg.task.kind == "classification" else 1
     assert output_dim > 0, "output_dim"
     head = Head(
         input_dim=input_dim,
@@ -123,7 +124,6 @@ def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None 
     common_kws = dict(
         aggregator=aggregator,
         head=head,
-        target_key=cfg.lit.target_key,
         lr_head=cfg.lit.lr_head,
         lr_aggregator=cfg.lit.lr_aggregator,
         weight_decay=cfg.lit.weight_decay,
@@ -136,9 +136,18 @@ def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None 
     match cfg.task.kind:
         case "classification":
             assert num_classes is not None, "num_classes"
-            return ClassificationMILLit(num_classes=num_classes, **common_kws)
+            return ClassificationMILLit(
+                num_classes=num_classes, 
+                target_key=cfg.lit.target_key,
+                **common_kws,
+            )
         case "regression":
-            return RegressionMILLit(num_outputs=1, loss=cfg.lit.loss, **common_kws)
+            return RegressionMILLit(
+                num_outputs=1, 
+                loss=cfg.lit.loss, 
+                target_key=cfg.lit.target_key,
+                **common_kws,
+            )
         case "survival":
             return SurvivalMILLit(
                 time_key=cfg.lit.time_key,
@@ -224,6 +233,8 @@ def train(cfg: MILConfig, config_path: str | None = None):
         LogModelStats(),
         LogWandbRunMetadataCallback(),
         LogCheckpointPathsCallback(),
+        LearningRateMonitor(logging_interval="epoch"),
+        # EarlyStopping(monitor="loss/val", mode="min", patience=15),
     ]
     trainer = L.Trainer(
         accelerator="auto",

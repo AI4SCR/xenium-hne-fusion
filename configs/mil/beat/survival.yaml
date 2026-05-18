@@ -7,16 +7,17 @@ pretrained:
 
 data:
   name: beat
-  metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/artifacts/mil/cells/clinical.parquet
-  batch_size: 4
-  num_workers: 10
+  # metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/artifacts/mil/cells/clinical.parquet
+  metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/mil/a4oj0ra0/metadata.parquet
+  batch_size: 10
+  num_workers: 6
   prefetch_factor: 4
 
 task:
   kind: survival
 
 aggregator:
-  name: attention
+  name: max
   hidden_dim: 128
   gated: false
 
@@ -26,20 +27,21 @@ head:
   dropout: 0.1
 
 lit:
-  time_key: metadata.52 # FIXME
-  event_key: metadata.53 # FIXME
-  lr_head: 1.0e-3
+  time_key: metadata.52
+  event_key: metadata.53
+  lr_head: 1.0e-4
   lr_aggregator: 1.0e-4
-  weight_decay: 1.0e-2
+  weight_decay: 1.0e-10
   schedule: cosine
   num_warmup_epochs: 10
-  metric_names: [balanced_accuracy, f1_macro, roc_auc]
+  metric_names: [cindex, brier]
 
 trainer:
-  max_epochs: 100
+  max_epochs: 500
   max_time: "00:04:00:00"
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
+  log_every_n_steps: 5
 
 wandb:
   project: xe-hne-fus-mil-v1

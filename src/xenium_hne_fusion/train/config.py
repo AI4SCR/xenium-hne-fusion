@@ -81,6 +81,7 @@ class TrainerConfig:
     limit_val_batches: float | int | None = None
     limit_test_batches: float | int | None = None
     limit_predict_batches: float | int | None = None
+    log_every_n_steps: int = 50
 
 
 @dataclass
