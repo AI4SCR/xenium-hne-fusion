@@ -27,7 +27,7 @@ class MILDataConfig:
 
 @dataclass
 class MILTaskConfig:
-    kind: Literal["regression", "classification"] = "regression"
+    kind: Literal["regression", "classification", "survival"] = "regression"
     num_classes: int | None = None
 
 
@@ -41,6 +41,8 @@ class AggregatorConfig:
 @dataclass
 class MILLitConfig:
     target_key: str = "target"
+    time_key: str = "time"
+    event_key: str = "event"
     lr_head: float = 1e-3
     lr_aggregator: float = 1e-4
     weight_decay: float = 1e-2

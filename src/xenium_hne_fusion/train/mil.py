@@ -12,7 +12,7 @@ from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
 from ai4bmr_learn.callbacks.log_wandb_run_metadata import LogWandbRunMetadataCallback
 from ai4bmr_learn.datasets import BagsDataset, pad_bags_collate
 from ai4bmr_learn.data.splits import Split
-from ai4bmr_learn.lit.mil import ClassificationMILLit, RegressionMILLit
+from ai4bmr_learn.lit.mil import ClassificationMILLit, RegressionMILLit, SurvivalMILLit
 from ai4bmr_learn.models.mil import (
     AttentionAggregation,
     MaxAggregation,
@@ -133,10 +133,20 @@ def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None 
         num_warmup_epochs=cfg.lit.num_warmup_epochs,
         metric_names=cfg.lit.metric_names,
     )
-    if cfg.task.kind == "classification":
-        assert num_classes is not None, "num_classes"
-        return ClassificationMILLit(num_classes=num_classes, **common_kws)
-    return RegressionMILLit(num_outputs=1, loss=cfg.lit.loss, **common_kws)
+    match cfg.task.kind:
+        case "classification":
+            assert num_classes is not None, "num_classes"
+            return ClassificationMILLit(num_classes=num_classes, **common_kws)
+        case "regression":
+            return RegressionMILLit(num_outputs=1, loss=cfg.lit.loss, **common_kws)
+        case "survival":
+            return SurvivalMILLit(
+                time_key=cfg.lit.time_key,
+                event_key=cfg.lit.event_key,
+                **common_kws,
+            )
+        case _:
+            raise ValueError(f"Received unsupported `cfg.task.kind` {cfg.task.kind}")
 
 
 def train(cfg: MILConfig, config_path: str | None = None):
