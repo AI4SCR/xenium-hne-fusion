@@ -1,7 +1,6 @@
-project: xe-hne-fus-mil
+project: xe-hne-fus-mil-v0
 output_dir: figures/eval/mil-classification
 filters:
   name: beat
-  items_path: all.json
   aggregator: attention
   metadata_paths: null

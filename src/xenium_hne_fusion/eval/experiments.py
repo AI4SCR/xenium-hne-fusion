@@ -55,7 +55,7 @@ def select_mil_runs(
 ) -> tuple[pd.DataFrame, str, str]:
     filters = eval_cfg.filters
     required_columns = ['config.data.name', 'config.wandb.name', 'config.aggregator.name',
-                        'config.data.items_path', 'config.data.metadata_path']
+                        'config.data.metadata_path']
     _assert_columns(runs, required_columns)
 
     def matches(row: pd.Series) -> bool:
@@ -63,15 +63,12 @@ def select_mil_runs(
             return False
         if row['config.aggregator.name'] != filters.aggregator:
             return False
-        if not _items_path_matches(row['config.data.items_path'], filters.items_path):
-            return False
         return _path_matches_any(row['config.data.metadata_path'], filters.metadata_paths, root='splits')
 
     selected = runs.loc[runs.apply(matches, axis=1)].copy()
     dataset = DATASET_LABELS.get(filters.name, filters.name.upper())
-    scope = _scope_label(filters.metadata_paths)
-    title = f'{dataset} MIL {scope}'
-    output_name = '-'.join(_clean_name(p) for p in [filters.name, 'mil'])
+    title = f'{dataset} MIL — {filters.aggregator}'
+    output_name = f'{filters.aggregator}/{_clean_name(filters.name)}-mil'
     logger.info(
         f'Selected {len(selected)}/{len(runs)} W&B runs for '
         f'dataset={filters.name}, metadata_paths={filters.metadata_paths}'
