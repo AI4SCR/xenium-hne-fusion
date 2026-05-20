@@ -6,12 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import lightning as L
+import torch
 import wandb
 from ai4bmr_learn.callbacks.log_model_checkpoint_paths import LogCheckpointPathsCallback
 from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
 from ai4bmr_learn.callbacks.log_wandb_run_metadata import LogWandbRunMetadataCallback
-from ai4bmr_learn.datasets import BagsDataset, pad_bags_collate
 from ai4bmr_learn.data.splits import Split
+from ai4bmr_learn.datasets import BagsDataset, pad_bags_collate
 from ai4bmr_learn.lit.mil import ClassificationMILLit, RegressionMILLit, SurvivalMILLit
 from ai4bmr_learn.models.mil import (
     AttentionAggregation,
@@ -19,11 +20,11 @@ from ai4bmr_learn.models.mil import (
     MeanAggregation,
     MinAggregation,
     SimpleAttentionAggregation,
+    TransformerAttentionAggregation,
 )
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
+from lightning.pytorch.loggers import WandbLogger
 from loguru import logger
-import torch
 from torch.utils.data import DataLoader
 
 from xenium_hne_fusion.models.mlp import Head
@@ -53,8 +54,12 @@ class MILBagsDataset(BagsDataset):
         items = self.bag_items[bag_id]
         assert len(items) == 1, f"expected 1 item per bag, got {len(items)}"
         bag_payload = torch.load(Path(items[0]["path"]), map_location="cpu")
-        assert isinstance(bag_payload, dict) and self.embedding_key in bag_payload, "bag_payload"
-        embeddings = torch.as_tensor(bag_payload[self.embedding_key], dtype=torch.float32)
+        assert (
+            isinstance(bag_payload, dict) and self.embedding_key in bag_payload
+        ), "bag_payload"
+        embeddings = torch.as_tensor(
+            bag_payload[self.embedding_key], dtype=torch.float32
+        )
         assert embeddings.ndim == 2, "embeddings_ndim"
         item: dict[str, Any] = {"bag_id": bag_id, "bag": embeddings}
         if self.metadata is not None:
@@ -66,7 +71,9 @@ class MILBagsDataset(BagsDataset):
 
 def resolve_pretrained_run(pretrained_cfg) -> ResolvedPretrainedRun:
     api = wandb.Api()
-    run = api.run(f"{pretrained_cfg.entity}/{pretrained_cfg.project}/{pretrained_cfg.run_id}")
+    run = api.run(
+        f"{pretrained_cfg.entity}/{pretrained_cfg.project}/{pretrained_cfg.run_id}"
+    )
     raw_config = dict(run.config)
     checkpoint_path_value = raw_config.get("best_model_path")
     assert checkpoint_path_value is not None, "best_model_path"
@@ -78,7 +85,6 @@ def resolve_pretrained_run(pretrained_cfg) -> ResolvedPretrainedRun:
     )
 
 
-
 def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
     assert cfg.data.name is not None, "cfg.data.name"
     managed = get_managed_paths(cfg.data.name)
@@ -86,28 +92,39 @@ def resolve_mil_paths(cfg: MILConfig) -> tuple[MILConfig, Path]:
 
     run_dir = output_dir / "mil" / cfg.pretrained.run_id
 
-    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=run_dir / "cache", default=run_dir / "cache")
+    cfg.data.cache_dir = _resolve_path(
+        cfg.data.cache_dir, root=run_dir / "cache", default=run_dir / "cache"
+    )
 
     return cfg, run_dir
 
 
 def build_aggregator(cfg: MILConfig, input_dim: int):
     name = cfg.aggregator.name
-    if name == "mean":
-        return MeanAggregation(input_dim=input_dim)
-    if name == "max":
-        return MaxAggregation(input_dim=input_dim)
-    if name == "min":
-        return MinAggregation(input_dim=input_dim)
-    if name == "simple_attention":
-        return SimpleAttentionAggregation(input_dim=input_dim)
-    if name == "attention":
-        return AttentionAggregation(
-            input_dim=input_dim,
-            hidden_dim=cfg.aggregator.hidden_dim,
-            gated=cfg.aggregator.gated,
-        )
-    raise ValueError(f"Unknown aggregator: {name}")
+    match name:
+        case "mean":
+            return MeanAggregation(input_dim=input_dim)
+        case "max":
+            return MaxAggregation(input_dim=input_dim)
+        case "min":
+            return MinAggregation(input_dim=input_dim)
+        case "simple_attention":
+            return SimpleAttentionAggregation(input_dim=input_dim)
+        case "attention":
+            return AttentionAggregation(
+                input_dim=input_dim,
+                hidden_dim=cfg.aggregator.hidden_dim,
+                gated=cfg.aggregator.gated,
+            )
+        case "transformer_attention":
+            return TransformerAttentionAggregation(
+                input_dim=input_dim,
+                hidden_dim=cfg.aggregator.hidden_dim,
+                dropout=cfg.aggregator.dropout,
+                num_heads=cfg.aggregator.num_heads,
+            )
+        case _:
+            raise ValueError(f"Unknown aggregator: {name}")
 
 
 def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None = None):
@@ -137,14 +154,14 @@ def build_mil_module(*, cfg: MILConfig, input_dim: int, num_classes: int | None 
         case "classification":
             assert num_classes is not None, "num_classes"
             return ClassificationMILLit(
-                num_classes=num_classes, 
+                num_classes=num_classes,
                 target_key=cfg.lit.target_key,
                 **common_kws,
             )
         case "regression":
             return RegressionMILLit(
-                num_outputs=1, 
-                loss=cfg.lit.loss, 
+                num_outputs=1,
+                loss=cfg.lit.loss,
                 target_key=cfg.lit.target_key,
                 **common_kws,
             )
@@ -200,7 +217,9 @@ def train(cfg: MILConfig, config_path: str | None = None):
     input_dim = int(example_bag.shape[1])
     num_classes = cfg.task.num_classes
     if cfg.task.kind == "classification":
-        assert num_classes is not None and num_classes > 1, "task.num_classes must be set for classification"
+        assert (
+            num_classes is not None and num_classes > 1
+        ), "task.num_classes must be set for classification"
     mil_lit = build_mil_module(cfg=cfg, input_dim=input_dim, num_classes=num_classes)
 
     dataloader_kws = dict(
@@ -214,8 +233,12 @@ def train(cfg: MILConfig, config_path: str | None = None):
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
     dl_fit = DataLoader(ds_fit, shuffle=True, **dataloader_kws)
-    dl_val = DataLoader(ds_val, shuffle=False, **dataloader_kws)
-    dl_test = DataLoader(ds_test, shuffle=False, **dataloader_kws)
+    # full batch evaluation for val and test to avoid no-event batches and to get better loss estimate
+    dataloader_kws.pop("batch_size")
+    dl_val = DataLoader(ds_val, shuffle=False, **dataloader_kws, batch_size=len(ds_val))
+    dl_test = DataLoader(
+        ds_test, shuffle=False, **dataloader_kws, batch_size=len(ds_test)
+    )
 
     logs_dir = run_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -264,7 +287,9 @@ def main(cfg: MILConfig, config_path: str | None = None) -> None:
     train(cfg, config_path=config_path)
 
 
-def _resolve_path(path: Path | None, *, root: Path | None = None, default: Path | None = None) -> Path | None:
+def _resolve_path(
+    path: Path | None, *, root: Path | None = None, default: Path | None = None
+) -> Path | None:
     if path is None:
         return default
     path = Path(os.path.expandvars(path))
