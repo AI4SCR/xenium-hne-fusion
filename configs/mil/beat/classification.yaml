@@ -2,12 +2,12 @@ debug: false
 
 pretrained:
   entity: chuv
-  project: xe-hne-fus-cell-v0
-  run_id: "saib5muk"
+  project: xe-hne-fus-cell-v1
+  run_id: ""
 
 data:
   name: beat
-  metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/artifacts/mil/cells/clinical.parquet
+  metadata_path: null
   batch_size: 4
   num_workers: 10
   prefetch_factor: 4
@@ -37,11 +37,11 @@ lit:
 
 trainer:
   max_epochs: 100
-  max_time: "00:04:00:00"
+  max_time: "00:01:45:00"
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
 
 wandb:
-  project: xe-hne-fus-mil
+  project: xe-hne-fus-mil-v0
   name: null
   tags: [beat, mil]
