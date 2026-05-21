@@ -1,41 +1,105 @@
-\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}
+\documentclass[11pt]{article}
 
+% --- Page geometry ---
+\usepackage[a4paper, margin=2.5cm]{geometry}
+
+% --- Fonts and encoding ---
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{xcolor}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Math ---
+\usepackage{amsmath, amssymb}
+
+% --- Figures ---
 \usepackage{graphicx}
 \graphicspath{{figures/}}
-\usepackage{booktabs}
 \usepackage{subcaption}
-\usepackage{placeins}
-\usepackage{longtable}
-\usepackage{tabularx}
+\usepackage{placeins}   % \FloatBarrier
 
-\raggedbottom
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{rotating}   % sidewaystable
+\usepackage{tabularx}
+\usepackage{longtable}
+
+% --- Lists ---
+\usepackage{enumitem}
+
+% --- Colors and hyperlinks ---
+\usepackage[dvipsnames]{xcolor}
+\usepackage[
+  colorlinks=true,
+  linkcolor=NavyBlue,
+  citecolor=NavyBlue,
+  urlcolor=NavyBlue
+]{hyperref}
+
+% --- Cross-references ---
+\usepackage{cleveref}
+
+% --- Bibliography ---
+\usepackage[
+  backend=biber,
+  style=nature,
+  sorting=none,
+  maxnames=6,
+  minnames=1
+]{biblatex}
+\addbibresource{zotero.bib}
+
+% --- Spacing ---
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+
+% -----------------------------------------------------------------------
 
 \begin{document}
 
-\title[Token-Level Multimodal Fusion]{Token-Level Multimodal Fusion of Histology and Spatial Transcriptomics for Morpho-Molecular Tissue Representation}
+% --- Title block ---
+\begin{center}
+  {\LARGE\bfseries Token-Level Multimodal Fusion of Histology and Spatial\\
+  Transcriptomics for Morpho-Molecular Tissue Representation}
 
-\author*[1,2]{\fnm{TODO} \sur{TODO}}
+  \vspace{1em}
 
-\affil*[1]{\orgname{ETH Zurich}, \orgaddress{\city{Zurich}, \country{Switzerland}}}
-\affil[2]{\orgname{Biomedical Data Science Center, CHUV}, \orgaddress{\city{Lausanne}, \country{Switzerland}}}
+  {\large
+    TODO$^{1,2}$,
+    % TODO: add remaining authors
+  }
 
-\abstract{\input{content/01_abstract}}
+  \vspace{0.5em}
 
-\maketitle
+  {\small
+    $^{1}$ETH Zurich, Zurich, Switzerland 1 \\
+    $^{2}$Biomedical Data Science Center, CHUV, Lausanne, Switzerland
+  }
 
+  \vspace{0.5em}
+
+  {\small \today}
+\end{center}
+
+\vspace{1em}
+
+% --- Abstract ---
+\input{content/01_abstract}
+
+\vspace{1em}
+
+% --- Main body ---
 \input{content/02_introduction}
 \input{content/03_methods}
 \input{content/04_results}
 \input{content/05_discussion}
 
-\bibliography{zotero}
+% --- References ---
+\printbibliography
 
-\begin{appendices}
+% --- Appendix ---
+\appendix
 \input{content/06_appendix}
-\end{appendices}
 
 \end{document}
