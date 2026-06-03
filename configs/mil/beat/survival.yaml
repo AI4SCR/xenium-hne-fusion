@@ -1,0 +1,51 @@
+debug: false
+
+pretrained:
+  entity: chuv
+  project: xe-hne-fus-cell-v1
+  run_id: "a4oj0ra0"
+
+data:
+  name: beat
+  # metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/artifacts/mil/cells/clinical.parquet
+  metadata_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/mil/a4oj0ra0/metadata.parquet
+  batch_size: 16
+  num_workers: 6
+  prefetch_factor: 4
+
+task:
+  kind: survival
+
+aggregator:
+  name: attention
+  hidden_dim: 512
+  gated: false
+  dropout: 0.2
+  num_heads: 1
+
+head:
+  num_hidden_layers: 0
+  hidden_dim: 128
+  dropout: 0.1
+
+lit:
+  time_key: metadata.52
+  event_key: metadata.53
+  lr_head: 1.0e-4
+  lr_aggregator: 1.0e-4
+  weight_decay: 1.0e-1
+  schedule: cosine
+  num_warmup_epochs: 10
+  metric_names: [cindex, cindex_pvalue]
+
+trainer:
+  max_epochs: 500
+  max_time: "00:04:00:00"
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  log_every_n_steps: 5
+
+wandb:
+  project: xe-hne-fus-mil-v1
+  name: surv_mil_test
+  tags: [beat, mil]

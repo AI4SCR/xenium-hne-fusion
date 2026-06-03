@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from xenium_hne_fusion.train.config import HeadConfig, TrainerConfig, WandbConfig, _merge_dataclass
+from xenium_hne_fusion.train.config import (HeadConfig, TrainerConfig,
+                                            WandbConfig, _merge_dataclass)
 
 
 @dataclass
@@ -27,20 +28,26 @@ class MILDataConfig:
 
 @dataclass
 class MILTaskConfig:
-    kind: Literal["regression", "classification"] = "regression"
+    kind: Literal["regression", "classification", "survival"] = "regression"
     num_classes: int | None = None
 
 
 @dataclass
 class AggregatorConfig:
-    name: Literal["mean", "max", "min", "simple_attention", "attention"] = "attention"
+    name: Literal[
+        "mean", "max", "min", "simple_attention", "attention", "transformer_attention"
+    ] = "attention"
     hidden_dim: int = 128
     gated: bool = False
+    dropout: float = 0.0
+    num_heads: int = 1
 
 
 @dataclass
 class MILLitConfig:
     target_key: str = "target"
+    time_key: str = "time"
+    event_key: str = "event"
     lr_head: float = 1e-3
     lr_aggregator: float = 1e-4
     weight_decay: float = 1e-2
