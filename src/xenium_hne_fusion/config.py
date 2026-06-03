@@ -99,7 +99,6 @@ class MILEvalConfig:
     @dataclass
     class Filters:
         name: str                            # dataset name, e.g. 'beat'
-        items_path: str                      # filename as in train config, e.g. all.json
         aggregator: str                      # e.g. 'attention'
         metadata_paths: list[str] | None = None
 
