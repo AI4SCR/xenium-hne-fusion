@@ -1,0 +1,8 @@
+data:
+  name: beat
+  master_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/18032026_metadata_beat_meso.csv
+  items_path: cells.json
+  batch_size: 256
+model:
+  name: UNI
+overwrite: false
