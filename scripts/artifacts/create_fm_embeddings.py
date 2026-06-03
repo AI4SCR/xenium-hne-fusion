@@ -67,7 +67,7 @@ def main(cfg: FMEmbeddingsConfig) -> int:
     save_dir = output_dir / 'fm_embeddings' / model_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    all_items = list(ds.items)
+    items = list(ds.items)
     logger.info(f'Processing {len(sample_ids)} samples with {model_name}.')
 
     for sid in sample_ids:
@@ -77,8 +77,8 @@ def main(cfg: FMEmbeddingsConfig) -> int:
             continue
 
         logger.info(f'Computing {model_name} embeddings for {sid}.')
-        ds.items = [i for i in all_items if i['sample_id'] == sid]
-        dl = DataLoader(ds, batch_size=cfg.data.batch_size)
+        ds.items = [i for i in items if i['sample_id'] == sid]
+        dl = DataLoader(ds, batch_size=cfg.data.batch_size, num_workers=10)
 
         records = []
         for batch in tqdm(dl, desc=sid):
@@ -99,7 +99,7 @@ def main(cfg: FMEmbeddingsConfig) -> int:
 
     return 0
 
-
+#%%
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", action="config")
