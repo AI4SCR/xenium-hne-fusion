@@ -176,6 +176,12 @@ You are an expert coding assistant for research code in computer vision, followi
 - When debugging scripts interactively, call the script's `cli([...])` or reusable `main(...)` with explicit arguments instead of relying on global state.
 - The shell `PATH` is minimal. Use full paths for Homebrew tools and prefer repo-local commands through `uv run`.
 - `cache_dir` (and all training paths) support shell env-var interpolation: set `cache_dir: $TMPDIR/cache` in a YAML config and `_resolve_path` will expand it at runtime via `os.path.expandvars`. Useful for Slurm jobs where `$TMPDIR` is only known at job start.
+- **W&B run config via `api.runs()`**: `run.config` returns `{}` when iterating `api.runs()` — the lightweight list objects don't fetch configs. Always resolve configs by fetching each run individually: `api.run(f'entity/project/{r.id}')` gives the full config. Example pattern:
+  ```python
+  for r in api.runs('entity/project'):
+      full = api.run(f'entity/project/{r.id}')
+      cfg = full.config  # now populated
+  ```
 
 ## Anti-patterns and mistakes to avoid
 
