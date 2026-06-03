@@ -85,7 +85,6 @@ def resolve_pretrained_run(pretrained_cfg) -> ResolvedPretrainedRun:
     )
 
 
-
 def build_mil_metadata(source_cfg: SupervisedConfig, run_dir: Path) -> Path:
     import pandas as pd
     from xenium_hne_fusion.train.utils import resolve_training_paths

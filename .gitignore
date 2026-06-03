@@ -101,6 +101,7 @@ cover/
 .env.kaiko
 .venv
 .venv-kray/
+.venv-titan/
 env/
 venv/
 ENV/

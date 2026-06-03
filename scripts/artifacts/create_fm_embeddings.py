@@ -12,6 +12,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 import lazyslide as zs
+from lazyslide.models import MODEL_REGISTRY
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.utils.getters import get_managed_paths
@@ -57,9 +58,13 @@ def main(cfg: FMEmbeddingsConfig) -> int:
 
     model_name = cfg.model.name
     assert model_name.lower() in zs.models.list_models(), f'Unknown model: {model_name}'
+    # zs.tl.feature_extraction()
+    # model_name = 'conch_v1.5'
 
-    model = getattr(zs.models.vision, model_name)()
+    # torch.set_default_device("cpu")  # required to avoid: RuntimeError: Tensor.item() cannot be called on meta tensors
+    model = MODEL_REGISTRY[model_name]()
     transform = model.get_transform()
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     model.model.eval()
