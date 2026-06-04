@@ -16,15 +16,16 @@ def main(data_cfg: DataConfig) -> None:
     assert data_cfg.name == "beat", f"Expected dataset='beat', got {data_cfg.name!r}"
     cfg = build_pipeline_config(data_cfg)
 
-    metadata_path = cfg.raw_dir / "metadata.parquet"
+    metadata_path = cfg.raw_dir / "metadata_b.parquet"
     if metadata_path.exists():
         structure_metadata(metadata_path, cfg.paths.structured_dir)
 
     sample_dirs = sorted(p for p in cfg.raw_dir.iterdir() if p.is_dir())
     logger.info(f"Found {len(sample_dirs)} samples in {cfg.raw_dir}")
+
     for sample_dir in sample_dirs:
         sample_id = sample_dir.name
-        wsi_path = sample_dir / "region.tiff"
+        wsi_path = sample_dir / "region.tif"
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
         cells_path = sample_dir / "cells.parquet"
         structure_sample(
@@ -33,8 +34,8 @@ def main(data_cfg: DataConfig) -> None:
             tx_path,
             cfg.paths.structured_dir,
             cells_path=cells_path if cells_path.exists() else None,
+            visualize=True,
         )
-
 
 def cli(argv: list[str] | None = None) -> int:
     data_cfg, _, _, _ = parse_data_args(argv, include_executor=False)
