@@ -26,12 +26,13 @@ uv pip install -e . --no-deps
 ## BEAT
 
 ```bash
+#for MODEL in uni; do
 for MODEL in uni uni2 conch_v1.5; do
     sbatch \
         --cpus-per-task=12 \
         --mem=64G \
         --gres=gpu:1 \
-        --partition=gpu-l40 \
+        --partition=gpu-gh \
         --time=04:00:00 \
         --output=$HOME/logs/%j.out \
         --job-name=fm-emb-${MODEL} \

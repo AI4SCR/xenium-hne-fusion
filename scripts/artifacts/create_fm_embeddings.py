@@ -1,3 +1,4 @@
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -27,7 +28,7 @@ class FMDataConfig:
 
 @dataclass
 class FMModelConfig:
-    name: str = 'UNI'
+    name: str = 'conch_v1.5'
 
 
 @dataclass
@@ -36,7 +37,31 @@ class FMEmbeddingsConfig:
     model: FMModelConfig = field(default_factory=FMModelConfig)
     overwrite: bool = False
 
-def main(cfg: FMEmbeddingsConfig) -> int:
+import yaml
+cfg = yaml.load(Path('/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/artifacts/beat/unil/fm.yaml').open(), Loader=yaml.SafeLoader)
+cfg = FMEmbeddingsConfig(
+    data=FMDataConfig(**cfg['data']),
+    model=FMModelConfig(**cfg['model'])
+)
+cfg.model.name = 'uni'
+cfg.data.items_path = Path(cfg.data.items_path)
+
+# def main(cfg: FMEmbeddingsConfig) -> int:
+def main() -> int:
+    import yaml
+    cfg = yaml.load(Path(
+        '/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/artifacts/beat/unil/fm.yaml').open(),
+                    Loader=yaml.SafeLoader)
+    cfg = FMEmbeddingsConfig(
+        data=FMDataConfig(**cfg['data']),
+        model=FMModelConfig(**cfg['model'])
+    )
+    cfg.model.name = 'uni'
+    cfg.data.items_path = Path(cfg.data.items_path)
+    cfg.data.batch_size = 2
+
+    logger.info(f'Creating embeddings with {cfg.model.name}')
+
     paths = get_managed_paths(cfg.data.name)
     output_dir = paths.output_dir
 
@@ -104,14 +129,16 @@ def main(cfg: FMEmbeddingsConfig) -> int:
 
     return 0
 
-#%%
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("--config", action="config")
-    parser.add_class_arguments(FMEmbeddingsConfig, None)
+main()
 
-    cfg = parser.parse_args()
-    init = parser.instantiate_classes(cfg)
-    d = vars(init)
-    d.pop("config", None)
-    raise SystemExit(main(FMEmbeddingsConfig(**d)))
+#%%
+# if __name__ == "__main__":
+#     parser = ArgumentParser()
+#     parser.add_argument("--config", action="config")
+#     parser.add_class_arguments(FMEmbeddingsConfig, None)
+#
+#     cfg = parser.parse_args()
+#     init = parser.instantiate_classes(cfg)
+#     d = vars(init)
+#     d.pop("config", None)
+#     raise SystemExit(main(FMEmbeddingsConfig(**d)))
