@@ -20,8 +20,8 @@ uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.y
 JOB_IDS=()
 for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/beat.yaml); do
     JOB_ID=$(sbatch --parsable \
-        --cpus-per-task=8 --mem=200G --time=04:00:00 \
-        --output=$HOME/logs/%j.out \
+        --cpus-per-task=8 --mem=400G --time=04:00:00 \
+        --output=$HOME/logs/${SAMPLE_ID}_%j.out \
         --job-name=beat_${SAMPLE_ID} \
         --wrap="uv run python scripts/data/process_beat.py \
             --config configs/data/remote/beat.yaml \
@@ -29,6 +29,8 @@ for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/d
     JOB_IDS+=($JOB_ID)
     echo "Submitted ${SAMPLE_ID}: ${JOB_ID}"
 done
+
+# HAS BEEN RUN UNTIL HERE
 
 # 4. Build tile inventory and compute stats after all sample jobs complete.
 DEPENDENCY=$(IFS=:; echo "afterok:${JOB_IDS[*]}")
