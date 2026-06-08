@@ -94,6 +94,7 @@ def build_supervised_lit(cfg: Config, checkpoint_path: str | os.PathLike[str] | 
         pos_embed_layer_name=cfg.backbone.pos_embed_layer_name,
         freeze_morph_encoder=cfg.backbone.freeze_morph_encoder,
         freeze_expr_encoder=cfg.backbone.freeze_expr_encoder,
+        permute_expr_tokens=cfg.lit.permute_expr_tokens,
     )
 
     embed_dim = infer_head_input_dim(

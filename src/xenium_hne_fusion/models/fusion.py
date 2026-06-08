@@ -70,7 +70,8 @@ class FusionModel(nn.Module):
             pos_embed_layer_name: str = '_pos_embed',
             freeze_morph_encoder: bool = False,
             freeze_expr_encoder: bool = False,
-            learnable_gate: bool = False
+            learnable_gate: bool = False,
+            permute_expr_tokens: bool = False,
     ):
         """
         Unified backbone for morphology-only, expression-only, and fusion models.
@@ -124,6 +125,7 @@ class FusionModel(nn.Module):
                 'If fusion_strategy is not None, then both expr_encoder and morph_encoder should be provided.'
             )
 
+        self.permute_expr_tokens = permute_expr_tokens
         self.epsilon = 1e-5  # needed for token normalization
 
         # Learnable residual scale for "add" fusion. tanh(0) = 0, so the
@@ -256,6 +258,10 @@ class FusionModel(nn.Module):
 
     def forward_expr_tokens(self, expr_tokens: torch.Tensor):
         expr_tokens = self.expr_encoder(expr_tokens)
+
+        if self.permute_expr_tokens:
+            idx = torch.randperm(expr_tokens.shape[1], device=expr_tokens.device)
+            expr_tokens = expr_tokens[:, idx]
 
         if self.expr_to_morph_proj is not None:
             expr_tokens = self.expr_to_morph_proj(expr_tokens)  # (B, num_transcripts_tokens, morph_dim)

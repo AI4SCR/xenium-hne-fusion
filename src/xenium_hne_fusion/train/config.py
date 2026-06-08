@@ -68,6 +68,7 @@ class LitConfig:
     eta: float = 1e-6
     schedule: Literal['cosine'] | None = 'cosine'
     num_warmup_epochs: int = 5
+    permute_expr_tokens: bool = False
 
 
 @dataclass
