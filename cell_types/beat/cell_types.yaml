@@ -1,0 +1,50 @@
+# based on /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/results/scRNAseq/annotation/manual_cell_type_annotation.parquet
+# Level3
+
+cell_types:
+  - malignant mesothelioma cell
+  - macrophage
+  - IEG activated fibroblast
+  - CD4-positive, alpha-beta T cell
+  - plasma cell
+  - natural killer cell
+  - myeloid cell
+  - B cell
+  - interferon response T cell
+  - T cell
+  - fibroblast of lung
+  - classical monocyte
+  - endothelial cell of lymphatic vessel
+  - IEG activated myeloid cell
+  - germinal center B cell
+  - mesothelial cell
+  - cycling germinal center B cell
+  - plasmacytoid dendritic cell
+  - CD8-positive, alpha-beta T cell
+  - endothelial cell
+  - CD1c-positive myeloid dendritic cell
+  - interferon response myeloid cell
+  - CD141-positive myeloid dendritic cell
+  - regulatory T cell
+  - cycling T cell
+  - cycling myeloid cell
+  - T follicular helper cell
+  - monocyte
+  - pericyte
+  - follicular B cell
+  - adipocyte
+  - DC3
+  - cycling endothelial cell
+  - neutrophil
+  - follicular dendritic cell
+  - natural killer T cell
+  - cycling fibroblast
+  - non-classical monocyte
+  - gamma delta T cell
+  - skeletal muscle fibre
+  - mast cell
+  - heat shock T cell
+  - club cell
+  - ciliated epithelial cell
+  - pulmonary alveolar type 2 cell
+  - pulmonary alveolar type 1 cell

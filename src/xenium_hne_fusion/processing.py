@@ -23,7 +23,7 @@ BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES = (
     "DeprecatedCodeword_",
     "Intergenic_Region_",
 )
-NUM_CELL_TYPE_CATEGORIES = 39
+NUM_CELL_TYPE_CATEGORIES = 46 # 39
 
 
 def extract_tiles(
@@ -335,9 +335,9 @@ def process_cells(
 
 def normalize_cell_type_categories(cell_types: pd.Series) -> pd.Series:
     assert isinstance(cell_types.dtype, pd.CategoricalDtype), "cell types must be categorical"
-    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES + 1, "expected 40 cell categories"
-    assert "unknown" in cell_types.cat.categories, "missing `unknown` cell category"
-    assert "nan" in cell_types.cat.categories, "missing `nan` cell category"
+    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES, f"expected {NUM_CELL_TYPE_CATEGORIES} cell categories"
+    # assert "unknown" in cell_types.cat.categories, "missing `unknown` cell category"
+    # assert "nan" in cell_types.cat.categories, "missing `nan` cell category"
     assert cell_types.notna().all(), "missing cell type"
 
     categories = [category for category in cell_types.cat.categories if category != "nan"]
@@ -346,7 +346,7 @@ def normalize_cell_type_categories(cell_types: pd.Series) -> pd.Series:
     cell_types = pd.Series(pd.Categorical(values, dtype=dtype), index=cell_types.index, name=cell_types.name)
 
     assert "nan" not in cell_types.cat.categories, "nan cell category remains"
-    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES, "expected 39 cell categories"
+    assert len(cell_types.cat.categories) == NUM_CELL_TYPE_CATEGORIES, f"expected {NUM_CELL_TYPE_CATEGORIES} cell categories"
     return cell_types
 
 
