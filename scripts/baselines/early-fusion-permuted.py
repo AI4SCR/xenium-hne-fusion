@@ -42,9 +42,10 @@ class Config:
     project: str = "xe-hne-fus-cell-v1"
     run_id: str = "40utmvmw"
     n_permutations: int = 1
-    debug: bool = True
+    debug: bool = False
 
 cfg = Config()
+cfg.debug = True
 
 def main(cfg: Config) -> None:
     assert cfg.run_id, "run_id must be set"
@@ -74,7 +75,6 @@ def main(cfg: Config) -> None:
     )
     if source_cfg.data.num_workers > 0 and source_cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = source_cfg.data.prefetch_factor
-    dl_test = DataLoader(ds_test, **dataloader_kws)
 
     trainer_kws = dict(
         accelerator="auto",
@@ -83,8 +83,12 @@ def main(cfg: Config) -> None:
         logger=False,
         enable_progress_bar=True,
     )
+
     if cfg.debug:
         trainer_kws["limit_test_batches"] = 2
+        dataloader_kws["batch_size"] = 2
+
+    dl_test = DataLoader(ds_test, **dataloader_kws)
 
     all_results: list[dict] = []
     for i in range(cfg.n_permutations):
