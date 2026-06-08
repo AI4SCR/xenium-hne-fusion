@@ -34,8 +34,9 @@ done
 
 # 4. Build tile inventory and compute stats after all sample jobs complete.
 DEPENDENCY=$(IFS=:; echo "afterok:${JOB_IDS[*]}")
-sbatch --dependency=${DEPENDENCY} \
-    --cpus-per-task=8 --mem=32G --time=02:00:00 \
+#sbatch --dependency=${DEPENDENCY} \
+sbatch --account=rgottar1_spatial \
+    --cpus-per-task=8 --mem=32G --time=04:00:00 \
     --output=$HOME/logs/%j.out \
     --job-name=beat_finalize \
     --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/beat.yaml && \
