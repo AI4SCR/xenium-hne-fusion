@@ -32,6 +32,31 @@ def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | N
             expr_encoder_dim = output_dim
             expr_encoder = Head(input_dim=input_dim, output_dim=output_dim, **kws)
             expr_transform = log1p_transform
+        case "vit_small_patch16_224":
+            from torch import nn
+            expr_encoder = timm.create_model(
+                model_name=expr_encoder_name,
+                pretrained=True,
+                img_size=224,
+                in_chans=3,
+                num_classes=0,
+                global_pool='',  # disable pooling and handle with global_pool in FusionModel
+            )
+
+            expr_encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
+            expr_encoder.patch_embed = nn.Linear(in_features=input_dim, out_features=expr_encoder_dim)
+
+            # x = torch.randn((1, 196, 380))
+            # z = expr_encoder(x)
+
+            # transform = get_timm_transform(expr_encoder)
+            # normalize = get_normalize_from_transform(transform)
+            #
+            # assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
+            # assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
+
+            expr_transform = log1p_transform
+
         case "geneformer":
             from xenium_hne_fusion.models.geneformer import Geneformer
             expr_encoder = Geneformer(gene_names=source_panel, transform=expm1_transform, **kws)
