@@ -17,7 +17,8 @@ backbone:
   fusion_stage: null
   use_proj: false
   learnable_gate: false
-  global_pool: token
+  expr_token_pool: token
+  global_pool: null
 
 data:
   name: beat
