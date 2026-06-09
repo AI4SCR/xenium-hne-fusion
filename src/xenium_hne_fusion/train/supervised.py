@@ -224,7 +224,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     dl_fit = DataLoader(ds_fit, shuffle=True, **dataloader_kws)
     dl_val = DataLoader(ds_val, **dataloader_kws)
     dl_test = DataLoader(ds_test, **dataloader_kws)
-    log_every_n_steps = min(50, len(dl_fit))
+    cfg.trainer.log_every_n_steps = min(cfg.trainer.log_every_n_steps, len(dl_fit))
 
     wb_logger = WandbLogger(
         entity="chuv",
@@ -265,7 +265,6 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         val_check_interval=None,
         check_val_every_n_epoch=1,
         num_sanity_val_steps=None,
-        log_every_n_steps=log_every_n_steps,
         default_root_dir=output_dir,
         **asdict(cfg.trainer),
     )
