@@ -39,9 +39,8 @@ cells_stats.num_cells.plot.hist(bins=100).figure.show()
 cells_stats.num_transcripts.plot.hist(bins=100).figure.show()
 cells_stats.num_transcripts.sum()
 
-
 # %%
-save_path = managed_paths.output_dir / 'stats' / 'high_diversity.parquet'
+save_path = managed_paths.output_dir / 'statistics' / 'high_diversity.parquet'
 if not save_path.exists():
     from scipy import stats
 
@@ -66,15 +65,20 @@ if not save_path.exists():
         pts = gpd.read_parquet(row.tile_dir + '/transcripts.parquet')
         high_diversity.loc[index, 'transcript_entropy'] = stats.entropy(pts['feature_name'].value_counts())
 
-    gpd.GeoDataFrame(high_diversity).to_parquet(save_path)
+    high_diversity.to_parquet(save_path)
 else:
-    high_diversity = gpd.read_parquet(save_path)
+    high_diversity = pd.read_parquet(save_path)
 
 high_diversity = high_diversity.sort_values(['transcript_entropy', 'cell_entropy'])
+high_diversity.transcript_entropy.plot.hist(bins=100).figure.show()
+high_diversity.cell_entropy.plot.hist(bins=100).figure.show()
 
-high_diversity[cells.columns].to_json(items_dir / 'high_diversity.json')
-high_diversity[cells.columns].head(1000).to_json(items_dir / 'low_entropy.json')
-high_diversity[cells.columns].tail(1000).to_json(items_dir / 'high_entropy.json')
+high_diversity[cells.columns].to_json(items_dir / 'high_diversity.json', orient='records')
+high_diversity[cells.columns].head(1000).to_json(items_dir / 'low_entropy.json', orient='records')
+high_diversity[cells.columns].tail(1000).to_json(items_dir / 'high_entropy.json', orient='records')
+
+# import json
+# json.loads((items_dir / 'high_diversity.json').read_text())
 
 # %%
 save_dir = Path('/work/FAC/FBM/DBC/mrapsoma/prometex/data/example-images')
@@ -86,7 +90,7 @@ for index, row in tqdm(pdat.iterrows()):
     img = torch.load(row.tile_dir + '/tile.pt')
     pts = gpd.read_parquet(row.tile_dir + '/cells.parquet')
     img = img.permute(1,2,0).numpy()
-    entropy = stats.entropy(pts[cell_type_col].value_counts())
+
     viz = visualize_points(pts, image=img.copy(), radius=1, color_by_label=True, labels_key='Level3_grouped')
 
     prefix = 'low' if index < 100 else 'high'

@@ -15,17 +15,16 @@ done
 
 
 """
-from __future__ import annotations
-
-import os
 from dataclasses import dataclass
 import json
+import pandas as pd
 
 import lightning as L
 import torch
 from dotenv import load_dotenv
 from loguru import logger
 from torch.utils.data import DataLoader
+from pathlib import Path
 
 load_dotenv(override=True)
 
@@ -41,16 +40,24 @@ class Config:
     entity: str = "chuv"
     project: str = "xe-hne-fus-cell-v1"
     run_id: str = "40utmvmw"
-    n_permutations: int = 1
+    n_permutations: int = 5
     debug: bool = False
+    items_path: Path | None = None
 
-cfg = Config()
-cfg.debug = True
+# cfg = Config()
+# cfg.debug = True
+# cfg.items_path = Path('high_diversity.json')
+# cfg.items_path = Path('high_entropy.json')
+# cfg.items_path = Path('low_entropy.json')
 
 def main(cfg: Config) -> None:
     assert cfg.run_id, "run_id must be set"
-
     resolved = resolve_pretrained_run(cfg)
+
+    save_dir = get_managed_paths(resolved.source_config.data.name).output_dir / 'baselines' / 'permutation'
+    save_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f'Saving results to {save_dir}')
+
     source_cfg = resolved.source_config
     logger.info(f"Loaded checkpoint: {resolved.checkpoint_path}")
 
@@ -59,9 +66,16 @@ def main(cfg: Config) -> None:
 
     # Enable permutation on the loaded backbone
     assert hasattr(lit.backbone, "permute_expr_tokens"), "backbone missing permute_expr_tokens"
-    lit.backbone.permute_expr_tokens = True
 
     dataset_kws = build_supervised_dataset_kws(source_cfg)
+    if cfg.items_path is not None:
+
+        if not cfg.items_path.is_absolute():
+            cfg.items_path = get_managed_paths(resolved.source_config.data.name).output_dir / 'items' / cfg.items_path
+            assert cfg.items_path.exists()
+
+        dataset_kws['items_path'] = cfg.items_path
+
     ds_test = TileDataset(**dataset_kws, split=Split.TEST.value)
     ds_test.setup()
     logger.info(f"Test set: {len(ds_test)} tiles")
@@ -69,7 +83,7 @@ def main(cfg: Config) -> None:
     dataloader_kws = dict(
         batch_size=source_cfg.data.batch_size,
         shuffle=False,
-        num_workers=source_cfg.data.num_workers,
+        num_workers=min(source_cfg.data.num_workers, 6),
         pin_memory=source_cfg.data.num_workers > 0,
         persistent_workers=source_cfg.data.num_workers > 0,
     )
@@ -90,27 +104,36 @@ def main(cfg: Config) -> None:
 
     dl_test = DataLoader(ds_test, **dataloader_kws)
 
-    all_results: list[dict] = []
+    # without permutation
+    lit.backbone.permute_expr_tokens = False
+    trainer = L.Trainer(**trainer_kws)
+    results, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
+    logger.info(f"Unpermuted: {results}")
+    
+    results = pd.DataFrame(results, index=[0])
+    results['permuted'] = False
+
+    # with permutation
+    lit.backbone.permute_expr_tokens = True
     for i in range(cfg.n_permutations):
         trainer = L.Trainer(**trainer_kws)
-        results = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
-        assert len(results) == 1
-        all_results.append(results[0])
-        logger.info(f"Permutation {i + 1}/{cfg.n_permutations}: {results[0]}")
+        res, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
+        logger.info(f"Permutation {i + 1}/{cfg.n_permutations}: {res}")
 
-    # Aggregate across permutations
-    keys = all_results[0].keys()
-    means = {k: torch.tensor([r[k] for r in all_results]).mean().item() for k in keys}
-    stds = {k: torch.tensor([r[k] for r in all_results]).std().item() for k in keys}
+        res = pd.DataFrame(res, index=[0])
+        res['permuted'] = True
+        results = pd.concat([results, res])
 
-    logger.info("=== Permuted baseline results ===")
-    for k in keys:
-        logger.info(f"  {k}: {means[k]:.4f} ± {stds[k]:.4f}")
-
+    results = results.reset_index(drop=True)
+    results['items'] = str(ds_test.items_path)
     output_dir = get_managed_paths(resolved.source_config.data.name).output_dir
-    save_path = output_dir / 'baselines' / 'permutation' / f'{cfg.run_id}.json'
+    save_path = output_dir / 'baselines' / 'permutation' / cfg.run_id / f'{ds_test.items_path.stem}.parquet'
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    json.dump(all_results, save_path.open('w'))
+    results.to_parquet(save_path)
+
+    plts = results.plot.box(column=['test/pearson_mean', 'test/spearman_mean'], by='permuted')
+    plts.iloc[0].figure.show()
+    plts.iloc[0].figure.savefig(save_path.with_suffix('.png'))
 
 # %%
 if __name__ == "__main__":
@@ -122,6 +145,6 @@ if __name__ == "__main__":
 
     cfg = parser.parse_args()
     init = parser.instantiate_classes(cfg)
-    d = vars(init)
+    d = init.as_dict()
     d.pop("config", None)
     raise SystemExit(main(Config(**d)))
