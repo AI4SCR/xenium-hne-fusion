@@ -34,7 +34,8 @@ def _validate_config(
         'flatten',
     ], f'Global pool has to be one of avg/max/token, got {global_pool}'
 
-    assert not (morph_encoder is None and global_pool == 'token'), f'If no morph_encoder is provided, global_pool cannot be `token`.'
+    # no longer true with vit as expr encoder
+    # assert not (morph_encoder is None and global_pool == 'token'), f'If no morph_encoder is provided, global_pool cannot be `token`.'
 
     if fusion_strategy is not None:
         assert fusion_stage in {'early', 'late'}, f'fusion_stage must be one of [early, late], got {fusion_stage}'
