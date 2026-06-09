@@ -132,6 +132,7 @@ def main(cfg: Config) -> None:
     results.to_parquet(save_path)
 
     plts = results.plot.box(column=['test/pearson_mean', 'test/spearman_mean'], by='permuted')
+    plts.iloc[0].figure.tight_layout()
     plts.iloc[0].figure.show()
     plts.iloc[0].figure.savefig(save_path.with_suffix('.png'))
 
