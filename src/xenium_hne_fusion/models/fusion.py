@@ -72,7 +72,8 @@ class FusionModel(nn.Module):
             freeze_morph_encoder: bool = False,
             freeze_expr_encoder: bool = False,
             learnable_gate: bool = False,
-            permute_expr_tokens: bool = False,
+            permute_expr_tokens: Literal['in-tile', 'in-batch'] | None = None,
+            permute_vision_tokens: Literal['in-tile', 'in-batch'] | None = None,
     ):
         """
         Unified backbone for morphology-only, expression-only, and fusion models.
@@ -126,7 +127,14 @@ class FusionModel(nn.Module):
                 'If fusion_strategy is not None, then both expr_encoder and morph_encoder should be provided.'
             )
 
+        assert permute_expr_tokens in (None, 'in-tile', 'in-batch'), (
+            f"permute_expr_tokens must be None, 'in-tile', or 'in-batch', got {permute_expr_tokens!r}"
+        )
+        assert permute_vision_tokens in (None, 'in-tile', 'in-batch'), (
+            f"permute_vision_tokens must be None, 'in-tile', or 'in-batch', got {permute_vision_tokens!r}"
+        )
         self.permute_expr_tokens = permute_expr_tokens
+        self.permute_vision_tokens = permute_vision_tokens
         self.epsilon = 1e-5  # needed for token normalization
 
         # Learnable residual scale for "add" fusion. tanh(0) = 0, so the
@@ -260,9 +268,12 @@ class FusionModel(nn.Module):
     def forward_expr_tokens(self, expr_tokens: torch.Tensor):
         expr_tokens = self.expr_encoder(expr_tokens)
 
-        if self.permute_expr_tokens:
+        if self.permute_expr_tokens in ('in-tile', 'in-batch'):
             idx = torch.randperm(expr_tokens.shape[1], device=expr_tokens.device)
             expr_tokens = expr_tokens[:, idx]
+        if self.permute_expr_tokens == 'in-batch':
+            idx = torch.randperm(expr_tokens.shape[0], device=expr_tokens.device)
+            expr_tokens = expr_tokens[idx]
 
         if self.expr_to_morph_proj is not None:
             expr_tokens = self.expr_to_morph_proj(expr_tokens)  # (B, num_transcripts_tokens, morph_dim)
@@ -275,6 +286,14 @@ class FusionModel(nn.Module):
         assert H == W
 
         morph_tokens = self.morph_encoder.patch_embed(image)  # (B, num_image_tokens, embed_dim)
+
+        if self.permute_vision_tokens in ('in-tile', 'in-batch'):
+            idx = torch.randperm(morph_tokens.shape[1], device=morph_tokens.device)
+            morph_tokens = morph_tokens[:, idx]
+        if self.permute_vision_tokens == 'in-batch':
+            idx = torch.randperm(morph_tokens.shape[0], device=morph_tokens.device)
+            morph_tokens = morph_tokens[idx]
+
         return morph_tokens
 
     def infer_route(self, batch: dict) -> Literal['fusion', 'morph_only', 'expr_only']:

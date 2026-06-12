@@ -40,14 +40,17 @@ class Config:
     entity: str = "chuv"
     project: str = "xe-hne-fus-cell-v1"
     run_id: str = "40utmvmw"
-    n_permutations: int = 5
+    n_permutations: int = 3
+    permute_mode: str = "in-tile"  # 'in-tile' or 'in-batch'
+    permute_expr_tokens: bool = False
+    permute_vision_tokens: bool = True
     debug: bool = False
     items_path: Path | None = None
 
 # cfg = Config()
 # cfg.debug = True
-# cfg.items_path = Path('high_diversity.json')
 # cfg.items_path = Path('high_entropy.json')
+# cfg.items_path = Path('high_diversity.json')
 # cfg.items_path = Path('low_entropy.json')
 
 def main(cfg: Config) -> None:
@@ -66,6 +69,9 @@ def main(cfg: Config) -> None:
 
     # Enable permutation on the loaded backbone
     assert hasattr(lit.backbone, "permute_expr_tokens"), "backbone missing permute_expr_tokens"
+    assert hasattr(lit.backbone, "permute_vision_tokens"), "backbone missing permute_vision_tokens"
+    assert cfg.permute_mode in ('in-tile', 'in-batch'), f"permute_mode must be 'in-tile' or 'in-batch', got {cfg.permute_mode!r}"
+    assert cfg.permute_expr_tokens or cfg.permute_vision_tokens, "at least one of permute_expr_tokens or permute_vision_tokens must be True"
 
     dataset_kws = build_supervised_dataset_kws(source_cfg)
     if cfg.items_path is not None:
@@ -104,37 +110,43 @@ def main(cfg: Config) -> None:
 
     dl_test = DataLoader(ds_test, **dataloader_kws)
 
+    permute_label = '+'.join(
+        [s for s, flag in [('expr', cfg.permute_expr_tokens), ('vision', cfg.permute_vision_tokens)] if flag]
+    )
+
     # without permutation
-    lit.backbone.permute_expr_tokens = False
+    lit.backbone.permute_expr_tokens = None
+    lit.backbone.permute_vision_tokens = None
     trainer = L.Trainer(**trainer_kws)
     results, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
     logger.info(f"Unpermuted: {results}")
-    
+
     results = pd.DataFrame(results, index=[0])
-    results['permuted'] = False
+    results['permute_mode'] = 'unpermuted'
 
     # with permutation
-    lit.backbone.permute_expr_tokens = True
+    lit.backbone.permute_expr_tokens = cfg.permute_mode if cfg.permute_expr_tokens else None
+    lit.backbone.permute_vision_tokens = cfg.permute_mode if cfg.permute_vision_tokens else None
     for i in range(cfg.n_permutations):
         trainer = L.Trainer(**trainer_kws)
         res, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
-        logger.info(f"Permutation {i + 1}/{cfg.n_permutations}: {res}")
+        logger.info(f"[{permute_label}/{cfg.permute_mode}] Permutation {i + 1}/{cfg.n_permutations}: {res}")
 
         res = pd.DataFrame(res, index=[0])
-        res['permuted'] = True
+        res['permute_mode'] = f'{permute_label}/{cfg.permute_mode}'
         results = pd.concat([results, res])
 
     results = results.reset_index(drop=True)
     results['items'] = str(ds_test.items_path)
     output_dir = get_managed_paths(resolved.source_config.data.name).output_dir
-    save_path = output_dir / 'baselines' / 'permutation' / cfg.run_id / f'{ds_test.items_path.stem}.parquet'
+    save_path = output_dir / 'baselines' / 'permutation' / cfg.run_id / f'{permute_label}_{cfg.permute_mode}' / f'{ds_test.items_path.stem}.parquet'
     save_path.parent.mkdir(parents=True, exist_ok=True)
     results.to_parquet(save_path)
 
-    plts = results.plot.box(column=['test/pearson_mean', 'test/spearman_mean'], by='permuted')
-    plts.iloc[0].figure.tight_layout()
-    plts.iloc[0].figure.show()
-    plts.iloc[0].figure.savefig(save_path.with_suffix('.png'))
+    axes = results.plot.box(column=['test/pearson_mean', 'test/spearman_mean'], by='permute_mode')
+    fig = axes.iloc[0].figure
+    fig.tight_layout()
+    fig.savefig(save_path.with_suffix('.png'))
 
 # %%
 if __name__ == "__main__":
