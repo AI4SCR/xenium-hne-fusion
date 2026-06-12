@@ -94,7 +94,6 @@ def build_supervised_lit(cfg: Config, checkpoint_path: str | os.PathLike[str] | 
         pos_embed_layer_name=cfg.backbone.pos_embed_layer_name,
         freeze_morph_encoder=cfg.backbone.freeze_morph_encoder,
         freeze_expr_encoder=cfg.backbone.freeze_expr_encoder,
-        permute_expr_tokens=cfg.lit.permute_expr_tokens,
     )
 
     embed_dim = infer_head_input_dim(
@@ -195,6 +194,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     )
 
     lit = build_supervised_lit(cfg)
+    # assert lit.backbone.morph_encoder is None
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -206,6 +206,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
     dataset_kws = build_supervised_dataset_kws(cfg)
+    # assert dataset_kws['include_image'] == False
 
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
@@ -219,6 +220,9 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     ds_val.setup()
     ds_test = TileDataset(**dataset_kws, split="test")
     ds_test.setup()
+
+    # assert ds_fit[0]['modalities'].get('image') is None
+    # assert isinstance(ds_fit[0]['modalities'].get('expr_tokens'), torch.Tensor)
 
     global_batch_size = cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
     dl_fit = DataLoader(ds_fit, shuffle=True, **dataloader_kws)
