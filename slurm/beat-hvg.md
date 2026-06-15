@@ -157,3 +157,43 @@ for N_TOP_GENES in 50 100; do
     uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-hvg-${N_TOP_GENES}.yaml
 done
 ```
+
+```bash
+PARTITION=gpu-l40
+TIME=04:30:00
+MEMORY=64G
+TASK=expression
+N_TOP_GENES=100
+ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
+
+for OUTER in 0 1 2 3; do
+    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+    SPLIT_DIR=cells
+    METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
+    PANEL_PATH="hvg-${N_TOP_GENES}/${SPLIT_DIR}/${SPLIT_NAME}.yaml"
+    PANEL_NAME="${PANEL_PATH%.yaml}"
+
+#    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+    for MODEL in expr-token-vit; do
+        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
+
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
+    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=${TASK}/${PANEL_NAME}
+
+        sbatch \
+            --cpus-per-task=12 \
+            --mem=${MEMORY} \
+            --gres=gpu:1 \
+            --partition=${PARTITION} \
+            --time=${TIME} \
+            --output=$HOME/logs/%j.out \
+            --job-name=${TASK}-${MODEL}-hvg-${OUTER} \
+            --wrap="uv run python scripts/train/supervised.py \
+                --config ${CONFIG} \
+                --data.items_path ${ITEMS_PATH} \
+                --data.metadata_path ${METADATA_PATH} \
+                --data.panel_path ${PANEL_PATH} \
+                --data.cache_dir=${TASK}/${PANEL_NAME}"
+    done
+done
+```

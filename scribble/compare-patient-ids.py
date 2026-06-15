@@ -86,21 +86,34 @@ meta = pd.read_parquet(meta_path)
 # meta = meta[meta.sample_id.isin(sample_ids)]
 meta = meta[meta.clinical_pat_id.isin(clinical_pat_ids)]
 meta = meta.drop_duplicates()
+meta = meta.sort_index()
 assert len(meta) == 139
 
-from sklearn.model_selection import RepeatedStratifiedKFold
-splitter = RepeatedStratifiedKFold(n_splits=5, n_repeats=2)
+from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold
+splitter = RepeatedStratifiedKFold(n_splits=5, n_repeats=2, random_state=0)
 splits = []
 for i, (train, test) in enumerate(splitter.split(meta, y=meta['7b'])):
+    test_ids = meta.iloc[test].clinical_pat_id.tolist()
+
+    train_ids = meta.iloc[train].clinical_pat_id.tolist()
+    df_train = meta.iloc[train]
+
+    fit_val_splitter = StratifiedKFold(n_splits=4, shuffle=False)
+    fit, val = next(iter(fit_val_splitter.split(df_train, y=df_train['7b'])))
+    fit_ids = df_train.iloc[fit].clinical_pat_id.tolist()
+    val_ids = df_train.iloc[val].clinical_pat_id.tolist()
+
+    assert set(fit_ids).intersection(set(val_ids)) == set()
+    assert set(fit_ids).intersection(set(test_ids)) == set()
+    assert set(val_ids).intersection(set(test_ids)) == set()
+
     split = {
         'id': i,
-        'train_ids': meta.iloc[train].clinical_pat_id.tolist(),
-        'test_ids': meta.iloc[test].clinical_pat_id.tolist(),
+        'fit_ids': fit_ids,
+        'val_ids': val_ids,
+        'test_ids': test_ids,
     }
     splits.append(split)
-
-for i in range(len(splits)):
-    assert set(splits[i]['test_ids']).intersection(set(splits[i]['train_ids'])) == set()
 
 import json
 save_path = meta_path.parent / f'{meta_path.stem}_splits.json'

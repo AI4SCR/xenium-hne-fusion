@@ -69,7 +69,6 @@ class LitConfig:
     schedule: Literal['cosine'] | None = 'cosine'
     num_warmup_epochs: int = 5
 
-
 @dataclass
 class TrainerConfig:
     max_epochs: int = 35

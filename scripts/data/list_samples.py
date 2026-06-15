@@ -14,6 +14,7 @@ from xenium_hne_fusion.utils.getters import (
     load_data_config,
     resolve_beat_samples,
     resolve_hest1k_samples,
+    resolve_owkin_samples
 )
 
 load_dotenv()
@@ -31,6 +32,8 @@ def main(config: Path) -> None:
         sample_ids = filter_hest_samples_by_tile_mpp(cfg, sample_ids, metadata_path)
     elif data_cfg.name == "beat":
         sample_ids = resolve_beat_samples(cfg)
+    elif data_cfg.name == "owkin":
+        sample_ids = resolve_owkin_samples(cfg)
     else:
         raise AssertionError(f"Unsupported dataset: {data_cfg.name}")
 

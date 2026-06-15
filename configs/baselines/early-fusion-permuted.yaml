@@ -1,0 +1,9 @@
+entity: chuv
+project: 'xe-hne-fus-cell-v1'
+# 40utmvmw j5x4suw2 owzcohia fif5wuld
+run_id: '40utmvmw'
+n_permutations: 3
+permute_expr_tokens: false
+permute_vision_tokens: true
+debug: false
+items_path: null

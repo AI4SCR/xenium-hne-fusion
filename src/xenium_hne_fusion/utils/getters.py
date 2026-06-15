@@ -223,7 +223,7 @@ def select_sample_ids(
 
 def build_pipeline_config(cfg: DataConfig) -> PipelineConfig:
     dataset = cfg.name
-    assert dataset in {'beat', 'hest1k'}, f'Unknown dataset for config name: {cfg.name!r}'
+    assert dataset in {'beat', 'hest1k', 'owkin'}, f'Unknown dataset for config name: {cfg.name!r}'
     managed = get_managed_paths(cfg.name)
     raw_dir = _require_env_path(f'{dataset.upper()}_RAW_DIR')
     return PipelineConfig(
@@ -395,6 +395,14 @@ def get_beat_raw_sample_ids(cfg: PipelineConfig) -> list[str]:
 
 def resolve_beat_samples(cfg: PipelineConfig) -> list[str]:
     return select_sample_ids(get_beat_raw_sample_ids(cfg), cfg.data.filter)
+
+
+def get_owkin_raw_sample_ids(cfg: PipelineConfig) -> list[str]:
+    return sorted(path.name for path in cfg.raw_dir.iterdir() if path.is_dir() and path.name.startswith('CH_'))
+
+
+def resolve_owkin_samples(cfg: PipelineConfig) -> list[str]:
+    return select_sample_ids(get_owkin_raw_sample_ids(cfg), cfg.data.filter)
 
 
 def resolve_hest1k_samples(cfg: DataConfig | PipelineConfig, metadata_path: Path) -> list[str]:

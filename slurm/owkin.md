@@ -1,4 +1,4 @@
-# BEAT Slurm Commands
+# Owkin Slurm Commands
 
 
 ## Data Preparation
@@ -10,12 +10,12 @@ Steps must run in order; each stage depends on the previous one.
 chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
 
 # 2. Structure raw BEAT data into 01_structured/<name>/.
-uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.yaml
+uv run python scripts/data/structure_owkin.py --config configs/data/remote/owkin.yaml
 
 # 3. Tile slides, extract transcripts and cell annotations — one job per sample.
 #    Cell annotations are included automatically when cells.parquet is present.
 JOB_IDS=()
-for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/beat.yaml); do
+for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/owkin.yaml); do
     JOB_ID=$(sbatch --parsable \
         --cpus-per-task=8 --mem=64G --time=08:00:00 \
         --output=$HOME/logs/%j.out \
