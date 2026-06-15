@@ -25,7 +25,7 @@ def main(data_cfg: DataConfig) -> None:
 
     for sample_dir in sample_dirs:
         sample_id = sample_dir.name
-        wsi_path = sample_dir / "region.tif"
+        wsi_path = sample_dir / "region.tiff"
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
         cells_path = sample_dir / "cells.parquet"
         structure_sample(
@@ -34,7 +34,7 @@ def main(data_cfg: DataConfig) -> None:
             tx_path,
             cfg.paths.structured_dir,
             cells_path=cells_path if cells_path.exists() else None,
-            visualize=True,
+            visualize=False,
         )
 
 def cli(argv: list[str] | None = None) -> int:
