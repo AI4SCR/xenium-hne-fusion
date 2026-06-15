@@ -29,6 +29,7 @@ from xenium_hne_fusion.train.mil import resolve_mil_paths, resolve_pretrained_ru
 from xenium_hne_fusion.train.mil_config import MILConfig
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws, build_supervised_lit, set_fast_dev_run_settings
+from xenium_hne_fusion.train.utils import prepare_training_config
 from torch.utils.data import DataLoader
 from ai4bmr_learn.callbacks.cache import PredictionCache
 import lightning as L
@@ -48,10 +49,11 @@ def main(cfg: MILConfig, overwrite: bool = False) -> None:
         cache_dir = run_dir / 'predictions'
     cache_dir = Path(os.path.expandvars(cache_dir))
 
-    lit = build_supervised_lit(resolved_run.source_config, checkpoint_path=resolved_run.checkpoint_path)
+    resolved_source = prepare_training_config(resolved_run.source_config)
+    lit = build_supervised_lit(resolved_source, checkpoint_path=resolved_run.checkpoint_path)
     lit.eval()
 
-    dataset_kws = build_supervised_dataset_kws(resolved_run.source_config)
+    dataset_kws = build_supervised_dataset_kws(resolved_source)
 
     dataloader_kws = dict(
         batch_size=resolved_run.source_config.data.batch_size,

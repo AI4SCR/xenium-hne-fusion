@@ -18,6 +18,7 @@ from xenium_hne_fusion.train.mil_config import (
     PretrainedConfig,
 )
 from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws, build_supervised_lit
+from xenium_hne_fusion.train.utils import prepare_training_config
 
 
 # --- parser -------------------------------------------------------------------
@@ -137,8 +138,9 @@ def test_build_supervised_builders_split_model_and_dataset_kws(monkeypatch: pyte
     pd.DataFrame([{"sample_id": "S1", "split": "fit"}]).set_index("sample_id").to_parquet(cfg.data.metadata_path)
     cfg.data.panel_path.write_text("{}", encoding="utf-8")
 
-    lit = build_supervised_lit(cfg)
-    dataset_kws = build_supervised_dataset_kws(cfg)
+    resolved = prepare_training_config(cfg)
+    lit = build_supervised_lit(resolved)
+    dataset_kws = build_supervised_dataset_kws(resolved)
 
     assert lit.num_outputs == 1
     assert dataset_kws["id_key"] == "id"

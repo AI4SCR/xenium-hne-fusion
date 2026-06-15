@@ -19,10 +19,11 @@ load_dotenv(override=True)
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws
+from xenium_hne_fusion.train.utils import prepare_training_config
 
 
 def main(cfg: Config) -> None:
-    dataset_kws = build_supervised_dataset_kws(cfg)
+    dataset_kws = build_supervised_dataset_kws(prepare_training_config(cfg))
     ds = TileDataset(**dataset_kws)
     ds.setup()
 

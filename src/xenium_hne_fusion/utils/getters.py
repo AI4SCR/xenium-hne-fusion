@@ -266,7 +266,7 @@ def _require_env_path(var: str) -> Path:
     return Path(_require_env(var)).expanduser().resolve()
 
 
-DEFAULT_CELL_TYPE_COL = 'first_type_cat' # 'first_type' # 'Level3_grouped' 
+DEFAULT_CELL_TYPE_COL = os.environ.get('BEAT_CELL_TYPE_COL', 'Level3_grouped')
 DEFAULT_SOURCE_ITEMS_NAME = 'all'
 STAT_COLS = ['num_transcripts', 'num_unique_transcripts', 'num_cells', 'num_unique_cells']
 

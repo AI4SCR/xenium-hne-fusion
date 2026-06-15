@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict
+from pathlib import Path
 from typing import Literal
+
+import pandas as pd
 
 import lightning as L
 import torch
@@ -25,6 +29,7 @@ from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_m
 from xenium_hne_fusion.train.config import Config
 from xenium_hne_fusion.train.lit import RegressionLit
 from xenium_hne_fusion.train.utils import (
+    ResolvedTrainingConfig,
     infer_head_input_dim,
     prepare_training_config,
     resolve_num_outputs,
@@ -32,8 +37,22 @@ from xenium_hne_fusion.train.utils import (
     set_fast_dev_run_settings,
     validate_task_config,
 )
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
 
 TaskTarget = Literal["expression", "cell_types"]
+
+
+def get_target_names(resolved: ResolvedTrainingConfig) -> list[str] | None:
+    cfg = resolved.cfg
+    if cfg.task.target == "expression":
+        return cfg.data.target_panel
+    if cfg.task.target == "cell_types":
+        items = json.loads(cfg.data.items_path.read_text())
+        tile_dir = Path(items[0]["tile_dir"])
+        cells = pd.read_parquet(tile_dir / "cells.parquet", columns=[DEFAULT_CELL_TYPE_COL])
+        assert cells[DEFAULT_CELL_TYPE_COL].dtype == "category", f"{DEFAULT_CELL_TYPE_COL} must be categorical"
+        return sorted(cells[DEFAULT_CELL_TYPE_COL].cat.categories.tolist())
+    return None
 
 mp.set_sharing_strategy("file_system")
 
@@ -47,8 +66,7 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def build_supervised_lit(cfg: Config, checkpoint_path: str | os.PathLike[str] | None = None) -> RegressionLit:
-    resolved = prepare_training_config(cfg)
+def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit:
     cfg = resolved.cfg
     num_source_genes = resolved.num_source_genes
     num_outputs = resolved.num_outputs
@@ -117,6 +135,7 @@ def build_supervised_lit(cfg: Config, checkpoint_path: str | os.PathLike[str] | 
         backbone=backbone,
         head=head,
         num_outputs=num_outputs,
+        target_names=target_names,
         batch_key="modalities",
         target_key=cfg.lit.target_key,
         lr_head=cfg.lit.lr_head,
@@ -133,8 +152,7 @@ def build_supervised_lit(cfg: Config, checkpoint_path: str | os.PathLike[str] | 
     return RegressionLit(**lit_kws)
 
 
-def build_supervised_dataset_kws(cfg: Config) -> dict:
-    resolved = prepare_training_config(cfg)
+def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
     cfg = resolved.cfg
 
     morph_encoder_name = cfg.backbone.morph_encoder_name
@@ -193,7 +211,8 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         f"Training task.target={cfg.task.target} with num_outputs={num_outputs} and num_source_genes={num_source_genes}"
     )
 
-    lit = build_supervised_lit(cfg)
+    target_names = get_target_names(resolved)
+    lit = build_supervised_lit(resolved, target_names=target_names)
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -204,7 +223,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     if cfg.data.num_workers > 0 and cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
-    dataset_kws = build_supervised_dataset_kws(cfg)
+    dataset_kws = build_supervised_dataset_kws(resolved)
 
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.

@@ -34,6 +34,7 @@ class RegressionLit(L.LightningModule):
         freeze_backbone: bool = False,
         pooling: str | None = None,
         loss: str = "mse",
+        target_names: list[str] | None = None,
         save_hparams: bool = True,
     ):
         super().__init__()
@@ -61,6 +62,7 @@ class RegressionLit(L.LightningModule):
         self.criterion = self.configure_loss(loss=loss)
 
         self.num_outputs = num_outputs
+        self.target_names = target_names
         metrics = self.get_metrics(num_outputs=num_outputs)
         self.train_metrics = metrics.clone(prefix="train/")
         self.valid_metrics = metrics.clone(prefix="val/")
@@ -104,6 +106,15 @@ class RegressionLit(L.LightningModule):
         metrics.reset()
         self.log_dict({f"{k}_mean": v.mean() for k, v in scores.items()})
         self.log_dict({f"{k}_std": v.std() for k, v in scores.items()})
+        if self.target_names is not None:
+            assert len(self.target_names) == self.num_outputs, (
+                f"target_names length {len(self.target_names)} != num_outputs {self.num_outputs}"
+            )
+            self.log_dict({
+                f"{k}/{name}": v[i]
+                for k, v in scores.items()
+                for i, name in enumerate(self.target_names)
+            })
 
     def _log_alpha(self, *, stage: str, batch_size: int) -> None:
         fusion_alpha = getattr(self.backbone, "fusion_alpha", None)
