@@ -6,10 +6,14 @@
 Steps must run in order; each stage depends on the previous one.
 
 ```bash
-# 1. Transfer cell annotations into the raw data directory.
-chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
+# 1. Transfer cell annotations into the raw data normalize_cell_type_categoriesdirectory.
+# TODO
+# chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
 
-# 2. Structure raw BEAT data into 01_structured/<name>/.
+# TODO
+# uv run python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/save-cell-coords-in-geometry-owkin.py
+
+# 2. Structure raw OWKIN data into 01_structured/<name>/.
 uv run python scripts/data/structure_owkin.py --config configs/data/remote/owkin.yaml
 
 # 3. Tile slides, extract transcripts and cell annotations — one job per sample.
@@ -17,11 +21,11 @@ uv run python scripts/data/structure_owkin.py --config configs/data/remote/owkin
 JOB_IDS=()
 for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/owkin.yaml); do
     JOB_ID=$(sbatch --parsable \
-        --cpus-per-task=8 --mem=64G --time=08:00:00 \
+        --cpus-per-task=8 --mem=128G --time=06:00:00 \
         --output=$HOME/logs/%j.out \
         --job-name=beat_${SAMPLE_ID} \
-        --wrap="uv run python scripts/data/process_beat.py \
-            --config configs/data/remote/beat.yaml \
+        --wrap="uv run python scripts/data/process_owkin.py \
+            --config configs/data/remote/owkin.yaml \
             --filter.include_ids [${SAMPLE_ID}] --filter.exclude_ids null")
     JOB_IDS+=($JOB_ID)
     echo "Submitted ${SAMPLE_ID}: ${JOB_ID}"
@@ -33,19 +37,19 @@ sbatch --dependency=${DEPENDENCY} \
     --cpus-per-task=8 --mem=32G --time=02:00:00 \
     --output=$HOME/logs/%j.out \
     --job-name=beat_finalize \
-    --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/beat.yaml && \
-            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/beat.yaml"
+    --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/owkin.yaml && \
+            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/owkin.yaml"
 
 # 5. Copy the default gene panel into the managed output directory.
-mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+#mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
 
 # 6. Create filtered item sets and cross-validated splits.
 #    expr:            expression task items and splits
 #    expr-with-cells: expression task with cell-type features
 #    cells:           cell-type prediction items and splits (also used as the canonical split for expr)
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/expr.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/expr-with-cells.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/cells.yaml
 
 # 7. Warmup cache (optional — pre-populates tile feature cache before GPU training).
 TASK=expression
