@@ -6,7 +6,7 @@ from typing import Callable, Literal
 import pandas as pd
 import torch
 from ai4bmr_learn.datasets.items import Items
-
+from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
 
 class TileDataset(Items):
     """
@@ -34,13 +34,13 @@ class TileDataset(Items):
                  target: Literal['cell_types', 'expression'],
                  source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
-                 include_image: bool = True,
-                 include_expr: bool = True,
+                 include_image: bool = False,
+                 include_expr: bool = False,
                  target_transform: Callable | None = None,
                  image_transform: Callable | None = None,
                  expr_transform: Callable | None = None,
                  expr_pool: Literal['token', 'tile'] = 'token',
-                 cell_type_col: str = 'Level3_grouped',
+                 cell_type_col: str = DEFAULT_CELL_TYPE_COL,
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -56,7 +56,7 @@ class TileDataset(Items):
         self.expr_pool = expr_pool
         self.cell_type_col = cell_type_col
 
-        assert target == 'expression' and target_panel is not None or target == 'cell_types', "target_panel must be specified when target is 'expression'"
+        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb'], "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
@@ -68,6 +68,7 @@ class TileDataset(Items):
 
         if self.cache_dir is not None and self.has_cache(iid=iid):
             item = torch.load(self.get_cache_path(iid), weights_only=False)
+            item['rgb'] = item['modalities']['image'].float().mean(dim=(1, 2))
             if not self.include_image:
                 item['modalities'].pop('image', None)
             if not self.include_expr:

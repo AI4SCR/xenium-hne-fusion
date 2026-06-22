@@ -21,15 +21,18 @@ def main(data_cfg: DataConfig) -> None:
     if metadata_path.exists():
         structure_metadata(metadata_path, cfg.paths.structured_dir)
 
-    sample_dirs = sorted(p for p in cfg.raw_dir.iterdir() if p.is_dir())
+    sample_dirs = sorted(path for path in cfg.raw_dir.iterdir() if path.is_dir() and path.name.startswith('CH_'))
     logger.info(f"Found {len(sample_dirs)} samples in {cfg.raw_dir}")
 
     for sample_dir in sample_dirs:
         sample_id = sample_dir.name
         wsi_path = sample_dir / "hne.ome.tif"
-        assert wsi_path.exists()
+        wsi_path = sample_dir / "region.tif"
+        assert wsi_path.exists(), f'{wsi_path} does not exist'
+
         tx_path = sample_dir / "xenium" / "transcripts.parquet"
-        assert tx_path.exists()
+        assert tx_path.exists(), f'{tx_path} does not exist'
+
         cells_path = sample_dir / "cells.parquet"
         structure_sample(
             sample_id,
@@ -37,7 +40,7 @@ def main(data_cfg: DataConfig) -> None:
             tx_path,
             cfg.paths.structured_dir,
             cells_path=cells_path if cells_path.exists() else None,
-            visualize=True,
+            visualize=False,
         )
 
 def cli(argv: list[str] | None = None) -> int:

@@ -3,7 +3,7 @@
 ## HVG Panel Creation
 
 ```bash
-N_TOP_GENES=50
+N_TOP_GENES=100
 for OUTER in 0 1 2 3; do
     SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
     SPLIT_DIR=cells
@@ -15,7 +15,7 @@ for OUTER in 0 1 2 3; do
         --time=04:00:00 \
         --output=$HOME/logs/%j.out \
         --wrap="uv run python scripts/artifacts/create_panel.py \
-            --config configs/artifacts/beat/unil/expr-hvg.yaml \
+            --config configs/artifacts/beat/unil/cells-hvg.yaml \
             --panel.n_top_genes ${N_TOP_GENES} \
             --panel.metadata_path ${METADATA_PATH} \
             --panel.name ${PANEL_NAME}"

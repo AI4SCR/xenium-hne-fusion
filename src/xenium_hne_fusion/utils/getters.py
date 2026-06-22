@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+assert load_dotenv()
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -379,6 +382,7 @@ def get_hest_metadata_path(raw_dir: Path) -> Path:
 
 def filter_hest_samples_by_tile_mpp(cfg: PipelineConfig, sample_ids: list[str], metadata_path: Path) -> list[str]:
     from xenium_hne_fusion.download import get_hest_sample_mpp
+    from loguru import logger
     eligible = []
     for sample_id in sample_ids:
         slide_mpp = get_hest_sample_mpp(sample_id, metadata_path)

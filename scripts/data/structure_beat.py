@@ -25,7 +25,7 @@ def main(data_cfg: DataConfig) -> None:
 
     for sample_dir in sample_dirs:
         sample_id = sample_dir.name
-        wsi_path = sample_dir / "region.tiff"
+        wsi_path = sample_dir / "region.tif"
         tx_path = sample_dir / "transcripts" / "transcripts.parquet"
         cells_path = sample_dir / "cells.parquet"
         structure_sample(

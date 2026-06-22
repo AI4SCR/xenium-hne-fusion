@@ -6,6 +6,17 @@
 Steps must run in order; each stage depends on the previous one.
 
 ```bash
+set -a
+source .env
+set +a
+
+mkdir -p "$DATA_DIR"
+GROUP=spatial_100794-pr-g
+chgrp -R "$GROUP" "$DATA_DIR"
+chmod -R g+rw "$DATA_DIR"
+chmod -R g+X "$DATA_DIR"
+find "$DATA_DIR" -type d -exec chmod g+s {} +
+
 # 1. Transfer cell annotations into the raw data directory as cells_.parquet
 chmod u+x scripts/data/copy-cell-annotations-to-raw-data-beat-realign.sh && scripts/data/copy-cell-annotations-to-raw-data-beat-realign.sh
 
@@ -20,7 +31,7 @@ uv run python scripts/data/structure_beat.py --config configs/data/remote/beat.y
 JOB_IDS=()
 for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/beat.yaml); do
     JOB_ID=$(sbatch --parsable \
-        --cpus-per-task=8 --mem=128G --time=04:00:00 \
+        --cpus-per-task=8 --mem=400G --time=04:00:00 \
         --output=$HOME/logs/${SAMPLE_ID}_%j.out \
         --job-name=beat_${SAMPLE_ID} \
         --wrap="uv run python scripts/data/process_beat.py \
@@ -47,8 +58,8 @@ mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${
 #    expr:            expression task items and splits
 #    expr-with-cells: expression task with cell-type features
 #    cells:           cell-type prediction items and splits (also used as the canonical split for expr)
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
+# uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr.yaml
+# uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/expr-with-cells.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/beat/unil/cells.yaml
 
 # 7. Warmup cache (optional — pre-populates tile feature cache before GPU training).
@@ -65,6 +76,7 @@ sbatch \
         --config configs/train/beat/${TASK}/early-fusion.yaml \
         --data.items_path ${ITEMS_PATH} \
         --data.panel_path ${PANEL_PATH} \
+        --metadata-path null \
         --data.cache_dir=${TASK}/${PANEL_NAME}"
 
 TASK=cell_types
