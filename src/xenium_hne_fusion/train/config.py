@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 @dataclass
 class TaskConfig:
-    target: Literal['expression', 'cell_types'] | None = None
+    target: Literal['expression', 'cell_types', 'rgb'] | None = None
 
 
 @dataclass
