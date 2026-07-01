@@ -112,6 +112,9 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
         pos_embed_layer_name=cfg.backbone.pos_embed_layer_name,
         freeze_morph_encoder=cfg.backbone.freeze_morph_encoder,
         freeze_expr_encoder=cfg.backbone.freeze_expr_encoder,
+        set_vision_to_zero=cfg.backbone.set_vision_to_zero,
+        normalize_expr_tokens=cfg.backbone.normalize_expr_tokens,
+        drop_num_vision_tokens=cfg.backbone.drop_num_vision_tokens,
     )
 
     embed_dim = infer_head_input_dim(
@@ -255,7 +258,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         assert 'image' not in fit_item['modalities']
         assert 'image' not in val_item['modalities']
         assert 'image' not in test_item['modalities']
-    elif cfg.wandb.name in ['early-fusion', 'late-fusion']:
+    elif cfg.wandb.name in ['early-fusion-vit', 'early-fusion', 'late-fusion-tile', 'late-fusion-token', 'late-fusion-token-vit']:
         assert 'image' in fit_item['modalities']
         assert 'image' in val_item['modalities']
         assert 'image' in test_item['modalities']

@@ -33,6 +33,7 @@ dependencies = [
     "transformers>=4.47",
     "wandb",
     "wsidata",
+    "scikit-bio>=0.7.3",
 ]
 
 [dependency-groups]

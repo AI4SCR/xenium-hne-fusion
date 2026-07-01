@@ -8,17 +8,18 @@ load_dotenv(override=True)
 
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
-# fast_dev_run = debug = True
-# from pathlib import Path
+fast_dev_run = debug = True
+from pathlib import Path
 # cfg = Config.from_yaml(Path("/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/train/beat/rgb/expr-token.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/expression/late-fusion.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/expression/vision.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-token.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-tile.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/cell_types/expr-token-vit.yaml"))
+# cfg = Config.from_yaml(Path("/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/train/beat/conch_labels/early-fusion.yaml"))
 # train(cfg, debug=debug)
 
-
+#%%
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", action="config")

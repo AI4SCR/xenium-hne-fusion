@@ -31,7 +31,7 @@ class TileDataset(Items):
     """
 
     def __init__(self, *,
-                 target: Literal['cell_types', 'expression'],
+                 target: Literal['cell_types', 'expression', 'rgb'],
                  source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
                  include_image: bool = False,
@@ -56,7 +56,7 @@ class TileDataset(Items):
         self.expr_pool = expr_pool
         self.cell_type_col = cell_type_col
 
-        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb'], "target_panel must be specified when target is 'expression'"
+        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb', 'conch'], "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
@@ -67,7 +67,9 @@ class TileDataset(Items):
         tile_dir = Path(item['tile_dir'])
 
         if self.cache_dir is not None and self.has_cache(iid=iid):
+            conch_class = item.get('conch_class', -1)
             item = torch.load(self.get_cache_path(iid), weights_only=False)
+            item['conch_class'] = conch_class
             item['rgb'] = item['modalities']['image'].float().mean(dim=(1, 2))
             if not self.include_image:
                 item['modalities'].pop('image', None)
@@ -79,22 +81,6 @@ class TileDataset(Items):
                 expr = pd.read_parquet(tile_dir / f'expr-kernel_size=16.parquet')
                 if 'token_index' in expr.columns:
                     expr = expr.drop(columns=['token_index'])
-
-            # construct target
-            if self.target == 'expression':
-                assert self.target_panel is not None
-                missing = sorted(set(self.target_panel) - set(expr.columns))
-                assert not missing, f'missing target genes: {missing[:8]}'
-                target = expr[self.target_panel].sum()
-            elif self.target == 'cell_types':
-                cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
-                assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
-                target = cell_types[self.cell_type_col].value_counts().sort_index()
-            else:
-                raise ValueError(f"Unsupported target: {self.target}")
-
-            target = torch.tensor(target.values, dtype=torch.float32)
-            item['target'] = target
 
             modalities = {}
             if self.include_image:
@@ -109,6 +95,26 @@ class TileDataset(Items):
                 modalities['expr_tokens'] = source
 
             item['modalities'] = modalities
+
+            # construct target
+            if self.target == 'expression':
+                assert self.target_panel is not None
+                missing = sorted(set(self.target_panel) - set(expr.columns))
+                assert not missing, f'missing target genes: {missing[:8]}'
+                target = expr[self.target_panel].sum()
+                target = torch.tensor(target.values, dtype=torch.float32)
+            elif self.target == 'cell_types':
+                cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
+                assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
+                target = cell_types[self.cell_type_col].value_counts().sort_index()
+                target = torch.tensor(target.values, dtype=torch.float32)
+            elif self.target == 'rgb':
+                target = item['modalities']['image'].float().mean(dim=(1, 2))
+                item['rgb'] = target
+            else:
+                raise ValueError(f"Unsupported target: {self.target}")
+
+            item['target'] = target
 
         if self.include_expr and self.expr_pool == 'tile':
             item['modalities']['expr_tokens'] = item['modalities']['expr_tokens'].mean(dim=0)

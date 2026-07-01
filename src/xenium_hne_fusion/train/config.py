@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 @dataclass
 class TaskConfig:
-    target: Literal['expression', 'cell_types', 'rgb'] | None = None
+    target: Literal['expression', 'cell_types', 'rgb', 'conch'] | None = None
 
 
 @dataclass
@@ -37,6 +37,9 @@ class BackboneConfig:
     pos_embed_layer_name: str = '_pos_embed'
     freeze_morph_encoder: bool = False
     freeze_expr_encoder: bool = False
+    set_vision_to_zero: bool = False
+    normalize_expr_tokens: bool = True
+    drop_num_vision_tokens: int = 0
 
 
 @dataclass

@@ -1,26 +1,32 @@
-"""Evaluate a trained early-fusion model with expression tokens randomly permuted.
+"""Evaluate a trained early-fusion model with vision tokens zeroed out.
 
-Loads a checkpoint by W&B run_id, enables token permutation on the backbone, and
-runs N independent test passes to estimate the permutation baseline (mean ± std).
+Loads a checkpoint by W&B run_id, zeros vision tokens on the backbone, and
+runs a test pass to measure performance without morphology information.
 
 Usage:
-    uv run python scripts/baselines/early-fusion-permuted.py \
+    uv run python scripts/baselines/early-fusion-zeroed.py \
         --entity chuv --project xe-hne-fus-expr-v0 --run_id <run_id>
-    uv run python scripts/baselines/early-fusion-permuted.py \
+    uv run python scripts/baselines/early-fusion-zeroed.py \
         --entity chuv --project xe-hne-fus-expr-v0 --run_id <run_id> --debug true
-40utmvmw
+
+concat: 9cukk99t oub4bwu9 lt9tpohq mx7vx5bi
+
 for run_id in 40utmvmw j5x4suw2 owzcohia fif5wuld; do
-    uv run python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/baselines/early-fusion-permuted.py --config configs/baselines/early-fusion-permuted.yaml --run_id $run_id
+    uv run python scripts/baselines/early-fusion-zeroed.py --run_id $run_id
 done
+
+for run_id in 9cukk99t oub4bwu9 lt9tpohq mx7vx5bi; do
+    uv run python scripts/baselines/early-fusion-zeroed.py --run_id $run_id
+done
+
 
 
 """
 from dataclasses import dataclass
-import json
+
 import pandas as pd
 
 import lightning as L
-import torch
 from dotenv import load_dotenv
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -41,12 +47,9 @@ class Config:
     entity: str = "chuv"
     project: str = "xe-hne-fus-cell-v1"
     run_id: str = "40utmvmw"
-    n_permutations: int = 3
-    permute_mode: str = "in-tile"  # 'in-tile' or 'in-batch'
-    permute_expr_tokens: bool = False
-    permute_vision_tokens: bool = True
+    ablation: str = 'zero-out-vision'
     debug: bool = False
-    items_path: Path | None = None
+    items_path: Path = Path('high_diversity.json')
 
 # cfg = Config()
 # cfg.debug = True
@@ -58,7 +61,7 @@ def main(cfg: Config) -> None:
     assert cfg.run_id, "run_id must be set"
     resolved = resolve_pretrained_run(cfg)
 
-    save_dir = get_managed_paths(resolved.source_config.data.name).output_dir / 'baselines' / 'permutation'
+    save_dir = get_managed_paths(resolved.source_config.data.name).output_dir / 'ablations'
     save_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f'Saving results to {save_dir}')
 
@@ -69,11 +72,7 @@ def main(cfg: Config) -> None:
     lit = build_supervised_lit(resolved_training, checkpoint_path=resolved.checkpoint_path)
     lit.eval()
 
-    # Enable permutation on the loaded backbone
-    assert hasattr(lit.backbone, "permute_expr_tokens"), "backbone missing permute_expr_tokens"
-    assert hasattr(lit.backbone, "permute_vision_tokens"), "backbone missing permute_vision_tokens"
-    assert cfg.permute_mode in ('in-tile', 'in-batch'), f"permute_mode must be 'in-tile' or 'in-batch', got {cfg.permute_mode!r}"
-    assert cfg.permute_expr_tokens or cfg.permute_vision_tokens, "at least one of permute_expr_tokens or permute_vision_tokens must be True"
+    assert hasattr(lit.backbone, "set_vision_to_zero"), "backbone missing set_vision_to_zero"
 
     dataset_kws = build_supervised_dataset_kws(resolved_training)
     if cfg.items_path is not None:
@@ -112,43 +111,34 @@ def main(cfg: Config) -> None:
 
     dl_test = DataLoader(ds_test, **dataloader_kws)
 
-    permute_label = '+'.join(
-        [s for s, flag in [('expr', cfg.permute_expr_tokens), ('vision', cfg.permute_vision_tokens)] if flag]
-    )
-
-    # without permutation
-    lit.backbone.permute_expr_tokens = None
-    lit.backbone.permute_vision_tokens = None
+    # without ablation
     trainer = L.Trainer(**trainer_kws)
     results, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
     logger.info(f"Unpermuted: {results}")
 
     results = pd.DataFrame(results, index=[0])
-    results['permute_mode'] = 'unpermuted'
+    results['ablation'] = 'none'
 
-    # with permutation
-    lit.backbone.permute_expr_tokens = cfg.permute_mode if cfg.permute_expr_tokens else None
-    lit.backbone.permute_vision_tokens = cfg.permute_mode if cfg.permute_vision_tokens else None
-    for i in range(cfg.n_permutations):
-        trainer = L.Trainer(**trainer_kws)
-        res, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
-        logger.info(f"[{permute_label}/{cfg.permute_mode}] Permutation {i + 1}/{cfg.n_permutations}: {res}")
+    # with ablation
+    lit.backbone.set_vision_to_zero = True
+    trainer = L.Trainer(**trainer_kws)
+    res, = trainer.test(model=lit, dataloaders=dl_test, verbose=False)
+    logger.info(f"Zeroed vision: {res}")
 
-        res = pd.DataFrame(res, index=[0])
-        res['permute_mode'] = f'{permute_label}/{cfg.permute_mode}'
-        results = pd.concat([results, res])
+    res = pd.DataFrame(res, index=[0])
+    res['ablation'] = cfg.ablation
+    results = pd.concat([results, res])
 
     results = results.reset_index(drop=True)
     results['items'] = str(ds_test.items_path)
     output_dir = get_managed_paths(resolved.source_config.data.name).output_dir
-    save_path = output_dir / 'baselines' / 'permutation' / cfg.run_id / f'{permute_label}_{cfg.permute_mode}' / f'{ds_test.items_path.stem}.parquet'
+    save_path = output_dir / 'baselines' / 'ablations' / cfg.ablation / cfg.run_id / f'{ds_test.items_path.stem}.parquet'
     save_path.parent.mkdir(parents=True, exist_ok=True)
     results.to_parquet(save_path)
 
-    axes = results.plot.box(column=['test/pearson_mean', 'test/spearman_mean'], by='permute_mode')
-    fig = axes.iloc[0].figure
-    fig.tight_layout()
-    fig.savefig(save_path.with_suffix('.png'))
+    ax = results.set_index('ablation')[['test/pearson_mean', 'test/spearman_mean']].plot.bar(rot=0)
+    ax.figure.tight_layout()
+    ax.figure.savefig(save_path.with_suffix('.png'))
 
 # %%
 if __name__ == "__main__":

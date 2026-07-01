@@ -1,8 +1,8 @@
 task:
-  target: cell_types
+  target: conch
 
 head:
-  output_dim: 39
+  output_dim: 32
   num_hidden_layers: 0
 
 backbone:
@@ -15,31 +15,29 @@ backbone:
     num_hidden_layers: 1
     dropout: 0.1
   fusion_strategy: add
-  fusion_stage: late
+  fusion_stage: early
   use_proj: true
   learnable_gate: false
-  expr_token_pool: avg
-  morph_token_pool: token
-  global_pool: null
+  global_pool: token
 
 data:
   name: beat
   num_workers: 10
   batch_size: 256
   expr_pool: token
-  items_path: cells.json
+  items_path: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v0/03_output/beat/figures/items_with_conch_labels.json
   metadata_path: cells/outer=0-inner=0-seed=0.parquet
   panel_path: default.yaml
   cache_dir: cell_types/default
 
 lit:
-  target_key: target
+  target_key: conch_class
   lr_head: 1.0e-4
   lr_backbone: 1.0e-5
 
 wandb:
   project: xe-hne-fus-cell-v1
-  name: late-fusion-token
+  name: early-fusion
   tags: [beat, lung]
 
 trainer:
