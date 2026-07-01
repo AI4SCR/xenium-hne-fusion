@@ -25,13 +25,13 @@ for OUTER in 0; do
         CONFIG=configs/train/beat/conch_labels/${MODEL}.yaml
 
 #        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
-        uv run python scripts/train/supervised.py \
-                --config ${CONFIG} \
-                --data.items_path ${ITEMS_PATH} \
-                --data.metadata_path ${METADATA_PATH} \
-                --data.panel_path ${PANEL_PATH} \
-                --data.cache_dir=${TASK}/${PANEL_NAME} \
-                --debug=True
+#        uv run python scripts/train/supervised.py \
+#                --config ${CONFIG} \
+#                --data.items_path ${ITEMS_PATH} \
+#                --data.metadata_path ${METADATA_PATH} \
+#                --data.panel_path ${PANEL_PATH} \
+#                --data.cache_dir=${TASK}/${PANEL_NAME} \
+#                --debug=True
 #        continue
         
         # Main run (GPU)

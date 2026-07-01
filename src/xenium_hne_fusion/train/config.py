@@ -7,6 +7,7 @@ from typing import Any, Literal
 @dataclass
 class TaskConfig:
     target: Literal['expression', 'cell_types', 'rgb', 'conch'] | None = None
+    type: Literal['regression', 'classification'] = 'regression'
 
 
 @dataclass

@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from glom import glom
 from torchmetrics import MetricCollection
+from torchmetrics.classification import MulticlassAccuracy, MulticlassF1Score
 from torchmetrics.regression import (
     MeanSquaredError,
     PearsonCorrCoef,
@@ -283,4 +284,179 @@ class RegressionLit(L.LightningModule):
                 "interval": "epoch",
                 "frequency": 1,
             },
+        }
+
+
+class ClassificationLit(L.LightningModule):
+    def __init__(
+        self,
+        backbone: nn.Module,
+        head: nn.Module,
+        num_classes: int,
+        batch_key: str | None = "modalities",
+        target_key: str = "target",
+        lr_head: float = 1e-4,
+        lr_backbone: float = 1e-5,
+        lr_alpha: float = 1e-3,
+        weight_decay: float = 1e-3,
+        eta: float = 1e-6,
+        schedule: str | None = "cosine",
+        max_epochs: int = 35,
+        num_warmup_epochs: int = 5,
+        pooling: str | None = None,
+        save_hparams: bool = True,
+    ):
+        super().__init__()
+
+        self.backbone = backbone
+        self.head = head
+        self.num_classes = num_classes
+        self.pooling = pooling
+        self.batch_key = batch_key
+        self.target_key = target_key
+
+        self.lr_head = lr_head
+        self.lr_backbone = lr_backbone
+        self.lr_alpha = lr_alpha
+        self.weight_decay = weight_decay
+
+        self.criterion = nn.CrossEntropyLoss()
+
+        metrics = MetricCollection({
+            "accuracy": MulticlassAccuracy(num_classes=num_classes),
+            "f1": MulticlassF1Score(num_classes=num_classes, average="macro"),
+        })
+        self.train_metrics = metrics.clone(prefix="train/")
+        self.valid_metrics = metrics.clone(prefix="val/")
+        self.test_metrics = metrics.clone(prefix="test/")
+
+        self.schedule = schedule
+        self.eta = eta
+        self.max_epochs = max_epochs
+        self.num_warmup_epochs = num_warmup_epochs
+
+        if save_hparams:
+            self.save_hyperparameters(ignore=["head", "backbone"])
+
+    def transfer_batch_to_device(self, batch, device, dataloader_idx):
+        from lightning_utilities.core.apply_func import apply_to_collection
+        batch = apply_to_collection(
+            batch, dtype=torch.Tensor,
+            function=lambda t: t.to(torch.float32) if t.dtype == torch.float64 else t,
+        )
+        return super().transfer_batch_to_device(batch, device, dataloader_idx)
+
+    def _log_alpha(self, *, stage: str, batch_size: int) -> None:
+        fusion_alpha = getattr(self.backbone, "fusion_alpha", None)
+        if fusion_alpha is None:
+            return
+        alpha = self.backbone.get_fusion_gate().detach().squeeze()
+        self.log(f"{stage}/alpha", alpha, on_step=True, on_epoch=True, batch_size=batch_size, add_dataloader_idx=False)
+
+    def shared_step(self, batch: dict, batch_idx: int):
+        x = glom(batch, self.batch_key) if self.batch_key is not None else batch
+        y = glom(batch, self.target_key)
+        assert y.ndim == 1, f"Classification target must be 1-D, got shape {y.shape}"
+        y = y.long()
+
+        z = self.backbone(x)
+        z = pool(z, strategy=self.pooling)
+        y_hat = self.head(z)
+        assert y_hat.ndim == 2 and y_hat.shape[1] == self.num_classes
+
+        loss = self.criterion(y_hat, y)
+        return z, y_hat, y, loss
+
+    def training_step(self, batch, batch_idx: int):
+        z, y_hat, y, loss = self.shared_step(batch, batch_idx)
+        batch_size = int(y.shape[0])
+        self.log("loss/train", loss, on_step=True, on_epoch=True, batch_size=batch_size)
+        self._log_alpha(stage="train", batch_size=batch_size)
+        self.train_metrics.update(y_hat, y)
+        batch["loss"] = loss
+        batch["y_hat"] = y_hat.detach().cpu()
+        batch["y"] = y.detach().cpu()
+        batch["z"] = z.detach().cpu()
+        return batch
+
+    def on_train_epoch_end(self) -> None:
+        if not self.trainer.fast_dev_run:
+            self.log_dict(self.train_metrics)
+
+    def validation_step(self, batch, batch_idx: int):
+        z, y_hat, y, loss = self.shared_step(batch, batch_idx)
+        batch_size = int(y.shape[0])
+        self.log("loss/val", loss, on_step=False, on_epoch=True, batch_size=batch_size)
+        self._log_alpha(stage="val", batch_size=batch_size)
+        self.valid_metrics.update(y_hat, y)
+        batch["loss"] = loss
+        batch["y_hat"] = y_hat.detach().cpu()
+        batch["y"] = y.detach().cpu()
+        batch["z"] = z.detach().cpu()
+        return batch
+
+    def on_validation_epoch_end(self) -> None:
+        if not self.trainer.fast_dev_run:
+            self.log_dict(self.valid_metrics)
+
+    def test_step(self, batch, batch_idx: int):
+        z, y_hat, y, loss = self.shared_step(batch, batch_idx)
+        batch_size = int(y.shape[0])
+        self.log("loss/test", loss, on_step=False, on_epoch=True, batch_size=batch_size)
+        self._log_alpha(stage="test", batch_size=batch_size)
+        self.test_metrics.update(y_hat, y)
+        batch["loss"] = loss
+        batch["y_hat"] = y_hat.detach().cpu()
+        batch["y"] = y.detach().cpu()
+        batch["z"] = z.detach().cpu()
+        return batch
+
+    def on_test_epoch_end(self) -> None:
+        if not self.trainer.fast_dev_run:
+            self.log_dict(self.test_metrics)
+
+    def predict_step(self, batch, batch_idx: int):
+        x = glom(batch, self.batch_key) if self.batch_key is not None else batch
+        z = self.backbone(x)
+        z = pool(z, strategy=self.pooling)
+        y_hat = self.head(z)
+        batch["prediction"] = y_hat.detach().cpu()
+        batch["y_hat"] = y_hat.detach().cpu()
+        batch["z"] = z.detach().cpu()
+        y = glom(batch, self.target_key)
+        assert isinstance(y, torch.Tensor)
+        batch["y"] = y.detach().cpu()
+        return batch
+
+    def configure_optimizers(self):
+        fusion_alpha = self.backbone.fusion_alpha
+        param_groups = [
+            {"params": self.head.parameters(), "lr": self.lr_head},
+            {
+                "params": [p for p in self.backbone.parameters() if p.requires_grad and p is not fusion_alpha],
+                "lr": self.lr_backbone,
+            },
+        ]
+        if fusion_alpha.requires_grad:
+            param_groups.append({"params": [fusion_alpha], "lr": self.lr_alpha, "weight_decay": 0.0})
+
+        optimizer = optim.AdamW(param_groups, weight_decay=self.weight_decay)
+
+        if self.schedule is None:
+            return optimizer
+
+        max_epochs = getattr(self.trainer, "max_epochs", None) or self.max_epochs
+
+        warmup_scheduler = optim.lr_scheduler.LinearLR(
+            optimizer, start_factor=1e-2, end_factor=1.0, total_iters=self.num_warmup_epochs,
+        )
+        cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=max_epochs - self.num_warmup_epochs, eta_min=self.eta,
+        )
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[self.num_warmup_epochs],
+        )
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {"scheduler": scheduler, "interval": "epoch", "frequency": 1},
         }

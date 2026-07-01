@@ -1,5 +1,6 @@
 task:
   target: conch
+  type: classification
 
 head:
   output_dim: 32

@@ -27,7 +27,7 @@ from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
 from xenium_hne_fusion.train.config import Config
-from xenium_hne_fusion.train.lit import RegressionLit
+from xenium_hne_fusion.train.lit import ClassificationLit, RegressionLit
 from xenium_hne_fusion.train.utils import (
     ResolvedTrainingConfig,
     infer_head_input_dim,
@@ -66,7 +66,7 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit:
+def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
     cfg = resolved.cfg
     num_source_genes = resolved.num_source_genes
     num_outputs = resolved.num_outputs
@@ -134,11 +134,9 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
         dropout=cfg.head.dropout,
     )
 
-    lit_kws = dict(
+    common_kws = dict(
         backbone=backbone,
         head=head,
-        num_outputs=num_outputs,
-        target_names=target_names,
         batch_key="modalities",
         target_key=cfg.lit.target_key,
         lr_head=cfg.lit.lr_head,
@@ -150,9 +148,17 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
         num_warmup_epochs=cfg.lit.num_warmup_epochs,
         save_hparams=False,
     )
+
+    if cfg.task.type == "classification":
+        lit_cls = ClassificationLit
+        lit_kws = {**common_kws, "num_classes": num_outputs}
+    else:
+        lit_cls = RegressionLit
+        lit_kws = {**common_kws, "num_outputs": num_outputs, "target_names": target_names}
+
     if checkpoint_path is not None:
-        return RegressionLit.load_from_checkpoint(checkpoint_path=checkpoint_path, **lit_kws)
-    return RegressionLit(**lit_kws)
+        return lit_cls.load_from_checkpoint(checkpoint_path=checkpoint_path, **lit_kws)
+    return lit_cls(**lit_kws)
 
 
 def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
@@ -293,8 +299,10 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         },
     )
 
-    monitor = "val/mse_mean"
-    mode = "min"
+    if cfg.task.type == "classification":
+        monitor, mode = "val/accuracy", "max"
+    else:
+        monitor, mode = "val/mse_mean", "min"
     callbacks = [
         LogModelStats(),
         LogWandbRunMetadataCallback(),

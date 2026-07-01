@@ -8,7 +8,7 @@ load_dotenv(override=True)
 
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
-fast_dev_run = debug = True
+# fast_dev_run = debug = True
 from pathlib import Path
 # cfg = Config.from_yaml(Path("/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/train/beat/rgb/expr-token.yaml"))
 # # cfg = Config.from_yaml(Path("configs/train/beat/expression/late-fusion.yaml"))
