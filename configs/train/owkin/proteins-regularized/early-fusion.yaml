@@ -1,0 +1,51 @@
+task:
+  target: proteins
+  type: regression
+
+head:
+  output_dim: 27
+  num_hidden_layers: 0
+
+backbone:
+  morph_encoder_name: vit_small_patch16_224
+  morph_encoder_kws:
+    img_size: 224
+    drop_rate: 0.2
+    drop_path_rate: 0.1
+  expr_encoder_name: mlp
+  expr_encoder_kws:
+    output_dim: 32
+    num_hidden_layers: 1
+    dropout: 0.1
+  fusion_strategy: add
+  fusion_stage: early
+  use_proj: true
+  learnable_gate: false
+  global_pool: token
+
+data:
+  name: owkin
+  num_workers: 8
+  batch_size: 256
+  expr_pool: token
+  augment_images: jitter
+  items_path: cells.json
+  metadata_path: cells/outer=0-inner=0-seed=0.parquet
+  panel_path: owkin-beat.yaml
+  cache_dir: protein/owkin-beat
+
+lit:
+  target_key: proteins
+  lr_head: 1.0e-4
+  lr_backbone: 1.0e-5
+
+wandb:
+  project: xe-hne-fus-protein-v0
+  name: early-fusion
+  tags: [beat, lung]
+
+trainer:
+  max_time: 00:04:00:00
+  max_epochs: 35
+  accumulate_grad_batches: 2
+  gradient_clip_val: 1.0

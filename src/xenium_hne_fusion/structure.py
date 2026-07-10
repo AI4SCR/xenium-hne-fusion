@@ -20,6 +20,7 @@ def structure_sample(
     transcripts_path: Path,
     structured_dir: Path,
     cells_path: Path | None = None,
+    cell_features_dir: Path | None = None,
     visualize: bool = True,
 ) -> None:
     """Create canonical sample dir with symlinked sample artifacts and visualizations."""
@@ -31,6 +32,10 @@ def structure_sample(
     symlink(transcripts_path, out / "transcripts.parquet")
     if cells_path is not None:
         symlink(cells_path, out / "cells.parquet")
+
+    if cell_features_dir is not None:
+        symlink(cell_features_dir, out / "cell_features")
+
     if visualize:
         save_sample_overview(out / "wsi.tiff", out / "transcripts.parquet", out)
         if cells_path is not None:

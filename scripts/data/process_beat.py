@@ -12,16 +12,16 @@ from xenium_hne_fusion.config import DataConfig
 from xenium_hne_fusion.processing import extract_tiles, process_cells, process_tiles, tile_cells, tile_transcripts
 from xenium_hne_fusion.processing_cli import parse_data_args
 from xenium_hne_fusion.tiling import detect_tissues, tile_tissues
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL, build_pipeline_config, select_sample_ids
+from xenium_hne_fusion.utils.getters import build_pipeline_config, select_sample_ids
 
 
 def main(
     data_cfg: DataConfig,
     overwrite: bool = False,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> None:
     assert data_cfg.name == "beat", f"Expected dataset='beat', got {data_cfg.name!r}"
     cfg = build_pipeline_config(data_cfg)
+    cell_type_col = data_cfg.cell_type_col
     sample_ids = select_sample_ids(
         sorted(p.name for p in cfg.paths.structured_dir.iterdir() if p.is_dir()),
         cfg.data.filter,

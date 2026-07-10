@@ -14,9 +14,6 @@ from xenium_hne_fusion.processing import (
     tile_cells,
     tile_transcripts,
 )
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
-
-
 def main(
     wsi_path: Path,
     tiles_parquet: Path,
@@ -29,7 +26,7 @@ def main(
     img_size: int,
     kernel_size: int = 16,
     cells_path: Optional[Path] = None,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+    cell_type_col: str | None = None,
 ) -> None:
     tiles = gpd.read_parquet(tiles_parquet)
     extract_tiles(wsi_path, tiles, output_dir, mpp, native_mpp=native_mpp, img_size=img_size)

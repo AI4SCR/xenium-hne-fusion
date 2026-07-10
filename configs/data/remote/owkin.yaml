@@ -1,4 +1,5 @@
 name: owkin
+cell_type_col: first_type
 tiles:
   tile_px: 512
   stride_px: 256

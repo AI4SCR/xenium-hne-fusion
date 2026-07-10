@@ -8,10 +8,7 @@ backbone:
   morph_encoder_name: null
   morph_encoder_kws: null
   expr_encoder_name: vit_small_patch16_224
-  expr_encoder_kws:
-    output_dim: 32
-    num_hidden_layers: 1
-    dropout: 0.1
+  expr_encoder_kws: null
   fusion_strategy: null
   fusion_stage: null
   use_proj: false

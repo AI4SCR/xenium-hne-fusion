@@ -9,17 +9,40 @@ set -a
 source /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/.env
 set + a
 
-for SAMPLE_DIR in $OWKIN_RAW_DIR/CH_*; do
+for SAMPLE_DIR in $DATA_DIR/01_structured/owkin/CH_*; do
+
     [ -d "$SAMPLE_DIR" ] || continue
 
-    # SAMPLE_NAME=$(basename "$SAMPLE_DIR")
-    # SAVE_DIR="$DATA_DIR/01_structured/owkin/$SAMPLE_NAME"
-    # SAVE_DIR=$SAMPLE_DIR
-    # mkdir -p $SAVE_DIR
-    # SAVE_PATH="$SAVE_DIR/region.tif"
+    echo "$SAMPLE_DIR/wsi.tiff->$SAMPLE_DIR/tmp.tiff"
+    vips tiffsave $SAMPLE_DIR/wsi.tiff $SAMPLE_DIR/tmp.tiff --tile --pyramid --tile-width 512 --tile-height 512 --compression deflate --bigtiff
+    mv $SAMPLE_DIR/tmp.tiff $SAMPLE_DIR/wsi.tiff
+done
 
-    echo "$SAMPLE_DIR/hne.ome.tif->$SAMPLE_DIR/region.tif"
-    vips tiffsave $SAMPLE_DIR/hne.ome.tif $SAMPLE_DIR/region.tif --tile --pyramid --tile-width 512 --tile-height 512 --compression deflate --bigtiff
+
+for SAMPLE_DIR in "$DATA_DIR"/01_structured/owkin/CH_*; do
+
+    [ -d "$SAMPLE_DIR" ] || continue
+
+    SAMPLE_ID="$(basename "$SAMPLE_DIR")"
+    echo '${SAMPLE_DIR}/wsi.tiff -> ${SAMPLE_DIR}/tmp.tiff'
+
+    sbatch \
+        --job-name="vips_${SAMPLE_ID}" \
+        --cpus-per-task=10 \
+        --mem=256G \
+        --time=04:00:00 \
+        --wrap="
+            vips tiffsave '${SAMPLE_DIR}/wsi.tiff' '${SAMPLE_DIR}/tmp.tiff' \
+                --tile \
+                --pyramid \
+                --tile-width 512 \
+                --tile-height 512 \
+                --compression deflate \
+                --bigtiff
+            mv '${SAMPLE_DIR}/tmp.tiff' '${SAMPLE_DIR}/wsi.tiff'
+
+        "
+
 done
 """
 

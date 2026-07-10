@@ -89,7 +89,12 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
     else:
         logger.info('Skipping panel creation: no panel config provided')
 
-    compute_items_stats(filtered_items_path, managed_paths.output_dir, overwrite=overwrite)
+    compute_items_stats(
+        filtered_items_path,
+        managed_paths.output_dir,
+        cell_type_col=artifacts_cfg.cell_type_col,
+        overwrite=overwrite,
+    )
 
 
 def cli(argv: list[str] | None = None) -> int:

@@ -8,6 +8,7 @@ import numpy as np
 from loguru import logger
 from spatialdata.models import ShapesModel
 from wsidata import open_wsi
+import matplotlib.pyplot as plt
 
 
 def detect_tissues(wsi_path: Path, output_parquet: Path) -> None:
@@ -20,6 +21,13 @@ def detect_tissues(wsi_path: Path, output_parquet: Path) -> None:
     logger.info(f"Detecting tissues: {wsi_path.name}")
     wsi = open_wsi(wsi_path)
     zs.pp.find_tissues(wsi)
+
+    _, ax = plt.subplots()
+    zs.pl.tissue(wsi, ax=ax)
+    # ax.figure.show()
+    ax.figure.savefig(output_parquet.with_suffix('.png'))
+    plt.close('all')
+
     tissues: gpd.GeoDataFrame = wsi["tissues"]
     logger.info(f"Found {len(tissues)} tissue region(s)")
     output_parquet.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +56,12 @@ def tile_tissues(
     wsi = open_wsi(wsi_path)
     wsi["tissues"] = ShapesModel.parse(gpd.read_parquet(tissues_parquet))
     zs.pp.tile_tissues(wsi, tile_px=tile_px, stride_px=stride_px, mpp=mpp, slide_mpp=slide_mpp)
+
+    _, ax = plt.subplots()
+    zs.pl.tiles(wsi, ax=ax)
+    # ax.figure.show()
+    ax.figure.savefig(output_parquet.with_suffix('.png'))
+    plt.close('all')
 
     tiles: gpd.GeoDataFrame = wsi["tiles"].copy()
     bounds = tiles.geometry.bounds  # minx, miny, maxx, maxy

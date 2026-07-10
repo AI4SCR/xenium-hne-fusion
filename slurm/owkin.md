@@ -7,19 +7,17 @@ Steps must run in order; each stage depends on the previous one.
 
 ```bash
 # 1. Transfer cell annotations into the raw data normalize_cell_type_categoriesdirectory.
-# TODO
-# chmod u+x scripts/data/copy-cell-annotations-to-raw-data.sh && scripts/data/copy-cell-annotations-to-raw-data.sh
-
-# TODO
-# uv run python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scripts/data/save-cell-coords-in-geometry-owkin.py
 
 # 2. Structure raw OWKIN data into 01_structured/<name>/.
 uv run python scripts/data/structure_owkin.py --config configs/data/remote/owkin.yaml
 
+uv run python /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/scribble/convert-owkin-to-pyramidal.py
+
 # 3. Tile slides, extract transcripts and cell annotations — one job per sample.
 #    Cell annotations are included automatically when cells.parquet is present.
 JOB_IDS=()
-for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/owkin.yaml); do
+#for SAMPLE_ID in $(uv run python scripts/data/list_samples.py --config configs/data/remote/owkin.yaml); do
+for SAMPLE_ID in CH_C_518a_x2  CH_C_525a_x2  CH_C_527a_x2  CH_D_529a_x2  CH_D_531a_x2  CH_G_532a_x2  CH_G_534a_x1  CH_G_535a_xr  CH_C_523a_x2  CH_C_526a_x1  CH_C_527a_xr  CH_D_530a_x2  CH_D_531a_xr  CH_G_533a_x2  CH_G_535a_x2  CH_G_536a_x2; do
     JOB_ID=$(sbatch --parsable \
         --cpus-per-task=8 --mem=128G --time=06:00:00 \
         --output=$HOME/logs/%j.out \
@@ -38,23 +36,18 @@ sbatch --dependency=${DEPENDENCY} \
     --output=$HOME/logs/%j.out \
     --job-name=beat_finalize \
     --wrap="uv run python scripts/data/create_items.py --config configs/data/remote/owkin.yaml && \
-            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/owkin.yaml"
+            uv run python scripts/data/compute_all_items_stats.py --config configs/data/remote/owkin.yaml --cell-type-col first_type"
 
 # 5. Copy the default gene panel into the managed output directory.
-#mkdir -p "${DATA_DIR}/03_output/beat/panels/" && cp panels/beat/default.yaml "${DATA_DIR}/03_output/beat/panels/"
+mkdir -p "${DATA_DIR}/03_output/owkin/panels/" && cp panels/owkin/owkin-beat.yaml "${DATA_DIR}/03_output/owkin/panels"
 
 # 6. Create filtered item sets and cross-validated splits.
-#    expr:            expression task items and splits
-#    expr-with-cells: expression task with cell-type features
-#    cells:           cell-type prediction items and splits (also used as the canonical split for expr)
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/expr.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/expr-with-cells.yaml
 uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/cells.yaml
 
 # 7. Warmup cache (optional — pre-populates tile feature cache before GPU training).
-TASK=expression
+TASK=proteins
 ITEMS_PATH=cells.json  # cells items/splits are used for both tasks for consistency
-PANEL_PATH=default.yaml
+PANEL_PATH=owkin-beat.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
 sbatch \
     --cpus-per-task=10 \
@@ -62,7 +55,7 @@ sbatch \
     --time=02:00:00 \
     --output=$HOME/logs/%j.out \
     --wrap="uv run python scripts/artifacts/warmup_cache.py \
-        --config configs/train/beat/${TASK}/early-fusion.yaml \
+        --config configs/train/owkin/${TASK}/early-fusion.yaml \
         --data.items_path ${ITEMS_PATH} \
         --data.panel_path ${PANEL_PATH} \
         --data.cache_dir=${TASK}/${PANEL_NAME}"
@@ -84,23 +77,25 @@ sbatch \
 
 ```bash
 PARTITION=gpu-l40
-TIME=04:30:00
+TIME=09:00:00
+MAX_TIME=00:08:00:00
 MEMORY=64G
 
-TASK=cell_types
-#TASK=expression
+TASK=proteins
 SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
-ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
-PANEL_PATH=default.yaml
+ITEMS_PATH=cells.json  # cells items/splits are used for both tasks for consistency
+PANEL_PATH=owkin-beat.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
-for OUTER in 0 1 2 3; do
-    for MODEL in early-fusion late-fusion-tile late-fusion-token vision expr-tile expr-token; do
+#for OUTER in 0 1 2 3; do
+for OUTER in 0; do
+    for MODEL in early-fusion expr-token-vit late-fusion-tile vision; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
-
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
-
+        CONFIG=configs/train/owkin/${TASK}/${MODEL}.yaml
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir="${TASK}/${PANEL_NAME}"
+#        break
+#        continue
         # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
@@ -115,19 +110,19 @@ for OUTER in 0 1 2 3; do
                 --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
+                --trainer.max_time ${MAX_TIME} \
                 --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
 done
 
 # concat
-for OUTER in 0 1 2 3; do
-    for MODEL in early-fusion late-fusion-tile late-fusion-token; do
+for OUTER in 0; do
+    for MODEL in early-fusion late-fusion-tile; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
+        CONFIG=configs/train/owkin/${TASK}/${MODEL}.yaml
 
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.fusion_strategy concat --debug true --data.cache_dir=null
-
+        # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
             --mem=${MEMORY} \
@@ -135,97 +130,41 @@ for OUTER in 0 1 2 3; do
             --partition=${PARTITION} \
             --time=${TIME} \
             --output=$HOME/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-concat-${OUTER} \
+            --job-name=${TASK}-${MODEL}-${OUTER}-concat \
             --wrap="uv run python scripts/train/supervised.py \
                 --config ${CONFIG} \
                 --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
-                --backbone.fusion_strategy concat \
-                --data.cache_dir=${TASK}/${PANEL_NAME}"
+                --trainer.max_time ${MAX_TIME} \
+                --data.cache_dir=${TASK}/${PANEL_NAME} \
+                --backbone.fusion_strategy concat"
     done
 done
 
-# freeze_morph_encoder=true
-for OUTER in 0 1 2 3; do
-    for MODEL in early-fusion late-fusion-tile late-fusion-token vision; do
-        SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-        METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
-
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.items_path ${ITEMS_PATH} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.freeze_morph_encoder true --debug true --data.cache_dir=null
-
-        sbatch \
-            --cpus-per-task=12 \
-            --mem=${MEMORY} \
-            --gres=gpu:1 \
-            --partition=${PARTITION} \
-            --time=${TIME} \
-            --output=$HOME/logs/%j.out \
-            --job-name=${TASK}-${MODEL}-freeze-morph-${OUTER} \
-            --wrap="uv run python scripts/train/supervised.py \
-                --config ${CONFIG} \
-                --data.items_path ${ITEMS_PATH} \
-                --data.metadata_path ${METADATA_PATH} \
-                --data.panel_path ${PANEL_PATH} \
-                --backbone.freeze_morph_encoder true \
-                --data.cache_dir=${TASK}/${PANEL_NAME}"
-    done
-done
-
-# learnable gate
-#for MODEL in early-fusion late-fusion-tile late-fusion-token; do
-#  for OUTER in 0 1 2 3; do
-#    SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
-#    METADATA_PATH="expr/${SPLIT_NAME}.parquet"
-#    MODEL=early-fusion
-#    CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
-#
-##    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --backbone.learnable_gate true --debug true
-#
-#    sbatch \
-#        --cpus-per-task=12 \
-#        --mem=${MEMORY} \
-#        --gres=gpu:1 \
-#        --partition=${PARTITION} \
-#        --time=${TIME} \
-#        --output=$HOME/logs/%j.out \
-#        --job-name=${TASK}-${MODEL}-gate-${OUTER} \
-#        --wrap="uv run python scripts/train/supervised.py \
-#            --config ${CONFIG} \
-#            --data.metadata_path ${METADATA_PATH} \
-#            --data.panel_path ${PANEL_PATH} \
-#            --backbone.learnable_gate true"
-#  done
-#done
-```
-
-## Evaluation
-```bash
-uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression.yaml
-uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/cell_types.yaml
-uv run python scripts/eval/plot_wandb_scores.py --config configs/eval/beat/expression-cells.yaml
 ```
 
 ```bash
 PARTITION=gpu-l40
-TIME=04:30:00
+TIME=09:00:00
+MAX_TIME=00:08:00:00
 MEMORY=64G
 
-TASK=cell_types
-#TASK=expression
-SPLIT_DIR=cells  # note we only use the cells splits across tasks for consistency
-ITEMS_PATH=cells.json  # note we only use the cells items across tasks for consistency
-PANEL_PATH=default.yaml
+TASK=proteins
+SPLIT_DIR=cells  # note we only use the cells splits across  nexttasks for consistency
+ITEMS_PATH=cells.json  # cells items/splits are used for both tasks for consistency
+PANEL_PATH=owkin-beat.yaml
 PANEL_NAME="${PANEL_PATH%.yaml}"
-for OUTER in 0 1 2 3; do
-    for MODEL in expr-token-vit; do
+#for OUTER in 0 1 2 3; do
+for OUTER in 0; do
+    for MODEL in early-fusion expr-token-vit late-fusion-tile vision; do
         SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
         METADATA_PATH="${SPLIT_DIR}/${SPLIT_NAME}.parquet"
-        CONFIG=configs/train/beat/${TASK}/${MODEL}.yaml
-
-    #    uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
-
+        CONFIG=configs/train/owkin/proteins-regularized/${MODEL}.yaml
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir=null
+#        uv run python scripts/train/supervised.py --config ${CONFIG} --data.metadata_path ${METADATA_PATH} --data.panel_path ${PANEL_PATH} --debug true --data.cache_dir="${TASK}/${PANEL_NAME}"
+#        break
+#        continue
         # Main run (GPU)
         sbatch \
             --cpus-per-task=12 \
@@ -240,6 +179,7 @@ for OUTER in 0 1 2 3; do
                 --data.items_path ${ITEMS_PATH} \
                 --data.metadata_path ${METADATA_PATH} \
                 --data.panel_path ${PANEL_PATH} \
+                --trainer.max_time ${MAX_TIME} \
                 --data.cache_dir=${TASK}/${PANEL_NAME}"
     done
 done

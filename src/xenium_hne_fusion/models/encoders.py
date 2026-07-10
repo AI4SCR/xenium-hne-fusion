@@ -1,10 +1,12 @@
 
+from typing import Literal
+
 import timm
 import torch
 from torchvision.transforms import v2
 
 from xenium_hne_fusion.models.mlp import Head
-from xenium_hne_fusion.transforms.utils import get_normalize_from_transform, get_timm_transform
+from xenium_hne_fusion.transforms.utils import get_image_augmentation, get_normalize_from_transform, get_timm_transform
 
 MODEL_EMBEDDING_DIMS = {
     'vit_small_patch16_224': 384,
@@ -41,6 +43,7 @@ def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | N
                 in_chans=3,
                 num_classes=0,
                 global_pool='',  # disable pooling and handle with global_pool in FusionModel
+                **kws,
             )
 
             expr_encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
@@ -66,6 +69,7 @@ def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | N
                 in_chans=3,
                 num_classes=0,
                 global_pool='',  # disable pooling and handle with global_pool in FusionModel
+                **kws,
             )
 
             expr_encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
@@ -96,7 +100,16 @@ def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | N
 
     return expr_encoder, expr_transform, expr_encoder_dim
 
-def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 224, **kws):
+def _compose_image_transform(normalize: v2.Transform, augment_images: Literal['jitter'] | None) -> v2.Transform:
+    # No spatial resize — tiles are assumed to be img_size × img_size already.
+    steps = [v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]
+    if augment_images is not None:
+        steps.append(get_image_augmentation(augment_images))
+    steps.append(normalize)
+    return v2.Compose(steps)
+
+
+def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 224, augment_images: Literal['jitter'] | None = None, **kws):
     if morph_encoder_name is not None and morph_encoder_name in timm.list_models():
         morph_encoder = timm.create_model(
             model_name=morph_encoder_name,
@@ -113,14 +126,7 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 
         assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
         assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
 
-        # No spatial resize — tiles are assumed to be img_size × img_size already.
-        image_transform = v2.Compose(
-            [
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                normalize,
-            ]
-        )
+        image_transform = _compose_image_transform(normalize, augment_images)
         morph_encoder_dim = MODEL_EMBEDDING_DIMS.get(morph_encoder_name)
 
     elif morph_encoder_name in ['conch_v1.5', 'conch_v1.5_trunk']:
@@ -137,22 +143,18 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 
 
         transform = titan.get_transform()
         normalize = get_normalize_from_transform(transform)
-        image_transform = v2.Compose(
-            [
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                normalize,
-            ]
-        )
+        image_transform = _compose_image_transform(normalize, augment_images)
 
     elif morph_encoder_name == 'phikon':
         from xenium_hne_fusion.models.phikon import Phikon
+        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
         morph_encoder = Phikon()
         image_transform = morph_encoder.get_transform()
         morph_encoder_dim = morph_encoder.embed_dim
 
     elif morph_encoder_name == 'loki':
         from xenium_hne_fusion.models.loki import Loki
+        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
         # TODO: download utils for loki
         ckpt_path = ''
         morph_encoder = Loki(ckpt_path=ckpt_path)
@@ -161,11 +163,13 @@ def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 
 
     elif morph_encoder_name == 'midnight':
         from xenium_hne_fusion.models.midnight import Midnight
+        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
         morph_encoder = Midnight()
         image_transform = morph_encoder.get_transform()
         morph_encoder_dim = morph_encoder.embed_dim
 
     else:
+        assert augment_images is None, f'augment_images requires an image encoder, got morph_encoder_name={morph_encoder_name}'
         morph_encoder = None
         image_transform = None
         morph_encoder_dim = None

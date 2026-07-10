@@ -24,7 +24,9 @@ from xenium_hne_fusion.train.utils import prepare_training_config
 
 def main(cfg: Config) -> None:
     dataset_kws = build_supervised_dataset_kws(prepare_training_config(cfg))
-    ds = TileDataset(**dataset_kws)
+    # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
+    kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
+    ds = TileDataset(**kws)
     ds.setup()
 
 

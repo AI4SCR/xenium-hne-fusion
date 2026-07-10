@@ -18,7 +18,6 @@ from xenium_hne_fusion.hvg import load_transcript_gene_categories
 from xenium_hne_fusion.metadata import build_split_metadata_frame, load_items_dataframe, save_split_metadata
 from xenium_hne_fusion.config import FilterConfig, ItemsConfig
 from xenium_hne_fusion.utils.getters import (
-    DEFAULT_CELL_TYPE_COL,
     DEFAULT_SOURCE_ITEMS_NAME,
     STAT_COLS,
     PipelineConfig,
@@ -332,10 +331,10 @@ def _compute_cell_stats(
 def compute_items_stats(
     items_path: Path,
     output_dir: Path,
+    cell_type_col: str,
     overwrite: bool = False,
     batch_size: int = 32,
     num_workers: int = 10,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
 ) -> Path:
     items_path = Path(items_path)
     output_dir = Path(output_dir)
@@ -439,15 +438,14 @@ def filter_items(
 
 def compute_all_items_stats(
     cfg: PipelineConfig,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
     overwrite: bool = False,
 ) -> Path:
     items_path = cfg.paths.output_dir / "items" / f"{DEFAULT_SOURCE_ITEMS_NAME}.json"
     return compute_items_stats(
         items_path,
         cfg.paths.output_dir,
+        cell_type_col=cfg.data.cell_type_col,
         overwrite=overwrite,
-        cell_type_col=cell_type_col,
     )
 
 

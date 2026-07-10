@@ -8,7 +8,6 @@ from xenium_hne_fusion.config import DataConfig
 from xenium_hne_fusion.utils.getters import build_pipeline_config
 from xenium_hne_fusion.processing_cli import parse_data_args
 import yaml
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
 
 
 
@@ -39,7 +38,7 @@ def main(data_cfg: DataConfig) -> None:
         )
 
         # add categorical cell types column
-        cells[DEFAULT_CELL_TYPE_COL] = cells["first_type"].astype(celltype_dtype)
+        cells[data_cfg.cell_type_col] = cells["first_type"].astype(celltype_dtype)
         cells.to_parquet(new_cells_path)
         logger.info(f"Saved new file at {new_cells_path}")
 

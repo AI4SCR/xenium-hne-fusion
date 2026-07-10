@@ -19,6 +19,7 @@ def build_data_parser(*, include_executor: bool = True) -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("--config", action="config", required=True, help="Path to a YAML config file.")
     parser.add_argument("--name", type=str, required=True)
+    parser.add_argument("--cell-type-col", type=str, required=True)
     parser.add_class_arguments(TilesConfig, nested_key="tiles")
     parser.add_class_arguments(FilterConfig, nested_key="filter")
     parser.add_argument("--overwrite", type=bool, default=False)
@@ -33,6 +34,7 @@ def namespace_to_data_config(ns) -> DataConfig:
     assert data["tiles"].get("img_size") is not None, "tiles.img_size is required"
     return DataConfig(
         name=data["name"],
+        cell_type_col=data["cell_type_col"],
         tiles=TilesConfig(**data["tiles"]),
         filter=FilterConfig(**data["filter"]),
     )
@@ -53,6 +55,7 @@ def build_artifacts_parser(*, include_overwrite: bool = True) -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("--config", action="config", required=True, help="Path to a YAML config file.")
     parser.add_argument("--name", type=str, required=True)
+    parser.add_argument("--cell-type-col", type=str, required=True)
     parser.add_class_arguments(ItemsConfig, nested_key="items")
     parser.add_class_arguments(SplitConfig, nested_key="split")
     parser.add_class_arguments(PanelConfig, nested_key="panel")
@@ -75,6 +78,7 @@ def namespace_to_artifacts_config(ns) -> ArtifactsConfig:
             panel = None
     return ArtifactsConfig(
         name=data["name"],
+        cell_type_col=data["cell_type_col"],
         items=ItemsConfig(
             name=items["name"],
             filter=ItemsThresholdConfig(**items_filter),

@@ -613,7 +613,7 @@ wheels = [
 
 [[package]]
 name = "dask"
-version = "2026.1.1"
+version = "2025.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -624,9 +624,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "toolz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/46/61ecde57bac647ca7eb6ffef8dcd90af6c1c649020874cd7fd8738003d62/dask-2026.1.1.tar.gz", hash = "sha256:12b1dbb0d6e92f287feb4076871600b2fba3a843d35ff214776ada5e9e7a1529", size = 10994732, upload-time = "2026-01-16T12:35:30.258Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/33/eacaa72731f7fc64868caaf2d35060d50049eff889bd217263e68f76472f/dask-2025.11.0.tar.gz", hash = "sha256:23d59e624b80ee05b7cc8df858682cca58262c4c3b197ccf61da0f6543c8f7c3", size = 10984781, upload-time = "2025-11-06T16:56:51.535Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/4b/9cc373120658a2516aa5f6dcdde631c95d714b876d29ad8f8e009d793f3f/dask-2026.1.1-py3-none-any.whl", hash = "sha256:146b0ef2918eb581e06139183a88801b4a8c52d7c37758a91f8c3b75c54b0e15", size = 1481492, upload-time = "2026-01-16T12:35:22.602Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/54/a46920229d12c3a6e9f0081d1bdaeffad23c1826353ace95714faee926e5/dask-2025.11.0-py3-none-any.whl", hash = "sha256:08c35a8146c05c93b34f83cf651009129c42ee71762da7ca452fb7308641c2b8", size = 1477108, upload-time = "2025-11-06T16:56:44.892Z" },
 ]
 
 [package.optional-dependencies]
@@ -702,7 +702,7 @@ wheels = [
 
 [[package]]
 name = "distributed"
-version = "2026.1.1"
+version = "2025.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -721,9 +721,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "zict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/45/19/0c13efdffc55cb311594f66c1c8d36a3c4711e427c820155fb9c59138b5e/distributed-2026.1.1.tar.gz", hash = "sha256:3d2709a43912797df3c345af3bb333bbf1a386ec1e9e6a134e5f050521373dbd", size = 2102870, upload-time = "2026-01-16T12:34:58.258Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/be/085a60b627c1f2b795827ce41d4cc1e11e74ffdadcb5235ee5fb620f7929/distributed-2025.11.0.tar.gz", hash = "sha256:372c2f0c2faa890fc42188349969ba468161a9b356df49c4ca7d9a8d551a7ace", size = 2119140, upload-time = "2025-11-06T16:57:32.391Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/dc/6d709bcf8fed7611d8a510aeed23b0436cf6db5b61e63c8eb8451eb0d4d8/distributed-2026.1.1-py3-none-any.whl", hash = "sha256:506759b1ed88e45e12ba65e2a429de9911862db55d27dd8bb293c6268430374e", size = 1008417, upload-time = "2026-01-16T12:34:55.535Z" },
+    { url = "https://files.pythonhosted.org/packages/46/ec/da78855318971c2be94d0283a41de6941a6b9f16146fb00babc74903ae01/distributed-2025.11.0-py3-none-any.whl", hash = "sha256:1794ff25b19ba347ccce563fb1dd5898c3bb30f500b15f8c20ad373f6281b30f", size = 1009248, upload-time = "2025-11-06T16:57:28.714Z" },
 ]
 
 [[package]]
@@ -2121,7 +2121,7 @@ wheels = [
 
 [[package]]
 name = "ome-zarr"
-version = "0.14.0"
+version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2129,15 +2129,30 @@ dependencies = [
     { name = "deprecated" },
     { name = "fsspec", extra = ["s3"] },
     { name = "numpy" },
+    { name = "ome-zarr-models" },
     { name = "rangehttpserver" },
     { name = "requests" },
     { name = "scikit-image" },
     { name = "toolz" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/29/c69ebfc1082eb947c260ed47b6aa74780e82099558f4395668ae04562e4e/ome_zarr-0.14.0.tar.gz", hash = "sha256:96728fc03388110da436b2dbe35176887ad6dd8a1e27ee9d3ea75049451ca8e1", size = 76421, upload-time = "2026-03-10T22:18:44.3Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/98/f39cf0ec00ad64996ed2d2d6059d15a30c7b8f559cd2a216589885001a6a/ome_zarr-0.18.0.tar.gz", hash = "sha256:5cc0fc682b0c177fa32e54f4479b2436f79850a171e83ad4c6b08fec32e66cd0", size = 106039, upload-time = "2026-06-17T16:22:07.76Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/ff/160e3098a6dadf1cca21a22d6ca69761bc900a60a7b8ac0adde7c58eccb4/ome_zarr-0.14.0-py3-none-any.whl", hash = "sha256:835e8348f7d6bbced6f0e7fc35b17ac5cca4d56ac26cccd310f45a0d6672eafb", size = 45058, upload-time = "2026-03-10T22:18:42.899Z" },
+    { url = "https://files.pythonhosted.org/packages/20/be/2cf9389c9a7b80ceefae88bd713afa6a4b488cb47e524e7dadae44260efd/ome_zarr-0.18.0-py3-none-any.whl", hash = "sha256:aaf6ea6ac5790623290210efc566ad49f92da170b50b07e9113b6b06a0870cc5", size = 57947, upload-time = "2026-06-17T16:22:06.732Z" },
+]
+
+[[package]]
+name = "ome-zarr-models"
+version = "1.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pydantic-zarr" },
+    { name = "zarr" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/17/f4aa0b46a59ba4e7875dc031f5401f709c9fe987bed9932b067c64bac0e2/ome_zarr_models-1.7.tar.gz", hash = "sha256:3979d304f7669e7a22be0bd8a6dd5dcc93fe85af3d842e56930d2ef2e6929090", size = 107192, upload-time = "2026-04-16T12:23:19.147Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/dd/3e3beee6716a4da1b60dc7dfc5d06d697bd015b11ed70c6c0bc0368aabc6/ome_zarr_models-1.7-py3-none-any.whl", hash = "sha256:4e786af38936e62be50cee000c53bf41091ee7d24b0d304570b43147ef34b6bb", size = 64185, upload-time = "2026-04-16T12:23:17.769Z" },
 ]
 
 [[package]]
@@ -2700,6 +2715,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/aa/81/05e400037eaf55ad400bcd318c05bb345b57e708887f07ddb2d20e3f0e98/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-macosx_11_0_arm64.whl", hash = "sha256:aabf5777b5c8ca26f7824cb4a120a740c9588ed58df9b2d196ce92fba42ff8dc", size = 1915388, upload-time = "2025-11-04T13:42:52.215Z" },
     { url = "https://files.pythonhosted.org/packages/6e/0d/e3549b2399f71d56476b77dbf3cf8937cec5cd70536bdc0e374a421d0599/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c007fe8a43d43b3969e8469004e9845944f1a80e6acd47c150856bb87f230c56", size = 1942879, upload-time = "2025-11-04T13:42:56.483Z" },
     { url = "https://files.pythonhosted.org/packages/f7/07/34573da085946b6a313d7c42f82f16e8920bfd730665de2d11c0c37a74b5/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76d0819de158cd855d1cbb8fcafdf6f5cf1eb8e470abe056d5d161106e38062b", size = 2139017, upload-time = "2025-11-04T13:42:59.471Z" },
+]
+
+[[package]]
+name = "pydantic-zarr"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/57/aac9e500abe15719b7406d55871fc8787e7d0ebf83de5f98d44471139f70/pydantic_zarr-0.10.0.tar.gz", hash = "sha256:996b5b4225fb05757e7fff831ee7a75c61f54514a4c2493c7b79635bade7b415", size = 80374, upload-time = "2026-04-23T14:23:12.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/05/04af0ca9c5747c95591a549509ebbb0a986155015de59f1e4c984e3af9ab/pydantic_zarr-0.10.0-py3-none-any.whl", hash = "sha256:d15769dab43346b070051fdf6e83509d7f55259dd00c6d12be2400935117e230", size = 52809, upload-time = "2026-04-23T14:23:11.011Z" },
 ]
 
 [[package]]
@@ -4150,6 +4179,7 @@ dependencies = [
     { name = "loguru" },
     { name = "marsilea" },
     { name = "matplotlib" },
+    { name = "ome-zarr" },
     { name = "pandas" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
@@ -4188,6 +4218,7 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "marsilea" },
     { name = "matplotlib" },
+    { name = "ome-zarr", specifier = ">=0.18.0" },
     { name = "pandas" },
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },

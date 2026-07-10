@@ -1,4 +1,5 @@
 name: hest1k
+cell_type_col: Level3_grouped
 tiles:
   tile_px: 512
   stride_px: 256

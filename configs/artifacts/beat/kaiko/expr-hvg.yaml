@@ -1,4 +1,5 @@
 name: beat
+cell_type_col: Level3_grouped
 items:
   name: expr
   filter:

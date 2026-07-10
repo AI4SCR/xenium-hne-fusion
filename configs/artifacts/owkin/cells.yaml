@@ -1,0 +1,36 @@
+name: owkin
+cell_type_col: first_type
+items:
+  name: cells
+  filter:
+    organs: null
+    include_ids:
+      - CH_C_518a_x2
+      - CH_C_525a_x2
+      - CH_C_527a_x2
+      - CH_C_523a_x2
+      - CH_C_526a_x1
+      - CH_C_527a_xr
+      - CH_D_529a_x2
+      - CH_D_531a_x2
+      - CH_D_530a_x2
+      - CH_D_531a_xr
+    exclude_ids: null
+    num_transcripts: 1000
+    num_unique_transcripts: null
+    num_cells: 1
+    num_unique_cells: 5
+split:
+  name: cells
+  test_size: 0.25
+  val_size: 0.25
+  stratify: false
+  target_column_name: null
+  encode_targets: false
+  nan_value: -1
+  use_filtered_targets_for_train: false
+  include_targets: null
+  group_column_name: sample_id
+  random_state: 0
+panel:
+  name: owkin-beat

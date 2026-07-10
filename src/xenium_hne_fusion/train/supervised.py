@@ -21,7 +21,7 @@ from lightning.pytorch.loggers import WandbLogger
 from loguru import logger
 from torch.utils.data import DataLoader
 
-from xenium_hne_fusion.datasets.tiles import TileDataset
+from xenium_hne_fusion.datasets.tiles import PROTEIN_PANEL, TileDataset
 from xenium_hne_fusion.models.encoders import log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
@@ -37,9 +37,45 @@ from xenium_hne_fusion.train.utils import (
     set_fast_dev_run_settings,
     validate_task_config,
 )
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
-
 TaskTarget = Literal["expression", "cell_types"]
+
+CELL_TYPE_COL = "Level3_grouped"
+
+# Index-ordered: conch_class labels (see scribble/create-conch-training.py) are argmax indices into this list.
+CONCH_CLASSES = [
+    "epithelioid nests",
+    "tubulopapillary epithelioid",
+    "solid sheets of epithelioid",
+    "inflamed epithelioid",
+    "cold, epithelioid, solid",
+    "nests and trabeculae, cold",
+    "cuboidal epithelioid",
+    "papillae and micropapillae",
+    "tubulopapillary",  # end of blues
+    "disorderly spindle cells",
+    "dense spindle cells",
+    "desmoplastic sarcomatoid",
+    "inflamed spindle cells",  # end of oranges
+    "inflamed, fibrotic",
+    "inflamed, malignant",  # end of reds
+    "connective tissues",
+    "epithelioid nests in bland stroma",
+    "basket-weave collagen",
+    "collagen, tiny nuclei",
+    "bland spindle cells and collagen",  # end of greens
+    "dense lymphocytes",
+    "skeletal muscle",
+    "muscle, transverse",  # end of pink
+    "inflamed fat",
+    "fat",
+    "fibrotically infiltrated fat",  # end of yellows
+    "diverse necrotic tissues",
+    "diathermy and crush",  # end of turquoises
+    "pleural plaque",
+    "talc reaction",
+    "vessels",
+    "airways",
+]
 
 
 def get_target_names(resolved: ResolvedTrainingConfig) -> list[str] | None:
@@ -49,9 +85,13 @@ def get_target_names(resolved: ResolvedTrainingConfig) -> list[str] | None:
     if cfg.task.target == "cell_types":
         items = json.loads(cfg.data.items_path.read_text())
         tile_dir = Path(items[0]["tile_dir"])
-        cells = pd.read_parquet(tile_dir / "cells.parquet", columns=[DEFAULT_CELL_TYPE_COL])
-        assert cells[DEFAULT_CELL_TYPE_COL].dtype == "category", f"{DEFAULT_CELL_TYPE_COL} must be categorical"
-        return sorted(cells[DEFAULT_CELL_TYPE_COL].cat.categories.tolist())
+        cells = pd.read_parquet(tile_dir / "cells.parquet", columns=[CELL_TYPE_COL])
+        assert cells[CELL_TYPE_COL].dtype == "category", f"{CELL_TYPE_COL} must be categorical"
+        return sorted(cells[CELL_TYPE_COL].cat.categories.tolist())
+    if cfg.task.target == "proteins":
+        return PROTEIN_PANEL
+    if cfg.task.target in ("conch", "conch_scores"):
+        return CONCH_CLASSES
     return None
 
 mp.set_sharing_strategy("file_system")
@@ -193,7 +233,7 @@ def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
         target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=morph_encoder_name is not None,
         include_expr=expr_encoder_name is not None,
-        target_transform=log1p_transform,
+        target_transform=log1p_transform if cfg.task.target in ("cell_types", "expression") else None,
         image_transform=image_transform,
         expr_transform=expr_transform,
         expr_pool=cfg.data.expr_pool,
@@ -240,7 +280,17 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         ds_all = TileDataset(**kws)
         ds_all.setup()
 
-    ds_fit = TileDataset(**dataset_kws, split="fit")
+    fit_dataset_kws = dataset_kws
+    if cfg.data.augment_images is not None:
+        assert cfg.backbone.morph_encoder_name is not None, 'augment_images requires an image encoder'
+        _, fit_image_transform, _ = get_morph_encoder_and_transform(
+            morph_encoder_name=cfg.backbone.morph_encoder_name,
+            augment_images=cfg.data.augment_images,
+            **(cfg.backbone.morph_encoder_kws or {}),
+        )
+        fit_dataset_kws = {**dataset_kws, 'image_transform': fit_image_transform}
+
+    ds_fit = TileDataset(**fit_dataset_kws, split="fit")
     ds_fit.setup()
     fit_item = ds_fit[0]
     ds_val = TileDataset(**dataset_kws, split="val")

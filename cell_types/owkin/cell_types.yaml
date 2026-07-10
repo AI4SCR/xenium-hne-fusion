@@ -1,0 +1,11 @@
+# data_dir = Path('/work/PRTNR/CHUV/DIR/rgottar1/owkin_spatial/data/crc_gbm_dlbcl_pilot/xenium_multimodal/results/matched_samples_cells_aligned')
+# sample_dirs = [d for d in data_dir.glob('*') if d.is_dir()]
+# cell_types = set()
+# for sample_dir in sample_dirs:
+#    cells = pd.read_parquet(sample_dir / 'centroids' / 'centroid_cropped.parquet', columns=['first_type'])
+#    tumor_cell = cells.first_type.str.startswith('Tu_CH_')
+#    cells.loc[tumor_cell, 'first_type'] = 'tumor'
+#    cell_types.update(cells.first_type.unique())
+# sorted(cell_types)
+
+cell_types: ['Astrocyte', 'B_cell', 'Endothelial_lymph', 'Endothelial_vasc', 'Epithelial_absorptive', 'Epithelial_other', 'Excitatory_Glutamatergic', 'Fibro_FAP', 'Fibro_Inflam', 'Fibro_Other', 'Granulocyte', 'Interneuron_NFS', 'Macrophage', 'Malignant', 'Microglia', 'Monocyte', 'Mural', 'NK', 'Neuron', 'Oligodendrocyte', 'Pericyte', 'Plasma', 'Smooth_muscle', 'T_CD4', 'T_CD8', 'T_NK_cycling', 'T_nos', 'T_reg', 'cDC1', 'cDC2', 'pDC', 'tumor']

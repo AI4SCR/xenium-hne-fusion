@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 @dataclass
 class TaskConfig:
-    target: Literal['expression', 'cell_types', 'rgb', 'conch'] | None = None
+    target: Literal['expression', 'cell_types', 'rgb', 'conch', 'conch_scores', 'proteins'] | None = None
     type: Literal['regression', 'classification'] = 'regression'
 
 
@@ -50,6 +50,7 @@ class DataLoaderConfig:
     batch_size: int = 256
     prefetch_factor: int | None = 4
     expr_pool: Literal['token', 'tile'] = 'token'
+    augment_images: Literal['jitter'] | None = None
     panel_path: Path | None = None
     source_panel: list[str] | None = None
     target_panel: list[str] | None = None

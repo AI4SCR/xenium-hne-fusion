@@ -45,6 +45,11 @@ def validate_task_config(cfg: Config) -> None:
         assert cfg.lit.target_key == "target", "cfg.lit.target_key"
         return
 
+    if cfg.task.target == "proteins":
+        assert cfg.head.output_dim is not None, "cfg.head.output_dim"
+        assert cfg.lit.target_key == "proteins", "cfg.lit.target_key"
+        return
+
     if cfg.task.target == "rgb":
         assert cfg.head.output_dim is not None, "cfg.head.output_dim"
         assert cfg.lit.target_key == "rgb", f"cfg.lit.target_key is {cfg.lit.target_key}"
@@ -53,6 +58,11 @@ def validate_task_config(cfg: Config) -> None:
     if cfg.task.target == "conch":
         assert cfg.head.output_dim is not None, "cfg.head.output_dim"
         assert cfg.lit.target_key == "conch_class", f"cfg.lit.target_key is {cfg.lit.target_key}"
+        return
+
+    if cfg.task.target == "conch_scores":
+        assert cfg.head.output_dim is not None, "cfg.head.output_dim"
+        assert cfg.lit.target_key == "conch_scores", f"cfg.lit.target_key is {cfg.lit.target_key}"
         return
 
     raise ValueError(f"Unknown task target: {cfg.task.target}")

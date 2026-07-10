@@ -64,6 +64,7 @@ class PanelConfig:
 @dataclass
 class DataConfig:
     name: str
+    cell_type_col: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
 
@@ -71,6 +72,7 @@ class DataConfig:
 @dataclass
 class ArtifactsConfig:
     name: str
+    cell_type_col: str
     items: ItemsConfig = field(default_factory=lambda: ItemsConfig(name='default'))
     split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
     panel: PanelConfig | None = None

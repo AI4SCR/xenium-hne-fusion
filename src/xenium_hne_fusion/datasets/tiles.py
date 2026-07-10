@@ -1,12 +1,18 @@
-
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Literal
 
+import numpy as np
 import pandas as pd
 import torch
 from ai4bmr_learn.datasets.items import Items
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
+
+PROTEIN_PANEL = [
+    'Beta-catenin', 'CD11c', 'CD138', 'CD16', 'CD163-1', 'CD20', 'CD31', 'CD3E-1', 'CD4-1', 'CD45',
+    'CD45RA', 'CD45RO', 'CD68-1', 'CD8A-1', 'E-Cadherin', 'GranzymeB', 'HLA-DR', 'Ki-67', 'LAG-3', 'PCNA',
+    'PD-1', 'PD-L1', 'PTEN-1', 'PanCK', 'VISTA', 'Vimentin', 'alphaSMA',
+]
+
 
 class TileDataset(Items):
     """
@@ -31,7 +37,7 @@ class TileDataset(Items):
     """
 
     def __init__(self, *,
-                 target: Literal['cell_types', 'expression', 'rgb'],
+                 target: Literal['cell_types', 'expression', 'rgb', 'conch', 'conch_scores', 'proteins'],
                  source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
                  include_image: bool = False,
@@ -40,7 +46,7 @@ class TileDataset(Items):
                  image_transform: Callable | None = None,
                  expr_transform: Callable | None = None,
                  expr_pool: Literal['token', 'tile'] = 'token',
-                 cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+                 cell_type_col: str = 'Level3_grouped',
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -56,7 +62,8 @@ class TileDataset(Items):
         self.expr_pool = expr_pool
         self.cell_type_col = cell_type_col
 
-        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb', 'conch'], "target_panel must be specified when target is 'expression'"
+        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb',
+                                                                                 'conch', 'conch_scores', 'proteins'], "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
@@ -67,10 +74,16 @@ class TileDataset(Items):
         tile_dir = Path(item['tile_dir'])
 
         if self.cache_dir is not None and self.has_cache(iid=iid):
+
             conch_class = item.get('conch_class', -1)
+            conch_scores = item.get('conch_scores', -1)
+
             item = torch.load(self.get_cache_path(iid), weights_only=False)
+
             item['conch_class'] = conch_class
+            item['conch_scores'] = torch.tensor(conch_scores).float()
             item['rgb'] = item['modalities']['image'].float().mean(dim=(1, 2))
+
             if not self.include_image:
                 item['modalities'].pop('image', None)
             if not self.include_expr:
@@ -102,25 +115,27 @@ class TileDataset(Items):
                 missing = sorted(set(self.target_panel) - set(expr.columns))
                 assert not missing, f'missing target genes: {missing[:8]}'
                 target = expr[self.target_panel].sum()
-                target = torch.tensor(target.values, dtype=torch.float32)
+                item['expression'] = torch.tensor(target.values, dtype=torch.float32)
             elif self.target == 'cell_types':
                 cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
                 assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
                 target = cell_types[self.cell_type_col].value_counts().sort_index()
-                target = torch.tensor(target.values, dtype=torch.float32)
+                item['cell_types'] = torch.tensor(target.values, dtype=torch.float32)
+            elif self.target == 'proteins':
+                proteins = pd.read_parquet(tile_dir / 'proteins.parquet', columns=PROTEIN_PANEL)
+                proteins = proteins.mean()
+                item['proteins'] = torch.tensor(np.arcsinh(proteins.values), dtype=torch.float32)
             elif self.target == 'rgb':
                 target = item['modalities']['image'].float().mean(dim=(1, 2))
                 item['rgb'] = target
             else:
                 raise ValueError(f"Unsupported target: {self.target}")
 
-            item['target'] = target
-
         if self.include_expr and self.expr_pool == 'tile':
             item['modalities']['expr_tokens'] = item['modalities']['expr_tokens'].mean(dim=0)
 
         if self.target_transform is not None:
-            item['target'] = self.target_transform(item['target'])
+            item[self.target] = self.target_transform(item[self.target])
 
         if self.include_image and self.image_transform is not None:
             item['modalities']['image'] = self.image_transform(item['modalities']['image'])

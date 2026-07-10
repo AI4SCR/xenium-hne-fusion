@@ -23,6 +23,7 @@ def main(
     compute_items_stats(
         items_path,
         output_dir,
+        cell_type_col=artifacts_cfg.cell_type_col,
         overwrite=overwrite,
         batch_size=batch_size,
         num_workers=num_workers,

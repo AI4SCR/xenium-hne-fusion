@@ -13,8 +13,6 @@ from loguru import logger
 from shapely.geometry import box
 from wsidata import open_wsi
 
-from xenium_hne_fusion.utils.getters import DEFAULT_CELL_TYPE_COL
-
 BIOLOGICAL_FEATURE_EXCLUDE_PREFIXES = (
     "BLANK_",
     "NegControlCodeword_",
@@ -282,7 +280,7 @@ def process_tiles(
     logger.info("Tile processing done")
 
 
-def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, output_dir: Path, predicate: str = "within") -> None:
+def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, output_dir: Path, name: str = 'cells.parquet', predicate: str = "within") -> None:
     """Write tile-local cell subsets to <tile_dir>/cells.parquet."""
     cells = gpd.read_parquet(cells_path)
     logger.info(f"Tiling cells (num_tiles={len(tiles)}, num_cells={len(cells)})...")
@@ -293,14 +291,16 @@ def tile_cells(tiles: gpd.GeoDataFrame, cells_path: Path, output_dir: Path, pred
         tile_dir = output_dir / str(tile_id)
         tile_dir.mkdir(parents=True, exist_ok=True)
         tile_cells = tile_cells.drop(columns=["tile_id"], errors="ignore")
-        tile_cells.to_parquet(tile_dir / "cells.parquet")
+        tile_cells.to_parquet(tile_dir / name)
 
 
 def process_cells(
     tiles: gpd.GeoDataFrame,
     output_dir: Path,
     img_size: int,
-    cell_type_col: str = DEFAULT_CELL_TYPE_COL,
+    name: str = 'cells.parquet',
+    cell_type_col: str | None = None,
+    normalize: bool = True,
 ) -> None:
     """Transform tile-local cell subsets and render cells.png overlays."""
     from skimage.io import imsave
@@ -313,7 +313,7 @@ def process_cells(
         tile_id = tile.tile_id
         tile_dir = output_dir / str(tile_id)
 
-        cells_path = tile_dir / "cells.parquet"
+        cells_path = tile_dir / name
         if not cells_path.exists():
             continue
         cells = gpd.read_parquet(cells_path)
@@ -321,14 +321,15 @@ def process_cells(
         cells = transform_points(cells, tile, dst_height=img_size, dst_width=img_size, errors="clip_warn")
         cells = cells.drop(columns=["tile_id", "index_right"], errors="ignore")
 
-        col = normalize_cell_type_categories(cells[cell_type_col])
-        del cells[cell_type_col]
-        cells[cell_type_col] = col
-        cells.to_parquet(tile_dir / "cells.parquet")
+        if normalize:
+            col = normalize_cell_type_categories(cells[cell_type_col])
+            del cells[cell_type_col]
+            cells[cell_type_col] = col
+        cells.to_parquet(cells_path)
 
         img = torch.load(tile_dir / "tile.pt").permute(1, 2, 0).numpy()
         viz = visualize_points(cells, image=img.copy(), radius=1)
-        imsave(tile_dir / "cells.png", viz)
+        imsave(cells_path.with_suffix('.png'), viz)
 
     logger.info("Cell processing done")
 
