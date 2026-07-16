@@ -26,14 +26,13 @@ from xenium_hne_fusion.models.encoders import log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
-from xenium_hne_fusion.train.config import Config
+from xenium_hne_fusion.train.config import TrainingConfig
 from xenium_hne_fusion.train.lit import ClassificationLit, RegressionLit
 from xenium_hne_fusion.train.utils import (
-    ResolvedTrainingConfig,
     infer_head_input_dim,
-    prepare_training_config,
     resolve_num_outputs,
     resolve_num_source_genes,
+    resolve_training_config,
     set_fast_dev_run_settings,
     validate_task_config,
 )
@@ -78,8 +77,7 @@ CONCH_CLASSES = [
 ]
 
 
-def get_target_names(resolved: ResolvedTrainingConfig) -> list[str] | None:
-    cfg = resolved.cfg
+def get_target_names(cfg: TrainingConfig) -> list[str] | None:
     if cfg.task.target == "expression":
         return cfg.data.target_panel
     if cfg.task.target == "cell_types":
@@ -106,10 +104,9 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
-    cfg = resolved.cfg
-    num_source_genes = resolved.num_source_genes
-    num_outputs = resolved.num_outputs
+def build_supervised_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
+    num_source_genes = cfg.num_source_genes
+    num_outputs = cfg.num_outputs
 
     morph_encoder_name = cfg.backbone.morph_encoder_name
     morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
@@ -118,20 +115,22 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
 
     assert morph_encoder_name is not None or expr_encoder_name is not None, "At least one encoder must be specified"
 
-    morph_encoder, image_transform, morph_encoder_dim = get_morph_encoder_and_transform(
+    morph_spec = get_morph_encoder_and_transform(
         morph_encoder_name=morph_encoder_name,
         **morph_encoder_kws,
     )
+    morph_encoder, image_transform, morph_encoder_dim = morph_spec.encoder, morph_spec.transform, morph_spec.dim
 
     expr_encoder = expr_transform = None
     expr_encoder_dim = None
     if expr_encoder_name is not None:
         kws = {**expr_encoder_cfg, "input_dim": num_source_genes}
-        expr_encoder, expr_transform, expr_encoder_dim = get_expr_encoder_and_transform(
+        expr_spec = get_expr_encoder_and_transform(
             expr_encoder_name=expr_encoder_name,
             source_panel=cfg.data.source_panel,
             **kws,
         )
+        expr_encoder, expr_transform, expr_encoder_dim = expr_spec.encoder, expr_spec.transform, expr_spec.dim
 
     backbone = FusionModel(
         expr_encoder=expr_encoder,
@@ -199,9 +198,7 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
     return lit_cls(**lit_kws)
 
 
-def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
-    cfg = resolved.cfg
-
+def build_supervised_dataset_kws(cfg: TrainingConfig) -> dict:
     morph_encoder_name = cfg.backbone.morph_encoder_name
     morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
     expr_encoder_name = cfg.backbone.expr_encoder_name
@@ -209,19 +206,19 @@ def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
 
     assert morph_encoder_name is not None or expr_encoder_name is not None, "At least one encoder must be specified"
 
-    _, image_transform, _ = get_morph_encoder_and_transform(
+    image_transform = get_morph_encoder_and_transform(
         morph_encoder_name=morph_encoder_name,
         **morph_encoder_kws,
-    )
+    ).transform
 
     expr_transform = None
     if expr_encoder_name is not None:
-        kws = {**expr_encoder_cfg, "input_dim": resolved.num_source_genes}
-        _, expr_transform, _ = get_expr_encoder_and_transform(
+        kws = {**expr_encoder_cfg, "input_dim": cfg.num_source_genes}
+        expr_transform = get_expr_encoder_and_transform(
             expr_encoder_name=expr_encoder_name,
             source_panel=cfg.data.source_panel,
             **kws,
-        )
+        ).transform
 
     return dict(
         target=cfg.task.target,
@@ -241,25 +238,24 @@ def build_supervised_dataset_kws(resolved: ResolvedTrainingConfig) -> dict:
     )
 
 
-def train(cfg: Config, debug: bool | None = None, config_path: str | None = None):
+def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | None = None):
     debug = debug if debug is not None else cfg.debug
     if debug or cfg.trainer.fast_dev_run:
         cfg = set_fast_dev_run_settings(cfg)
-    resolved = prepare_training_config(cfg)
-    cfg = resolved.cfg
-    output_dir = resolved.output_dir
+    cfg = resolve_training_config(cfg)
+    output_dir = cfg.output_dir
 
     logs_dir = output_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    num_source_genes = resolved.num_source_genes
-    num_outputs = resolved.num_outputs
+    num_source_genes = cfg.num_source_genes
+    num_outputs = cfg.num_outputs
     logger.info(
         f"Training task.target={cfg.task.target} with num_outputs={num_outputs} and num_source_genes={num_source_genes}"
     )
 
-    target_names = get_target_names(resolved)
-    lit = build_supervised_lit(resolved, target_names=target_names)
+    target_names = get_target_names(cfg)
+    lit = build_supervised_lit(cfg, target_names=target_names)
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -270,7 +266,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     if cfg.data.num_workers > 0 and cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
-    dataset_kws = build_supervised_dataset_kws(resolved)
+    dataset_kws = build_supervised_dataset_kws(cfg)
 
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
@@ -278,17 +274,7 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
         ds_all = TileDataset(**kws)
         ds_all.setup()
 
-    fit_dataset_kws = dataset_kws
-    if cfg.data.augment_images is not None:
-        assert cfg.backbone.morph_encoder_name is not None, 'augment_images requires an image encoder'
-        _, fit_image_transform, _ = get_morph_encoder_and_transform(
-            morph_encoder_name=cfg.backbone.morph_encoder_name,
-            augment_images=cfg.data.augment_images,
-            **(cfg.backbone.morph_encoder_kws or {}),
-        )
-        fit_dataset_kws = {**dataset_kws, 'image_transform': fit_image_transform}
-
-    ds_fit = TileDataset(**fit_dataset_kws, split="fit")
+    ds_fit = TileDataset(**dataset_kws, split="fit")
     ds_fit.setup()
     fit_item = ds_fit[0]
     ds_val = TileDataset(**dataset_kws, split="val")
@@ -391,5 +377,5 @@ def train(cfg: Config, debug: bool | None = None, config_path: str | None = None
     }
 
 
-def main(cfg: Config, debug: bool | None = None, config_path: str | None = None) -> None:
+def main(cfg: TrainingConfig, debug: bool | None = None, config_path: str | None = None) -> None:
     train(cfg, debug=debug, config_path=config_path)

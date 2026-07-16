@@ -44,11 +44,11 @@ class BackboneConfig:
 @dataclass
 class DataLoaderConfig:
     name: str | None = None
+    data_dir: Path | None = None
     num_workers: int = 10
     batch_size: int = 256
     prefetch_factor: int | None = 4
     expr_pool: Literal['token', 'tile'] = 'token'
-    augment_images: Literal['jitter'] | None = None
     panel_path: Path | None = None
     source_panel: list[str] | None = None
     target_panel: list[str] | None = None
@@ -95,7 +95,7 @@ class WandbConfig:
 
 
 @dataclass
-class Config:
+class TrainingConfig:
     task: TaskConfig = field(default_factory=TaskConfig)
     debug: bool = False
     head: HeadConfig = field(default_factory=HeadConfig)
@@ -105,14 +105,19 @@ class Config:
     trainer: TrainerConfig = field(default_factory=TrainerConfig)
     wandb: WandbConfig = field(default_factory=WandbConfig)
 
+    # Populated by `resolve_training_config()`; unset on a freshly loaded config.
+    output_dir: Path | None = None
+    num_source_genes: int | None = None
+    num_outputs: int | None = None
+
     @classmethod
-    def from_yaml(cls, path: Path) -> 'Config':
+    def from_yaml(cls, path: Path) -> 'TrainingConfig':
         import yaml
         data = yaml.safe_load(path.read_text()) or {}
         return _merge_dataclass(cls, data)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'Config':
+    def from_dict(cls, data: dict[str, Any]) -> 'TrainingConfig':
         return _merge_dataclass(cls, data)
 
 

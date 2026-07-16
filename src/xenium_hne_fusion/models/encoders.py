@@ -1,12 +1,14 @@
 
-from typing import Literal
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import timm
 import torch
+from torch import nn
 from torchvision.transforms import v2
 
 from xenium_hne_fusion.models.mlp import Head
-from xenium_hne_fusion.transforms.utils import get_image_augmentation, get_normalize_from_transform, get_timm_transform
+from xenium_hne_fusion.transforms.utils import get_normalize_from_transform, get_timm_transform
 
 MODEL_EMBEDDING_DIMS = {
     'vit_small_patch16_224': 384,
@@ -14,6 +16,13 @@ MODEL_EMBEDDING_DIMS = {
     'conch_v1.5': 768,
     'conch_v1.5_trunk': 1024,
 }
+
+
+@dataclass
+class EncoderSpec:
+    encoder: nn.Module | None
+    transform: Callable | None
+    dim: int | None
 
 
 def log1p_transform(x: torch.Tensor) -> torch.Tensor:
@@ -28,150 +37,148 @@ def is_half(value: float) -> bool:
     return value == 0.5
 
 
-def get_expr_encoder_and_transform(*, expr_encoder_name: str, input_dim: int | None = None, output_dim: int | None = None, source_panel: list[str] | None = None, **kws):
-    match expr_encoder_name:
-        case "mlp":
-            expr_encoder_dim = output_dim
-            expr_encoder = Head(input_dim=input_dim, output_dim=output_dim, **kws)
-            expr_transform = log1p_transform
-        case "vit_small_patch16_224":
-            from torch import nn
-            expr_encoder = timm.create_model(
-                model_name=expr_encoder_name,
-                pretrained=True,
-                img_size=224,
-                in_chans=3,
-                num_classes=0,
-                global_pool='',  # disable pooling and handle with global_pool in FusionModel
-                **kws,
-            )
-
-            expr_encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
-            expr_encoder.patch_embed = nn.Linear(in_features=input_dim, out_features=expr_encoder_dim)
-
-            # x = torch.randn((1, 196, 380))
-            # z = expr_encoder(x)
-
-            # transform = get_timm_transform(expr_encoder)
-            # normalize = get_normalize_from_transform(transform)
-            #
-            # assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
-            # assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
-
-            expr_transform = log1p_transform
-
-        case "vit_base_patch16_224":
-            from torch import nn
-            expr_encoder = timm.create_model(
-                model_name=expr_encoder_name,
-                pretrained=True,
-                img_size=224,
-                in_chans=3,
-                num_classes=0,
-                global_pool='',  # disable pooling and handle with global_pool in FusionModel
-                **kws,
-            )
-
-            expr_encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
-            expr_encoder.patch_embed = nn.Linear(in_features=input_dim, out_features=expr_encoder_dim)
-
-            # x = torch.randn((1, 196, 380))
-            # z = expr_encoder(x)
-
-            # transform = get_timm_transform(expr_encoder)
-            # normalize = get_normalize_from_transform(transform)
-            #
-            # assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
-            # assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
-
-            expr_transform = log1p_transform
-
-        case "geneformer":
-            from xenium_hne_fusion.models.geneformer import Geneformer
-            expr_encoder = Geneformer(gene_names=source_panel, transform=expm1_transform, **kws)
-            expr_transform = log1p_transform
-            expr_encoder_dim = expr_encoder.embed_dim
-        case None:
-            expr_encoder = None
-            expr_transform = log1p_transform
-            expr_encoder_dim = None
-        case _:
-            raise ValueError(f"Unknown expr_encoder_name: {expr_encoder_name}")
-
-    return expr_encoder, expr_transform, expr_encoder_dim
-
-def _compose_image_transform(normalize: v2.Transform, augment_images: Literal['jitter'] | None) -> v2.Transform:
+def _image_transform_from_normalize(normalize: v2.Transform) -> v2.Transform:
     # No spatial resize — tiles are assumed to be img_size × img_size already.
-    steps = [v2.ToImage(), v2.ToDtype(torch.float32, scale=True)]
-    if augment_images is not None:
-        steps.append(get_image_augmentation(augment_images))
-    steps.append(normalize)
-    return v2.Compose(steps)
+    return v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True), normalize])
 
 
-def get_morph_encoder_and_transform(*, morph_encoder_name: str, img_size: int = 224, augment_images: Literal['jitter'] | None = None, **kws):
-    if morph_encoder_name is not None and morph_encoder_name in timm.list_models():
-        morph_encoder = timm.create_model(
-            model_name=morph_encoder_name,
-            pretrained=True,
-            img_size=img_size,
-            in_chans=3,
-            num_classes=0,
-            global_pool='',  # disable pooling and handle with global_pool in FusionModel
-            **kws,
-        )
-        transform = get_timm_transform(morph_encoder)
-        normalize = get_normalize_from_transform(transform)
+def _assert_no_extra_kws(morph_encoder_name: str, kws: dict) -> None:
+    assert not kws, f"Unexpected kws for morph_encoder_name={morph_encoder_name}: {kws}"
 
-        assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
-        assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
 
-        image_transform = _compose_image_transform(normalize, augment_images)
-        morph_encoder_dim = MODEL_EMBEDDING_DIMS.get(morph_encoder_name)
+def _build_mlp_expr_encoder(*, expr_encoder_name: str, input_dim: int | None, output_dim: int | None, source_panel: list[str] | None, **kws) -> EncoderSpec:
+    encoder = Head(input_dim=input_dim, output_dim=output_dim, **kws)
+    return EncoderSpec(encoder, log1p_transform, output_dim)
 
-    elif morph_encoder_name in ['conch_v1.5', 'conch_v1.5_trunk']:
-        import lazyslide as zs
-        titan = zs.models.multimodal.Titan()
 
-        model, transform = titan.conch, titan.conch_transform
-        if morph_encoder_name == 'conch_v1.5_trunk':
-            morph_encoder = model.trunk  # image encoder without CLIP proj head
-            morph_encoder_dim = 1024
-        else:
-            morph_encoder = model  # full model with CLIP proj head
-            morph_encoder_dim = 768
+def _build_timm_expr_encoder(*, expr_encoder_name: str, input_dim: int | None, output_dim: int | None, source_panel: list[str] | None, **kws) -> EncoderSpec:
+    encoder = timm.create_model(
+        model_name=expr_encoder_name,
+        pretrained=True,
+        img_size=224,
+        in_chans=3,
+        num_classes=0,
+        global_pool='',  # disable pooling and handle with global_pool in FusionModel
+        **kws,
+    )
+    encoder_dim = MODEL_EMBEDDING_DIMS.get(expr_encoder_name)
+    encoder.patch_embed = nn.Linear(in_features=input_dim, out_features=encoder_dim)
+    return EncoderSpec(encoder, log1p_transform, encoder_dim)
 
-        transform = titan.get_transform()
-        normalize = get_normalize_from_transform(transform)
-        image_transform = _compose_image_transform(normalize, augment_images)
 
-    elif morph_encoder_name == 'phikon':
-        from xenium_hne_fusion.models.phikon import Phikon
-        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
-        morph_encoder = Phikon()
-        image_transform = morph_encoder.get_transform()
-        morph_encoder_dim = morph_encoder.embed_dim
+def _build_geneformer_encoder(*, expr_encoder_name: str, input_dim: int | None, output_dim: int | None, source_panel: list[str] | None, **kws) -> EncoderSpec:
+    from xenium_hne_fusion.models.geneformer import Geneformer
+    encoder = Geneformer(gene_names=source_panel, transform=expm1_transform, **kws)
+    return EncoderSpec(encoder, log1p_transform, encoder.embed_dim)
 
-    elif morph_encoder_name == 'loki':
-        from xenium_hne_fusion.models.loki import Loki
-        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
-        # TODO: download utils for loki
-        ckpt_path = ''
-        morph_encoder = Loki(ckpt_path=ckpt_path)
-        image_transform = morph_encoder.get_transform()
-        morph_encoder_dim = morph_encoder.embed_dim
 
-    elif morph_encoder_name == 'midnight':
-        from xenium_hne_fusion.models.midnight import Midnight
-        assert augment_images is None, f'augment_images not supported for morph_encoder_name={morph_encoder_name}'
-        morph_encoder = Midnight()
-        image_transform = morph_encoder.get_transform()
-        morph_encoder_dim = morph_encoder.embed_dim
+EXPR_ENCODER_REGISTRY: dict[str, Callable[..., EncoderSpec]] = {
+    "mlp": _build_mlp_expr_encoder,
+    "vit_small_patch16_224": _build_timm_expr_encoder,
+    "vit_base_patch16_224": _build_timm_expr_encoder,
+    "geneformer": _build_geneformer_encoder,
+}
 
+
+def get_expr_encoder_and_transform(
+    *,
+    expr_encoder_name: str | None,
+    input_dim: int | None = None,
+    output_dim: int | None = None,
+    source_panel: list[str] | None = None,
+    **kws,
+) -> EncoderSpec:
+    if expr_encoder_name is None:
+        return EncoderSpec(None, log1p_transform, None)
+    assert expr_encoder_name in EXPR_ENCODER_REGISTRY, f"Unknown expr_encoder_name: {expr_encoder_name}"
+    builder = EXPR_ENCODER_REGISTRY[expr_encoder_name]
+    return builder(
+        expr_encoder_name=expr_encoder_name,
+        input_dim=input_dim,
+        output_dim=output_dim,
+        source_panel=source_panel,
+        **kws,
+    )
+
+
+def _build_timm_morph_encoder(*, morph_encoder_name: str, img_size: int = 224, **kws) -> EncoderSpec:
+    encoder = timm.create_model(
+        model_name=morph_encoder_name,
+        pretrained=True,
+        img_size=img_size,
+        in_chans=3,
+        num_classes=0,
+        global_pool='',  # disable pooling and handle with global_pool in FusionModel
+        **kws,
+    )
+    transform = get_timm_transform(encoder)
+    normalize = get_normalize_from_transform(transform)
+
+    assert all(map(is_half, normalize.mean)), f"Expected mean 0.5, got {normalize.mean}"
+    assert all(map(is_half, normalize.std)), f"Expected std 0.5, got {normalize.std}"
+
+    image_transform = _image_transform_from_normalize(normalize)
+    encoder_dim = MODEL_EMBEDDING_DIMS.get(morph_encoder_name)
+    return EncoderSpec(encoder, image_transform, encoder_dim)
+
+
+def _build_conch_morph_encoder(*, morph_encoder_name: str, **kws) -> EncoderSpec:
+    _assert_no_extra_kws(morph_encoder_name, kws)
+    import lazyslide as zs
+    titan = zs.models.multimodal.Titan()
+
+    model = titan.conch
+    if morph_encoder_name == 'conch_v1.5_trunk':
+        encoder = model.trunk  # image encoder without CLIP proj head
+        encoder_dim = 1024
     else:
-        assert augment_images is None, f'augment_images requires an image encoder, got morph_encoder_name={morph_encoder_name}'
-        morph_encoder = None
-        image_transform = None
-        morph_encoder_dim = None
+        encoder = model  # full model with CLIP proj head
+        encoder_dim = 768
 
-    return morph_encoder, image_transform, morph_encoder_dim
+    normalize = get_normalize_from_transform(titan.get_transform())
+    image_transform = _image_transform_from_normalize(normalize)
+    return EncoderSpec(encoder, image_transform, encoder_dim)
+
+
+def _build_phikon_morph_encoder(*, morph_encoder_name: str, **kws) -> EncoderSpec:
+    _assert_no_extra_kws(morph_encoder_name, kws)
+    from xenium_hne_fusion.models.phikon import Phikon
+    encoder = Phikon()
+    return EncoderSpec(encoder, encoder.get_transform(), encoder.embed_dim)
+
+
+def _build_loki_morph_encoder(*, morph_encoder_name: str, **kws) -> EncoderSpec:
+    from xenium_hne_fusion.models.loki import Loki
+    # TODO: download utils for loki
+    ckpt_path = kws.pop('ckpt_path', '')
+    _assert_no_extra_kws(morph_encoder_name, kws)
+    encoder = Loki(ckpt_path=ckpt_path)
+    return EncoderSpec(encoder, encoder.get_transform(), encoder.embed_dim)
+
+
+def _build_midnight_morph_encoder(*, morph_encoder_name: str, **kws) -> EncoderSpec:
+    _assert_no_extra_kws(morph_encoder_name, kws)
+    from xenium_hne_fusion.models.midnight import Midnight
+    encoder = Midnight()
+    return EncoderSpec(encoder, encoder.get_transform(), encoder.embed_dim)
+
+
+MORPH_ENCODER_REGISTRY: dict[str, Callable[..., EncoderSpec]] = {
+    "conch_v1.5": _build_conch_morph_encoder,
+    "conch_v1.5_trunk": _build_conch_morph_encoder,
+    "phikon": _build_phikon_morph_encoder,
+    "loki": _build_loki_morph_encoder,
+    "midnight": _build_midnight_morph_encoder,
+}
+
+
+def get_morph_encoder_and_transform(*, morph_encoder_name: str | None, img_size: int = 224, **kws) -> EncoderSpec:
+    if morph_encoder_name is None:
+        return EncoderSpec(None, None, None)
+
+    if morph_encoder_name in timm.list_models():
+        return _build_timm_morph_encoder(morph_encoder_name=morph_encoder_name, img_size=img_size, **kws)
+
+    assert morph_encoder_name in MORPH_ENCODER_REGISTRY, f"Unknown morph_encoder_name: {morph_encoder_name}"
+    builder = MORPH_ENCODER_REGISTRY[morph_encoder_name]
+    return builder(morph_encoder_name=morph_encoder_name, **kws)
