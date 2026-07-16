@@ -5,45 +5,21 @@ from loguru import logger
 from ai4bmr_learn.utils.pooling import pool
 from typing import Literal
 
-# from timm.models.vision_transformer import vit_small_patch16_224
-# model = vit_small_patch16_224()
-# import torch
-from timm.layers.attention import maybe_add_mask, resolve_self_attn_mask
 
-# img = torch.randn(1, 3, 224, 224)
-# tokens = model.patch_embed(img)
-# x = model._pos_embed(tokens)
-
-# x = model.blocks[0](tokens)
-# x.shape
-# x = model.blocks[0].norm1(x)
-# self = model.blocks[0].attn
-#
-# B, N, C = x.shape
-# qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
-# q, k, v = qkv.unbind(0)
-# q, k = self.q_norm(q), self.k_norm(k)
-#
-# q = q * self.scale
-# attn = q @ k.transpose(-2, -1)
-
-# attn_mask = None
-# is_causal = False
-# attn_bias = resolve_self_attn_mask(N, attn, attn_mask, is_causal)
-# attn = maybe_add_mask(attn, attn_bias)
-# attn = attn.softmax(dim=-1)
-# attn = self.attn_drop(attn)
-
-
-def _validate_config(
+def _validate_fusion_config(
+    *,
     morph_encoder,
     expr_encoder,
+    morph_encoder_dim,
+    expr_encoder_dim,
     fusion_strategy,
     fusion_stage,
     global_pool,
     morph_token_pool,
     expr_token_pool,
     learnable_gate,
+    use_proj,
+    use_modality_embed,
 ):
     assert morph_encoder is not None or expr_encoder is not None, (
         'At least one of morph_encoder or expr_model should be provided.'
@@ -63,9 +39,6 @@ def _validate_config(
         'flatten',
     ], f'Global pool has to be one of avg/max/token, got {global_pool}'
 
-    # no longer true with vit as expr encoder
-    # assert not (morph_encoder is None and global_pool == 'token'), f'If no morph_encoder is provided, global_pool cannot be `token`.'
-
     if fusion_strategy is not None:
         assert fusion_stage in {'early', 'late'}, f'fusion_stage must be one of [early, late], got {fusion_stage}'
 
@@ -76,15 +49,23 @@ def _validate_config(
     if learnable_gate:
         assert fusion_strategy == 'add', f'learnable_gate requires fusion_strategy="add" not {fusion_strategy}.'
 
-
-def _validate_drop_vision_tokens(drop_num_vision_tokens: int, fusion_stage: str | None, fusion_strategy: str | None) -> None:
-    if drop_num_vision_tokens == 0:
-        return
-    assert drop_num_vision_tokens > 0, f'drop_num_vision_tokens must be non-negative, got {drop_num_vision_tokens}'
-    assert fusion_stage == 'early' and fusion_strategy == 'concat', (
-        f'drop_num_vision_tokens is only supported for early-fusion concat, '
-        f'got fusion_stage={fusion_stage!r}, fusion_strategy={fusion_strategy!r}'
-    )
+    if fusion_strategy is None:
+        assert (expr_encoder is None) != (morph_encoder is None), (
+            'If fusion_strategy is None, then only one of expr_encoder or morph_encoder should be provided.'
+        )
+    else:
+        assert expr_encoder is not None and morph_encoder is not None, (
+            'If fusion_strategy is not None, then both expr_encoder and morph_encoder should be provided.'
+        )
+        if not use_proj:
+            if fusion_strategy == 'add':
+                assert expr_encoder_dim == morph_encoder_dim, (
+                    'If `use_proj` is False, then expr_encoder_dim must be equal to morph_encoder_dim.'
+                )
+            else:
+                assert use_modality_embed is False and expr_encoder_dim == morph_encoder_dim, (
+                    'Modality embedding requires same embedding dimension. Use `use_proj=True`.'
+                )
 
 
 _MISSING = object()  # NOTE: None can be a valid path in a dict, this we need sentinel value to detect missing keys
@@ -111,11 +92,7 @@ class FusionModel(nn.Module):
             freeze_morph_encoder: bool = False,
             freeze_expr_encoder: bool = False,
             learnable_gate: bool = False,
-            drop_num_vision_tokens: int = 0,
             normalize_expr_tokens: bool = True,
-            permute_expr_tokens: Literal['in-tile', 'in-batch'] | None = None,
-            permute_vision_tokens: Literal['in-tile', 'in-batch'] | None = None,
-            set_vision_to_zero: bool = False
     ):
         """
         Unified backbone for morphology-only, expression-only, and fusion models.
@@ -137,17 +114,20 @@ class FusionModel(nn.Module):
         with `fusion_strategy=None`.
         """
 
-        _validate_config(
-            morph_encoder,
-            expr_encoder,
-            fusion_strategy,
-            fusion_stage,
-            global_pool,
-            morph_token_pool,
-            expr_token_pool,
-            learnable_gate,
+        _validate_fusion_config(
+            morph_encoder=morph_encoder,
+            expr_encoder=expr_encoder,
+            morph_encoder_dim=morph_encoder_dim,
+            expr_encoder_dim=expr_encoder_dim,
+            fusion_strategy=fusion_strategy,
+            fusion_stage=fusion_stage,
+            global_pool=global_pool,
+            morph_token_pool=morph_token_pool,
+            expr_token_pool=expr_token_pool,
+            learnable_gate=learnable_gate,
+            use_proj=use_proj,
+            use_modality_embed=use_modality_embed,
         )
-        _validate_drop_vision_tokens(drop_num_vision_tokens, fusion_stage, fusion_strategy)
 
         super().__init__()
 
@@ -161,23 +141,6 @@ class FusionModel(nn.Module):
         self.fusion_strategy = fusion_strategy
         self.fusion_stage = fusion_stage
 
-        if fusion_strategy is None:
-            assert (self.expr_encoder is None) != (self.morph_encoder is None), (
-                'If fusion_strategy is None, then only one of expr_encoder or morph_encoder should be provided.'
-            )
-        else:
-            assert self.expr_encoder is not None and self.morph_encoder is not None, (
-                'If fusion_strategy is not None, then both expr_encoder and morph_encoder should be provided.'
-            )
-
-        assert permute_expr_tokens in (None, 'in-tile', 'in-batch'), (
-            f"permute_expr_tokens must be None, 'in-tile', or 'in-batch', got {permute_expr_tokens!r}"
-        )
-        assert permute_vision_tokens in (None, 'in-tile', 'in-batch'), (
-            f"permute_vision_tokens must be None, 'in-tile', or 'in-batch', got {permute_vision_tokens!r}"
-        )
-        self.permute_expr_tokens = permute_expr_tokens
-        self.permute_vision_tokens = permute_vision_tokens
         self.normalize_expr_tokens = normalize_expr_tokens
         self.epsilon = 1e-5  # needed for token normalization
 
@@ -193,13 +156,8 @@ class FusionModel(nn.Module):
                 # TODO: do we need to activate?
                 self.expr_to_morph_proj = nn.Linear(expr_encoder_dim, morph_encoder_dim)
                 # self.expr_norm = nn.LayerNorm(self.morph_dim)  # TODO: check if this is needed
-            elif fusion_strategy == 'add':
-                assert expr_encoder_dim == morph_encoder_dim, (
-                    'If `use_proj` is False, then expr_encoder_dim must be equal to morph_encoder_dim.'
-                )
-            else:
+            elif fusion_strategy != 'add':
                 logger.warning('No projection layer used for expr to morph dimension alignment.')
-                assert use_modality_embed is False and expr_encoder_dim == morph_encoder_dim, f'Modality embedding requires same embedding dimension. Use `use_proj=True`.'
 
         if freeze_morph_encoder and self.morph_encoder is not None:
             self.morph_encoder.requires_grad_(False)
@@ -217,9 +175,6 @@ class FusionModel(nn.Module):
 
         self.ln_morph = nn.LayerNorm(embed_dim)
         self.ln_expr = nn.LayerNorm(embed_dim)
-
-        self.set_vision_to_zero = set_vision_to_zero
-        self.drop_num_vision_tokens = drop_num_vision_tokens
 
     def forward_morph(self, images: torch.Tensor) -> torch.Tensor:
         return self.morph_encoder(images)
@@ -256,7 +211,7 @@ class FusionModel(nn.Module):
         assert morph_tokens is not None and expr_tokens is not None
         assert morph_tokens.shape == expr_tokens.shape, f'morph_features and expr_features must have the same shape for early fusion, got morph: {morph_tokens.shape} and expr: {expr_tokens.shape}'
 
-        if self.set_vision_to_zero or not self.normalize_expr_tokens:
+        if not self.normalize_expr_tokens:
             expr_scaled = expr_tokens
         else:
             expr_scaled = self.normalize_expr_to_morph(morph_tokens=morph_tokens, expr_tokens=expr_tokens)
@@ -272,18 +227,6 @@ class FusionModel(nn.Module):
 
             case 'concat':
                 morph_tokens = getattr(self.morph_encoder, self.pos_embed_layer_name)(morph_tokens)
-
-                if self.drop_num_vision_tokens > 0:
-                    # morph_tokens is [B, 1+N_patches, D] after _pos_embed (CLS at index 0)
-                    num_patches = morph_tokens.shape[1] - 1
-                    assert self.drop_num_vision_tokens < num_patches, (
-                        f'drop_num_vision_tokens={self.drop_num_vision_tokens} >= num_patches={num_patches}'
-                    )
-                    # sample patch indices to keep (1-indexed to skip CLS), then prepend CLS
-                    patch_keep = torch.randperm(num_patches, device=morph_tokens.device)[:num_patches - self.drop_num_vision_tokens] + 1
-                    patch_keep = patch_keep.sort().values
-                    keep = torch.cat([morph_tokens.new_zeros(1, dtype=torch.long), patch_keep])
-                    morph_tokens = morph_tokens[:, keep]
 
                 # we use the same positional embedding for expr_tokens
                 # _pos_embed adds a cls token to the input so here we need to remove it
@@ -330,13 +273,6 @@ class FusionModel(nn.Module):
     def forward_expr_tokens(self, expr_tokens: torch.Tensor):
         expr_tokens = self.expr_encoder(expr_tokens)
 
-        if self.permute_expr_tokens in ('in-tile', 'in-batch'):
-            idx = torch.randperm(expr_tokens.shape[1], device=expr_tokens.device)
-            expr_tokens = expr_tokens[:, idx]
-        if self.permute_expr_tokens == 'in-batch':
-            idx = torch.randperm(expr_tokens.shape[0], device=expr_tokens.device)
-            expr_tokens = expr_tokens[idx]
-
         if self.expr_to_morph_proj is not None:
             expr_tokens = self.expr_to_morph_proj(expr_tokens)  # (B, num_transcripts_tokens, morph_dim)
             # expr_tokens = self.expr_norm(expr_tokens)  # TODO: should we norm?
@@ -347,16 +283,7 @@ class FusionModel(nn.Module):
         _, _, H, W = image.shape
         assert H == W
 
-        morph_tokens = self.morph_encoder.patch_embed(image)  # (B, num_image_tokens, embed_dim)
-
-        if self.permute_vision_tokens in ('in-tile', 'in-batch'):
-            idx = torch.randperm(morph_tokens.shape[1], device=morph_tokens.device)
-            morph_tokens = morph_tokens[:, idx]
-        if self.permute_vision_tokens == 'in-batch':
-            idx = torch.randperm(morph_tokens.shape[0], device=morph_tokens.device)
-            morph_tokens = morph_tokens[idx]
-
-        return morph_tokens
+        return self.morph_encoder.patch_embed(image)  # (B, num_image_tokens, embed_dim)
 
     def infer_route(self, batch: dict) -> Literal['fusion', 'morph_only', 'expr_only']:
         has_morph = glom(batch, self.morph_key, default=_MISSING) is not _MISSING
@@ -416,10 +343,6 @@ class FusionModel(nn.Module):
 
             if self.fusion_stage == 'early':
                 morph_tokens = self.patchify(images)  # (B, num_tokens, morph_dim)
-
-                if self.set_vision_to_zero:
-                    morph_tokens = torch.zeros_like(morph_tokens)
-
                 features = self.forward_early_fusion(morph_tokens=morph_tokens, expr_tokens=expr_tokens)
 
             elif self.fusion_stage == 'late':

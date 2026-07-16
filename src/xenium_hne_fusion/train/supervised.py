@@ -152,9 +152,7 @@ def build_supervised_lit(resolved: ResolvedTrainingConfig, checkpoint_path: str 
         pos_embed_layer_name=cfg.backbone.pos_embed_layer_name,
         freeze_morph_encoder=cfg.backbone.freeze_morph_encoder,
         freeze_expr_encoder=cfg.backbone.freeze_expr_encoder,
-        set_vision_to_zero=cfg.backbone.set_vision_to_zero,
         normalize_expr_tokens=cfg.backbone.normalize_expr_tokens,
-        drop_num_vision_tokens=cfg.backbone.drop_num_vision_tokens,
     )
 
     embed_dim = infer_head_input_dim(
