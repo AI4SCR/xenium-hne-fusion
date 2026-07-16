@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 @dataclass
 class TaskConfig:
-    target: Literal['expression', 'cell_types', 'rgb', 'conch', 'conch_scores', 'proteins'] | None = None
+    target: Literal['expression', 'cell_types', 'rgb', 'conch_class', 'conch_scores', 'proteins'] | None = None
     type: Literal['regression', 'classification'] = 'regression'
 
 

@@ -90,7 +90,7 @@ def get_target_names(resolved: ResolvedTrainingConfig) -> list[str] | None:
         return sorted(cells[CELL_TYPE_COL].cat.categories.tolist())
     if cfg.task.target == "proteins":
         return PROTEIN_PANEL
-    if cfg.task.target in ("conch", "conch_scores"):
+    if cfg.task.target in ("conch_class", "conch_scores"):
         return CONCH_CLASSES
     return None
 

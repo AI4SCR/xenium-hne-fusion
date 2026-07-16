@@ -37,7 +37,7 @@ class TileDataset(Items):
     """
 
     def __init__(self, *,
-                 target: Literal['cell_types', 'expression', 'rgb', 'conch', 'conch_scores', 'proteins'],
+                 target: Literal['cell_types', 'expression', 'rgb', 'conch_class', 'conch_scores', 'proteins'],
                  source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
                  include_image: bool = False,
@@ -63,7 +63,7 @@ class TileDataset(Items):
         self.cell_type_col = cell_type_col
 
         assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb',
-                                                                                 'conch', 'conch_scores', 'proteins'], "target_panel must be specified when target is 'expression'"
+                                                                                 'conch_class', 'conch_scores', 'proteins'], "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
@@ -74,29 +74,16 @@ class TileDataset(Items):
         tile_dir = Path(item['tile_dir'])
 
         if self.cache_dir is not None and self.has_cache(iid=iid):
-
-            conch_class = item.get('conch_class', -1)
-            conch_scores = item.get('conch_scores', -1)
-
-            item = torch.load(self.get_cache_path(iid), weights_only=False)
-
-            item['conch_class'] = conch_class
-            item['conch_scores'] = torch.tensor(conch_scores).float()
-            item['rgb'] = item['modalities']['image'].float().mean(dim=(1, 2))
-
-            if not self.include_image:
-                item['modalities'].pop('image', None)
-            if not self.include_expr:
-                item['modalities'].pop('expr_tokens', None)
+            # merge onto `item` (not replace it) so json-sourced fields like conch_class/conch_scores survive
+            item.update(torch.load(self.get_cache_path(iid), weights_only=False))
         else:
-
             if self.include_expr or self.target == 'expression':
                 expr = pd.read_parquet(tile_dir / f'expr-kernel_size=16.parquet')
                 if 'token_index' in expr.columns:
                     expr = expr.drop(columns=['token_index'])
 
             modalities = {}
-            if self.include_image:
+            if self.include_image or self.target == 'rgb':
                 modalities['image'] = torch.load(tile_dir / 'tile.pt', weights_only=True)
 
             if self.include_expr:
@@ -125,11 +112,24 @@ class TileDataset(Items):
                 proteins = pd.read_parquet(tile_dir / 'proteins.parquet', columns=PROTEIN_PANEL)
                 proteins = proteins.mean()
                 item['proteins'] = torch.tensor(np.arcsinh(proteins.values), dtype=torch.float32)
-            elif self.target == 'rgb':
-                target = item['modalities']['image'].float().mean(dim=(1, 2))
-                item['rgb'] = target
+            elif self.target in ('rgb', 'conch_class', 'conch_scores'):
+                pass  # handled uniformly below for both cache and non-cache paths
             else:
                 raise ValueError(f"Unsupported target: {self.target}")
+
+        if self.target == 'rgb':
+            assert 'image' in item['modalities'], "target='rgb' requires the image modality (include_image or a cached image)"
+            item['rgb'] = item['modalities']['image'].float().mean(dim=(1, 2))
+        elif self.target in ('conch_class', 'conch_scores'):
+            # sourced directly from item json metadata, not from tile_dir files
+            assert self.target in item, f"'{self.target}' missing from item metadata"
+            if self.target == 'conch_scores':
+                item['conch_scores'] = torch.tensor(item['conch_scores']).float()
+
+        if not self.include_image:
+            item['modalities'].pop('image', None)
+        if not self.include_expr:
+            item['modalities'].pop('expr_tokens', None)
 
         if self.include_expr and self.expr_pool == 'tile':
             item['modalities']['expr_tokens'] = item['modalities']['expr_tokens'].mean(dim=0)
