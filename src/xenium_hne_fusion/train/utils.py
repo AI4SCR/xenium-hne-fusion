@@ -1,22 +1,30 @@
 import os
-from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
-from xenium_hne_fusion.train.config import Config
-from xenium_hne_fusion.utils.getters import get_managed_paths, get_panels_dir
+from xenium_hne_fusion.train.config import TrainingConfig
+from xenium_hne_fusion.utils.getters import ManagedPaths
 
 
-@dataclass
-class ResolvedTrainingConfig:
-    cfg: Config
-    output_dir: Path
-    num_source_genes: int | None
-    num_outputs: int
+def resolve_training_paths(cfg: TrainingConfig) -> TrainingConfig:
+    """Resolve items/metadata/panel/cache paths and set `cfg.output_dir`. Mutates `cfg` in place."""
+    assert cfg.data.data_dir is not None, 'cfg.data.data_dir must be set'
+    assert cfg.data.name is not None, 'cfg.data.name must be set'
+    assert cfg.data.items_path is not None, 'cfg.data.items_path must be set'
+    assert cfg.data.metadata_path is not None, 'cfg.data.metadata_path must be set'
+    assert cfg.data.panel_path is not None, 'cfg.data.panel_path must be set'
+
+    managed = ManagedPaths(data_dir=cfg.data.data_dir, name=cfg.data.name)
+    cfg.output_dir = managed.output_dir
+    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=managed.output_dir / 'items')
+    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=managed.output_dir / 'splits')
+    cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=managed.panels_dir)
+    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=managed.output_dir / 'cache')
+    return cfg
 
 
-def load_panel_config(cfg: Config) -> Config:
+def load_panel_config(cfg: TrainingConfig) -> TrainingConfig:
     if cfg.data.panel_path is None:
         return cfg
     assert cfg.data.panel_path.exists(), f"Panel file not found: {cfg.data.panel_path}"
@@ -28,7 +36,7 @@ def load_panel_config(cfg: Config) -> Config:
     return cfg
 
 
-def validate_task_config(cfg: Config) -> None:
+def validate_task_config(cfg: TrainingConfig) -> None:
     assert cfg.task.target is not None, "cfg.task.target"
     assert cfg.lit.target_key is not None, "cfg.lit.target_key must be set explicitly"
 
@@ -68,15 +76,14 @@ def validate_task_config(cfg: Config) -> None:
     raise ValueError(f"Unknown task target: {cfg.task.target}")
 
 
-def resolve_num_source_genes(cfg: Config) -> int | None:
+def resolve_num_source_genes(cfg: TrainingConfig) -> int | None:
     if cfg.backbone.expr_encoder_name is None:
         return None
     assert cfg.data.source_panel is not None, "cfg.data.source_panel must be set when using an expression encoder"
     return len(cfg.data.source_panel)
 
 
-def resolve_num_outputs(cfg: Config) -> int:
-    validate_task_config(cfg)
+def resolve_num_outputs(cfg: TrainingConfig) -> int:
     if cfg.task.target == "expression":
         assert cfg.data.target_panel is not None
         return len(cfg.data.target_panel)
@@ -84,18 +91,17 @@ def resolve_num_outputs(cfg: Config) -> int:
     return cfg.head.output_dim
 
 
-def prepare_training_config(cfg: Config) -> ResolvedTrainingConfig:
-    cfg, output_dir = resolve_training_paths(cfg)
-    cfg = load_panel_config(cfg)
+def resolve_training_config(cfg: TrainingConfig) -> TrainingConfig:
+    """Single entrypoint for config resolution: paths, panel, task validation, and derived dims.
+
+    Mutates and returns `cfg` with `output_dir`, `num_source_genes`, and `num_outputs` populated.
+    """
+    resolve_training_paths(cfg)
+    load_panel_config(cfg)
     validate_task_config(cfg)
-    num_source_genes = resolve_num_source_genes(cfg)
-    num_outputs = resolve_num_outputs(cfg)
-    return ResolvedTrainingConfig(
-        cfg=cfg,
-        output_dir=output_dir,
-        num_source_genes=num_source_genes,
-        num_outputs=num_outputs,
-    )
+    cfg.num_source_genes = resolve_num_source_genes(cfg)
+    cfg.num_outputs = resolve_num_outputs(cfg)
+    return cfg
 
 
 def infer_head_input_dim(
@@ -113,7 +119,7 @@ def infer_head_input_dim(
     return embed_dim
 
 
-def set_fast_dev_run_settings(cfg: Config) -> Config:
+def set_fast_dev_run_settings(cfg: TrainingConfig) -> TrainingConfig:
     cfg.wandb.project = 'debug'
     cfg.data.batch_size = 2
     cfg.data.num_workers = 0
@@ -125,21 +131,6 @@ def set_fast_dev_run_settings(cfg: Config) -> Config:
     cfg.trainer.limit_predict_batches = 2
     cfg.lit.num_warmup_epochs = 2
     return cfg
-
-
-def resolve_training_paths(cfg: Config) -> tuple[Config, Path]:
-    name = cfg.data.name
-    assert name is not None, 'cfg.data.name must be set'
-    assert cfg.data.items_path is not None, 'cfg.data.items_path must be set'
-    assert cfg.data.metadata_path is not None, 'cfg.data.metadata_path must be set'
-    assert cfg.data.panel_path is not None, 'cfg.data.panel_path must be set'
-
-    output_dir = get_managed_paths(name).output_dir
-    cfg.data.items_path = _resolve_path(cfg.data.items_path, root=output_dir / 'items')
-    cfg.data.metadata_path = _resolve_path(cfg.data.metadata_path, root=output_dir / 'splits')
-    cfg.data.panel_path = _resolve_path(cfg.data.panel_path, root=get_panels_dir(name))
-    cfg.data.cache_dir = _resolve_path(cfg.data.cache_dir, root=output_dir / 'cache')
-    return cfg, output_dir
 
 
 def _resolve_path(path: Path | None, *, root: Path | None = None, default: Path | None = None) -> Path | None:

@@ -1,33 +1,40 @@
-from dotenv import load_dotenv
-from jsonargparse import ArgumentParser
-
-from xenium_hne_fusion.train.config import Config
+from xenium_hne_fusion.train.config import TrainingConfig
 from xenium_hne_fusion.train.supervised import main, train
-
-load_dotenv(override=True)
 
 # Manual debug entrypoint for quick local iteration.
 # Uncomment to run without going through the CLI.
-# fast_dev_run = debug = True
-from pathlib import Path
-# cfg = Config.from_yaml(Path("/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/train/beat/rgb/expr-token.yaml"))
-# # cfg = Config.from_yaml(Path("configs/train/beat/expression/late-fusion.yaml"))
-# # cfg = Config.from_yaml(Path("configs/train/beat/expression/vision.yaml"))
-# # cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-token.yaml"))
-# # cfg = Config.from_yaml(Path("configs/train/beat/expression/expr-tile.yaml"))
-# # cfg = Config.from_yaml(Path("configs/train/beat/cell_types/expr-token-vit.yaml"))
-# cfg = Config.from_yaml(Path("/work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/configs/train/beat/conch_labels/early-fusion.yaml"))
+# from dotenv import load_dotenv
+# load_dotenv(override=True)
+# from pathlib import Path
+# debug = True
+# cfg = TrainingConfig.from_yaml(Path("configs/train/owkin/proteins/early-fusion.yaml"))
 # train(cfg, debug=debug)
 
-#%%
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("--config", action="config")
-    parser.add_class_arguments(Config, None)
 
-    cfg = parser.parse_args()
+def _build_parser():
+    from jsonargparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("--config", action="config", required=True)
+    parser.add_class_arguments(TrainingConfig, nested_key="train")
+    parser.add_argument("--debug", type=bool, default=False)
+    return parser
+
+
+def cli(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
+
+    load_dotenv(override=True)
+
+    parser = _build_parser()
+    cfg = parser.parse_args(argv)
     config_path = cfg.as_dict().get("config")
-    init = parser.instantiate_classes(cfg)
-    d = vars(init)
-    d.pop("config", None)
-    raise SystemExit(main(Config(**d), config_path=config_path))
+    init = parser.instantiate(cfg)
+    main(init.train, debug=init.debug, config_path=config_path)
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(cli(sys.argv[1:]))

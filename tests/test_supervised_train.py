@@ -9,13 +9,13 @@ from torchvision.transforms import v2
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.models.encoders import log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
-from xenium_hne_fusion.train.config import Config
+from xenium_hne_fusion.train.config import TrainingConfig
 from xenium_hne_fusion.train.lit import RegressionLit
 from xenium_hne_fusion.train.supervised import infer_head_input_dim, resolve_num_outputs, validate_task_config
 
 
-def make_expression_cfg() -> Config:
-    cfg = Config()
+def make_expression_cfg() -> TrainingConfig:
+    cfg = TrainingConfig()
     cfg.task.target = 'expression'
     cfg.lit.target_key = 'target'
     cfg.data.source_panel = ['A', 'B']
@@ -23,8 +23,8 @@ def make_expression_cfg() -> Config:
     return cfg
 
 
-def make_cell_type_cfg() -> Config:
-    cfg = Config()
+def make_cell_type_cfg() -> TrainingConfig:
+    cfg = TrainingConfig()
     cfg.task.target = 'cell_types'
     cfg.head.output_dim = 39
     cfg.lit.target_key = 'target'

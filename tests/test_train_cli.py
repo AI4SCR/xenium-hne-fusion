@@ -1,16 +1,9 @@
 import importlib.util
 from pathlib import Path
 
-from xenium_hne_fusion.train.config import (
-    BackboneConfig,
-    Config,
-    DataLoaderConfig,
-    HeadConfig,
-    LitConfig,
-    TaskConfig,
-    TrainerConfig,
-    WandbConfig,
-)
+from xenium_hne_fusion.train.config import TrainingConfig
+
+CONFIG_PATH = "configs/train/owkin/proteins/early-fusion.yaml"
 
 
 def _load_script(path: str, module_name: str):
@@ -22,37 +15,40 @@ def _load_script(path: str, module_name: str):
     return module
 
 
-def test_supervised_parser_reads_yaml_config_into_namespace():
+def test_supervised_parser_reads_yaml_config_into_nested_namespace():
     module = _load_script("scripts/train/supervised.py", "train_supervised_script")
     parser = module._build_parser()
 
-    namespace = parser.parse_args(["--config", "configs/train/beat/expression/early-fusion.yaml"])
+    namespace = parser.parse_args(["--config", CONFIG_PATH])
     data = namespace.as_dict()
 
     assert data["debug"] is False
-    assert data["task"]["target"] == "expression"
-    assert data["backbone"]["morph_encoder_name"] == "vit_small_patch16_224"
-    assert data["data"]["items_path"] == Path("expr.json")
-    assert data["data"]["metadata_path"] == Path("expr/outer=0-inner=0-seed=0.parquet")
-    assert data["data"]["panel_path"] == Path("default.yaml")
+    assert data["train"]["task"]["target"] == "proteins"
+    assert data["train"]["backbone"]["morph_encoder_name"] == "vit_small_patch16_224"
+    assert data["train"]["data"]["items_path"] == Path("cells.json")
+    assert data["train"]["data"]["metadata_path"] == Path("cells/outer=0-inner=0-seed=0.parquet")
+    assert data["train"]["data"]["panel_path"] == Path("owkin-beat.yaml")
 
 
-def test_supervised_namespace_bridge_returns_concrete_training_config():
-    module = _load_script("scripts/train/supervised.py", "train_supervised_bridge_script")
-    parser = module._build_parser()
-    namespace = parser.parse_args(["--config", "configs/train/beat/expression/early-fusion.yaml"])
+def test_supervised_cli_instantiates_concrete_training_config_and_calls_main(monkeypatch):
+    module = _load_script("scripts/train/supervised.py", "train_supervised_cli_script")
 
-    cfg = module._namespace_to_config(namespace)
+    captured = {}
 
-    assert isinstance(cfg, Config)
-    assert isinstance(cfg.task, TaskConfig)
-    assert isinstance(cfg.head, HeadConfig)
-    assert isinstance(cfg.backbone, BackboneConfig)
-    assert isinstance(cfg.data, DataLoaderConfig)
-    assert isinstance(cfg.lit, LitConfig)
-    assert isinstance(cfg.trainer, TrainerConfig)
-    assert isinstance(cfg.wandb, WandbConfig)
-    assert cfg.task.target == "expression"
-    assert cfg.data.items_path == Path("expr.json")
-    assert cfg.data.metadata_path == Path("expr/outer=0-inner=0-seed=0.parquet")
-    assert cfg.data.panel_path == Path("default.yaml")
+    def fake_main(cfg, debug=None, config_path=None):
+        captured["cfg"] = cfg
+        captured["debug"] = debug
+        captured["config_path"] = config_path
+
+    monkeypatch.setattr(module, "main", fake_main)
+
+    exit_code = module.cli(["--config", CONFIG_PATH])
+
+    assert exit_code == 0
+    cfg = captured["cfg"]
+    assert isinstance(cfg, TrainingConfig)
+    assert cfg.task.target == "proteins"
+    assert cfg.data.items_path == Path("cells.json")
+    assert cfg.data.metadata_path == Path("cells/outer=0-inner=0-seed=0.parquet")
+    assert cfg.data.panel_path == Path("owkin-beat.yaml")
+    assert captured["debug"] is False

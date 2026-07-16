@@ -114,7 +114,8 @@ class TrainingConfig:
     def from_yaml(cls, path: Path) -> 'TrainingConfig':
         import yaml
         data = yaml.safe_load(path.read_text()) or {}
-        return _merge_dataclass(cls, data)
+        assert 'train' in data, f"config file must be nested under a top-level 'train' key: {path}"
+        return _merge_dataclass(cls, data['train'])
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'TrainingConfig':
