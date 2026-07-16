@@ -1,6 +1,6 @@
 # Xenium x H&E Fusion
 
-Research code for ["Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer"](https://openreview.net/forum?id=h2GcySraTP) (ICLR 2026 Workshop LMRL) — an early-fusion multimodal transformer that integrates subcellular Xenium transcript readouts directly into the ViT token stream for gene expression prediction and downstream patient-level MIL tasks.
+Research code for ["Learning Joint Morpho-Molecular Tissue Representations with a Multimodal Transformer"](https://openreview.net/forum?id=h2GcySraTP) (ICLR 2026 Workshop LMRL) — an early-fusion multimodal transformer that integrates subcellular Xenium transcript readouts directly into the ViT token stream for gene expression prediction.
 
 Primary results are on an internal Xenium cohort (BEAT); we also benchmark on [`hest1k`](https://arxiv.org/abs/2406.16192) using splits and panels from the [HESCAPE](https://arxiv.org/abs/2508.01490) benchmark.
 
@@ -11,8 +11,6 @@ raw data
   └─► structure + process (scripts/data/)
         └─► items + splits + panels (scripts/artifacts/)
               └─► supervised training (scripts/train/supervised.py)
-                    └─► prediction cache (scripts/artifacts/cache_predictions.py)
-                          └─► MIL training (scripts/train/mil.py)
 ```
 
 Each stage writes managed outputs under `DATA_DIR/03_output/<name>/`. All paths in configs are relative to that root.
@@ -23,13 +21,12 @@ Each stage writes managed outputs under `DATA_DIR/03_output/<name>/`. All paths 
 xenium-hne-fusion/
 ├── src/xenium_hne_fusion/   # reusable package code
 ├── scripts/data/            # dataset structuring and processing entrypoints
-├── scripts/artifacts/       # items, splits, panels, stats, and MIL cache/metadata
-├── scripts/train/           # training entrypoints (supervised and MIL)
+├── scripts/artifacts/       # items, splits, panels, and stats
+├── scripts/train/           # supervised training entrypoint
 ├── scripts/eval/            # W&B score plots and paired tests
 ├── configs/data/            # dataset processing configs
 ├── configs/artifacts/       # artifact generation configs
 ├── configs/train/           # supervised training configs
-├── configs/mil/             # MIL training configs
 ├── configs/eval/            # evaluation configs
 ├── slurm/                   # Slurm experiment command references
 ├── ray/                     # Ray submission helpers and command references
@@ -79,9 +76,6 @@ Use `uv run ...` for all entrypoints — it loads `.env` automatically.
 | `scripts/data/create_items.py` | Build `03_output/<name>/items/all.json` tile inventory |
 | `scripts/artifacts/create_artifacts.py` | Filter items, create splits and gene panels |
 | `scripts/train/supervised.py` | Train a supervised tile-level model (expression / cell types) |
-| `scripts/artifacts/create_mil_metadata.py` | Join items with clinical labels for MIL |
-| `scripts/artifacts/cache_predictions.py` | Run pretrained model inference; write per-patient bags (GPU) |
-| `scripts/train/mil.py` | Train a MIL aggregator on top of cached embeddings |
 | `scripts/eval/plot_wandb_scores.py` | Fetch W&B runs and produce score plots + paired tests |
 | `scripts/artifacts/warmup_cache.py` | Pre-populate tile feature cache before GPU training |
 
@@ -116,7 +110,6 @@ All exact submission commands live in the referenced `.md` files — use them as
 | [slurm/beat.md](slurm/beat.md) | BEAT data prep, supervised training, evaluation |
 | [slurm/hescape.md](slurm/hescape.md) | HESCAPE artifact creation and training sweep |
 | [slurm/hest1k.md](slurm/hest1k.md) | HEST-1k data structuring and processing |
-| [slurm/mil.md](slurm/mil.md) | MIL pipeline: chained cache → training jobs for all run IDs and aggregators |
 | [ray/hescape.md](ray/hescape.md) | Ray equivalents for HESCAPE training |
 | [ray/beat.md](ray/beat.md) | Ray equivalents for BEAT training |
 

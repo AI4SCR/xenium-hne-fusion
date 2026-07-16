@@ -10,6 +10,25 @@ class FilterConfig:
     include_ids: list[str] | None = None
     exclude_ids: list[str] | None = None
 
+    def select(self, available_ids: list[str]) -> list[str]:
+        assert self.include_ids is None or self.exclude_ids is None, 'include_ids and exclude_ids are mutually exclusive'
+        available = sorted(available_ids)
+        available_set = set(available)
+
+        if self.include_ids is not None:
+            missing = sorted(set(self.include_ids) - available_set)
+            assert not missing, f'Unknown sample_ids in include_ids: {missing}'
+            selected = sorted(self.include_ids)
+        elif self.exclude_ids is not None:
+            missing = sorted(set(self.exclude_ids) - available_set)
+            assert not missing, f'Unknown sample_ids in exclude_ids: {missing}'
+            selected = [sample_id for sample_id in available if sample_id not in set(self.exclude_ids)]
+        else:
+            selected = available
+
+        assert selected, f'No samples match filter: {self}'
+        return selected
+
 
 @dataclass
 class TilesConfig:
@@ -22,60 +41,11 @@ class TilesConfig:
 
 
 @dataclass
-class ItemsThresholdConfig:
-    organs: list[str] | None = None
-    include_ids: list[str] | None = None
-    exclude_ids: list[str] | None = None
-    num_transcripts: int | None = None
-    num_unique_transcripts: int | None = None
-    num_cells: int | None = None
-    num_unique_cells: int | None = None
-
-
-@dataclass
-class ItemsConfig:
-    name: str
-    filter: ItemsThresholdConfig = field(default_factory=ItemsThresholdConfig)
-
-
-@dataclass
-class SplitConfig:
-    name: str
-    test_size: float | None = None
-    val_size: float | None = None
-    stratify: bool = False
-    target_column_name: str | None = None
-    encode_targets: bool = False
-    nan_value: int = -1
-    use_filtered_targets_for_train: bool = False
-    include_targets: list[str] | None = None
-    group_column_name: str | None = None
-    random_state: int | None = None
-
-
-@dataclass
-class PanelConfig:
-    name: str | None = None
-    metadata_path: Path | None = None
-    n_top_genes: int | None = None
-    flavor: str | None = None
-
-
-@dataclass
 class DataConfig:
     name: str
     cell_type_col: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
-
-
-@dataclass
-class ArtifactsConfig:
-    name: str
-    cell_type_col: str
-    items: ItemsConfig = field(default_factory=lambda: ItemsConfig(name='default'))
-    split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
-    panel: PanelConfig | None = None
 
 
 @dataclass
@@ -92,21 +62,6 @@ class EvalConfig:
     output_dir: Path
     filters: Filters
     baseline: str = 'vision'
-    parameter_columns: list[str] | None = None
-    sort_by_score: bool = True
-
-
-@dataclass
-class MILEvalConfig:
-    @dataclass
-    class Filters:
-        name: str                            # dataset name, e.g. 'beat'
-        aggregator: str                      # e.g. 'attention'
-        metadata_paths: list[str] | None = None
-
-    project: str
-    output_dir: Path
-    filters: Filters
     parameter_columns: list[str] | None = None
     sort_by_score: bool = True
 

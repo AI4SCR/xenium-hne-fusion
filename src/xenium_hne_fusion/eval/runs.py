@@ -13,8 +13,6 @@ _DEDUP_KEY_COLUMNS = [
     'config.backbone.learnable_gate',
     'config.backbone.freeze_morph_encoder',
     'config.backbone.freeze_expr_encoder',
-    'config.aggregator.name',     # MIL: aggregator is a model dimension
-    'config.pretrained.run_id',   # MIL: identifies the fold (absent in supervised runs → NaN)
 ]
 
 

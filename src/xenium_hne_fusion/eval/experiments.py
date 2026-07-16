@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 from loguru import logger
 
-from xenium_hne_fusion.config import EvalConfig, MILEvalConfig
+from xenium_hne_fusion.config import EvalConfig
 from xenium_hne_fusion.utils.getters import get_managed_paths
 
 TARGETS = {'expression', 'cell_types'}
@@ -48,35 +48,6 @@ def select_runs(
     return selected, _plot_title(eval_cfg), output_name
 
 
-def select_mil_runs(
-    runs: pd.DataFrame,
-    *,
-    eval_cfg: MILEvalConfig,
-) -> tuple[pd.DataFrame, str, str]:
-    filters = eval_cfg.filters
-    required_columns = ['config.data.name', 'config.wandb.name', 'config.aggregator.name',
-                        'config.data.metadata_path']
-    _assert_columns(runs, required_columns)
-
-    def matches(row: pd.Series) -> bool:
-        if row['config.data.name'] != filters.name:
-            return False
-        if row['config.aggregator.name'] != filters.aggregator:
-            return False
-        return _path_matches_any(row['config.data.metadata_path'], filters.metadata_paths, root='splits')
-
-    selected = runs.loc[runs.apply(matches, axis=1)].copy()
-    dataset = DATASET_LABELS.get(filters.name, filters.name.upper())
-    title = f'{dataset} MIL — {filters.aggregator}'
-    output_name = f'{filters.aggregator}/{_clean_name(filters.name)}-mil'
-    logger.info(
-        f'Selected {len(selected)}/{len(runs)} W&B runs for '
-        f'dataset={filters.name}, metadata_paths={filters.metadata_paths}'
-    )
-    assert not selected.empty, 'No W&B runs match MIL eval config'
-    return selected, title, output_name
-
-
 def _items_path_matches(value, items_filename: str) -> bool:
     path = _normalize_path(value)
     if path is None:
@@ -109,7 +80,7 @@ def build_plot_output_prefix(output_name: str, *, output_dir: Path) -> Path:
     return output_dir / output_name
 
 
-def resolve_eval_output_dir(eval_cfg: EvalConfig | MILEvalConfig, override: Path | None = None) -> Path:
+def resolve_eval_output_dir(eval_cfg: EvalConfig, override: Path | None = None) -> Path:
     output_dir = override or eval_cfg.output_dir
     if output_dir.is_absolute():
         return output_dir
