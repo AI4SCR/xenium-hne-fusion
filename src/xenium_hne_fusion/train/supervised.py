@@ -104,7 +104,7 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def build_supervised_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
+def build_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
     num_source_genes = cfg.num_source_genes
     num_outputs = cfg.num_outputs
 
@@ -198,7 +198,7 @@ def build_supervised_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike
     return lit_cls(**lit_kws)
 
 
-def build_supervised_dataset_kws(cfg: TrainingConfig) -> dict:
+def build_dataset_kws(cfg: TrainingConfig) -> dict:
     morph_encoder_name = cfg.backbone.morph_encoder_name
     morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
     expr_encoder_name = cfg.backbone.expr_encoder_name
@@ -255,7 +255,7 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
     )
 
     target_names = get_target_names(cfg)
-    lit = build_supervised_lit(cfg, target_names=target_names)
+    lit = build_lit(cfg, target_names=target_names)
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -266,7 +266,7 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
     if cfg.data.num_workers > 0 and cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
-    dataset_kws = build_supervised_dataset_kws(cfg)
+    dataset_kws = build_dataset_kws(cfg)
 
     if cfg.data.cache_dir is not None:
         # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.

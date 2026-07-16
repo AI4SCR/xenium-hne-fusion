@@ -15,11 +15,12 @@ import lazyslide as zs
 from lazyslide.models import MODEL_REGISTRY
 
 from xenium_hne_fusion.datasets.tiles import TileDataset
-from xenium_hne_fusion.utils.getters import get_managed_paths
+from xenium_hne_fusion.utils.getters import ManagedPaths
 
 @dataclass
 class FMDataConfig:
     name: str
+    data_dir: Path
     master_path: Path
     items_path: Path
     batch_size: int = 256
@@ -34,10 +35,9 @@ class FMModelConfig:
 class FMEmbeddingsConfig:
     data: FMDataConfig
     model: FMModelConfig = field(default_factory=FMModelConfig)
-    overwrite: bool = False
 
-def main(cfg: FMEmbeddingsConfig) -> int:
-    paths = get_managed_paths(cfg.data.name)
+def main(cfg: FMEmbeddingsConfig, *, overwrite: bool = False) -> int:
+    paths = ManagedPaths(data_dir=cfg.data.data_dir, name=cfg.data.name)
     output_dir = paths.output_dir
 
     items_path = cfg.data.items_path
@@ -77,7 +77,7 @@ def main(cfg: FMEmbeddingsConfig) -> int:
 
     for sid in sample_ids:
         out_path = save_dir / f'{sid}.parquet'
-        if out_path.exists() and not cfg.overwrite:
+        if out_path.exists() and not overwrite:
             logger.info(f'Skip {sid} (already exists).')
             continue
 
@@ -104,14 +104,18 @@ def main(cfg: FMEmbeddingsConfig) -> int:
 
     return 0
 
-#%%
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
     parser = ArgumentParser()
-    parser.add_argument("--config", action="config")
-    parser.add_class_arguments(FMEmbeddingsConfig, None)
+    parser.add_argument("--config", action="config", required=True)
+    parser.add_class_arguments(FMEmbeddingsConfig, nested_key="fm")
+    parser.add_argument("--overwrite", type=bool, default=False)
 
-    cfg = parser.parse_args()
-    init = parser.instantiate_classes(cfg)
-    d = vars(init)
-    d.pop("config", None)
-    raise SystemExit(main(FMEmbeddingsConfig(**d)))
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    return main(init.fm, overwrite=init.overwrite)
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(cli(sys.argv[1:]))

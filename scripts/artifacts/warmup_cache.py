@@ -5,40 +5,42 @@ Run before supervised training to avoid cache-miss overhead during the first epo
 
 Usage:
     uv run python scripts/artifacts/warmup_cache.py \\
-        --config configs/train/beat/expression/early-fusion.yaml \\
-        --data.items_path cells.json \\
-        --data.panel_path default.yaml \\
-        --data.cache_dir expression/default
+        --config configs/train/owkin/proteins/early-fusion.yaml \\
+        --train.data.items_path cells.json \\
+        --train.data.panel_path default.yaml \\
+        --train.data.cache_dir expression/default
 """
-import sys
-
-from dotenv import load_dotenv
-
-load_dotenv(override=True)
-
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.train.config import TrainingConfig
-from xenium_hne_fusion.train.supervised import build_supervised_dataset_kws
+from xenium_hne_fusion.train.supervised import build_dataset_kws
 from xenium_hne_fusion.train.utils import resolve_training_config
 
 
 def main(cfg: TrainingConfig) -> None:
-    dataset_kws = build_supervised_dataset_kws(resolve_training_config(cfg))
+    dataset_kws = build_dataset_kws(resolve_training_config(cfg))
     # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
     kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
     ds = TileDataset(**kws)
     ds.setup()
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
     from jsonargparse import ArgumentParser
 
-    parser = ArgumentParser()
-    parser.add_argument("--config", action="config")
-    parser.add_class_arguments(TrainingConfig, None)
+    load_dotenv(override=True)
 
-    cfg = parser.parse_args()
-    init = parser.instantiate_classes(cfg)
-    d = vars(init)
-    d.pop("config", None)
-    raise SystemExit(main(TrainingConfig(**d)))
+    parser = ArgumentParser()
+    parser.add_argument("--config", action="config", required=True)
+    parser.add_class_arguments(TrainingConfig, nested_key="train")
+
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    main(init.train)
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(cli(sys.argv[1:]))

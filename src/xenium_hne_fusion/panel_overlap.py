@@ -5,10 +5,11 @@ import matplotlib
 import pandas as pd
 import seaborn as sns
 
-from xenium_hne_fusion.config import ArtifactsConfig
+from xenium_hne_fusion.artifacts.config import ArtifactsConfig
+from xenium_hne_fusion.artifacts.items import apply_filter
 from xenium_hne_fusion.metadata import normalize_sample_metadata
 from xenium_hne_fusion.processing import load_feature_universe
-from xenium_hne_fusion.utils.getters import apply_filter, get_managed_paths
+from xenium_hne_fusion.utils.getters import ManagedPaths
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -208,7 +209,7 @@ def plot_pairwise_overlap(sample_summaries: list[dict], overlap: pd.DataFrame, o
 
 
 def report_feature_overlap(artifacts_cfg: ArtifactsConfig) -> tuple[str, Path]:
-    managed_paths = get_managed_paths(artifacts_cfg.name)
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     items_path = managed_paths.output_dir / 'items' / 'all.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet'
     stats_path = managed_paths.output_dir / 'statistics' / 'all.parquet'

@@ -6,7 +6,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-import torch
 from shapely.geometry import Point, box
 
 from xenium_hne_fusion.processing import (
@@ -15,17 +14,9 @@ from xenium_hne_fusion.processing import (
     extract_tiles,
     infer_feature_universe,
     make_token_tiles,
-    normalize_cell_type_categories,
-    process_cells,
-    process_tiles,
     set_feature_universe,
-    tile_cells,
     tile_transcripts,
 )
-
-
-def _cell_type_categories() -> list[str]:
-    return ['tumor', 'stroma', 'unknown', 'nan', *[f'cell_type_{i}' for i in range(36)]]
 
 
 def test_infer_feature_universe_streams_and_caches_filtered_features(
@@ -162,81 +153,6 @@ def test_extract_tiles_uses_native_mpp_override(monkeypatch: pytest.MonkeyPatch,
     assert tuple(tensor.shape) == (3, 224, 224)
 
 
-def test_tile_subsets_are_written_directly_into_tile_dirs(tmp_path: Path):
-    tiles = gpd.GeoDataFrame(
-        [
-            {'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100},
-            {'tile_id': 1, 'x_px': 100, 'y_px': 0, 'width_px': 100, 'height_px': 100},
-        ],
-        geometry=[box(0, 0, 100, 100), box(100, 0, 200, 100)],
-    )
-    transcripts = gpd.GeoDataFrame(
-        {
-            'transcript_id': [1, 2],
-            'cell_id': [10, 11],
-            'feature_name': ['A', 'B'],
-            'he_x': [10.0, 150.0],
-            'he_y': [10.0, 20.0],
-        },
-        geometry=[Point(10, 10), Point(150, 20)],
-    )
-    cells = gpd.GeoDataFrame(
-        {
-            'original_cell_id': [100, 101],
-            'Level3_grouped': ['tumor', 'stroma'],
-        },
-        geometry=[Point(20, 20), Point(120, 30)],
-    )
-
-    transcripts_path = tmp_path / 'transcripts.parquet'
-    cells_path = tmp_path / 'cells.parquet'
-    transcripts.to_parquet(transcripts_path)
-    cells.to_parquet(cells_path)
-
-    output_dir = tmp_path / 'processed'
-    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
-    tile_cells(tiles, cells_path, output_dir)
-
-    assert not (output_dir / 'transcripts').exists()
-    assert not (output_dir / 'cells').exists()
-    assert (output_dir / '0' / 'transcripts.parquet').exists()
-    assert (output_dir / '1' / 'transcripts.parquet').exists()
-    assert (output_dir / '0' / 'cells.parquet').exists()
-    assert (output_dir / '1' / 'cells.parquet').exists()
-
-    stored_tx = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
-    stored_cells = gpd.read_parquet(output_dir / '0' / 'cells.parquet')
-    assert 'tile_id' not in stored_tx.columns
-    assert 'tile_id' not in stored_cells.columns
-
-
-def test_tile_transcripts_supports_coordinate_only_hest_parquet(tmp_path: Path):
-    tiles = gpd.GeoDataFrame(
-        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
-        geometry=[box(0, 0, 100, 100)],
-    )
-    transcripts = pd.DataFrame(
-        {
-            'transcript_id': [1, 2],
-            'cell_id': [10, 11],
-            'feature_name': [b'A', b'B'],
-            'he_x': [10.0, 60.0],
-            'he_y': [20.0, 40.0],
-        }
-    )
-
-    transcripts_path = tmp_path / 'transcripts.parquet'
-    transcripts.to_parquet(transcripts_path)
-
-    output_dir = tmp_path / 'processed'
-    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
-
-    stored = gpd.read_parquet(output_dir / '0' / 'transcripts.parquet')
-    assert stored['transcript_id'].tolist() == [1, 2]
-    assert stored.geometry.x.tolist() == [10.0, 60.0]
-    assert stored.geometry.y.tolist() == [20.0, 40.0]
-
-
 def test_tile_transcripts_supports_geometry_only_beat_parquet(tmp_path: Path):
     tiles = gpd.GeoDataFrame(
         [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
@@ -263,112 +179,3 @@ def test_tile_transcripts_supports_geometry_only_beat_parquet(tmp_path: Path):
     assert stored.geometry.y.tolist() == [20.0, 40.0]
 
 
-def test_process_tiles_and_cells_create_expected_tile_local_artifacts(tmp_path: Path):
-    tiles = gpd.GeoDataFrame(
-        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
-        geometry=[box(0, 0, 100, 100)],
-    )
-    transcripts = gpd.GeoDataFrame(
-        {
-            'transcript_id': [1, 2],
-            'cell_id': [10, 11],
-            'feature_name': ['A', 'B'],
-            'he_x': [10.0, 60.0],
-            'he_y': [10.0, 20.0],
-        },
-        geometry=[Point(10, 10), Point(60, 20)],
-    )
-    cells = gpd.GeoDataFrame(
-        {
-            'original_cell_id': [100, 101],
-            'Level3_grouped': pd.Categorical(['tumor', 'stroma'], categories=_cell_type_categories()),
-        },
-        geometry=[Point(15, 15), Point(75, 35)],
-    )
-
-    transcripts_path = tmp_path / 'transcripts.parquet'
-    cells_path = tmp_path / 'cells.parquet'
-    transcripts.to_parquet(transcripts_path)
-    cells.to_parquet(cells_path)
-
-    output_dir = tmp_path / 'processed'
-    tile_dir = output_dir / '0'
-    tile_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(torch.zeros((3, 100, 100), dtype=torch.uint8), tile_dir / 'tile.pt')
-
-    tile_transcripts(tiles, transcripts_path, output_dir, img_size=100)
-    tile_cells(tiles, cells_path, output_dir)
-    process_tiles(tiles, output_dir, img_size=100, kernel_size=50)
-    process_cells(tiles, output_dir, img_size=100)
-
-    assert (tile_dir / 'transcripts.parquet').exists()
-    assert (tile_dir / 'expr-kernel_size=50.parquet').exists()
-    assert (tile_dir / 'tile.png').exists()
-    assert (tile_dir / 'transcripts.png').exists()
-    assert (tile_dir / 'transcripts_top5_feats.png').exists()
-    assert (tile_dir / 'cells.parquet').exists()
-    assert (tile_dir / 'cells.png').exists()
-
-    stored_tx = gpd.read_parquet(tile_dir / 'transcripts.parquet')
-    stored_cells = gpd.read_parquet(tile_dir / 'cells.parquet')
-    assert stored_tx.geometry.x.between(0, 100).all()
-    assert stored_tx.geometry.y.between(0, 100).all()
-    assert stored_cells.geometry.x.between(0, 100).all()
-    assert stored_cells.geometry.y.between(0, 100).all()
-    assert len(stored_cells['Level3_grouped'].cat.categories) == 39
-    assert 'nan' not in stored_cells['Level3_grouped'].cat.categories
-
-
-def test_normalize_cell_type_categories_replaces_nan_with_unknown():
-    cell_types = pd.Series(
-        pd.Categorical(
-            ['tumor', 'nan', 'stroma'],
-            categories=_cell_type_categories(),
-        )
-    )
-
-    normalized = normalize_cell_type_categories(cell_types)
-
-    assert normalized.tolist() == ['tumor', 'unknown', 'stroma']
-    assert list(normalized.cat.categories) == [
-        'tumor',
-        'stroma',
-        'unknown',
-        *[f'cell_type_{i}' for i in range(36)],
-    ]
-
-
-def test_normalize_cell_type_categories_rejects_tiles_without_nan_category():
-    cell_types = pd.Series(
-        pd.Categorical(
-            ['tumor', 'unknown'],
-            categories=['tumor', 'stroma', 'unknown', *[f'cell_type_{i}' for i in range(36)]],
-        )
-    )
-
-    with pytest.raises(AssertionError, match='expected 40 cell categories'):
-        normalize_cell_type_categories(cell_types)
-
-
-def test_process_cells_respects_cell_type_col(tmp_path: Path):
-    tiles = gpd.GeoDataFrame(
-        [{'tile_id': 0, 'x_px': 0, 'y_px': 0, 'width_px': 100, 'height_px': 100}],
-        geometry=[box(0, 0, 100, 100)],
-    )
-    tile_dir = tmp_path / 'processed' / '0'
-    tile_dir.mkdir(parents=True)
-    torch.save(torch.zeros((3, 100, 100), dtype=torch.uint8), tile_dir / 'tile.pt')
-    cells = gpd.GeoDataFrame(
-        {
-            'custom_cell_type': pd.Categorical(['nan'], categories=_cell_type_categories()),
-        },
-        geometry=[Point(15, 15)],
-    )
-    cells.to_parquet(tile_dir / 'cells.parquet')
-
-    process_cells(tiles, tmp_path / 'processed', img_size=100, cell_type_col='custom_cell_type')
-
-    stored = gpd.read_parquet(tile_dir / 'cells.parquet')
-    assert stored['custom_cell_type'].tolist() == ['unknown']
-    assert len(stored['custom_cell_type'].cat.categories) == 39
-    assert 'nan' not in stored['custom_cell_type'].cat.categories

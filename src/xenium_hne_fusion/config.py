@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from pathlib import Path
 
 
 @dataclass
@@ -46,24 +45,6 @@ class DataConfig:
     cell_type_col: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
-
-
-@dataclass
-class EvalConfig:
-    @dataclass
-    class Filters:
-        target: str       # expression / cell_types
-        name: str         # hest1k / beat
-        items_path: str   # filename as in train config, e.g. all.json
-        metadata_paths: list[str] | None = None
-        panel_paths: list[str] | None = None
-
-    project: str
-    output_dir: Path
-    filters: Filters
-    baseline: str = 'vision'
-    parameter_columns: list[str] | None = None
-    sort_by_score: bool = True
 
 
 ProcessingConfig = DataConfig
