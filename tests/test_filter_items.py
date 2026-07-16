@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 from loguru import logger
 
-from xenium_hne_fusion.config import ArtifactsConfig, ItemsConfig, ItemsThresholdConfig
-from xenium_hne_fusion.pipeline import filter_items
+from xenium_hne_fusion.artifacts.config import ArtifactsConfig, ItemsFilterConfig, ItemsThresholdConfig
+from xenium_hne_fusion.artifacts.filter import filter_items
 
 
 def _load_filter_items_module():
@@ -51,7 +51,11 @@ def test_filter_items_uses_beat_default_threshold(monkeypatch: pytest.MonkeyPatc
     module = _load_filter_items_module()
     artifacts_cfg = ArtifactsConfig(
         name='beat',
-        items=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
+        data_dir=data_dir,
+        cell_type_col='cell_type',
+        tile_px=256,
+        stride_px=256,
+        items=ItemsFilterConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
     )
     module.main(artifacts_cfg=artifacts_cfg, overwrite=True)
 
@@ -99,7 +103,11 @@ def test_filter_items_filters_hest1k_by_organ(monkeypatch: pytest.MonkeyPatch, t
     module = _load_filter_items_module()
     artifacts_cfg = ArtifactsConfig(
         name='hest1k',
-        items=ItemsConfig(name='lung', filter=ItemsThresholdConfig(organs=['Lung'], num_transcripts=100)),
+        data_dir=data_dir,
+        cell_type_col='cell_type',
+        tile_px=256,
+        stride_px=256,
+        items=ItemsFilterConfig(name='lung', filter=ItemsThresholdConfig(organs=['Lung'], num_transcripts=100)),
     )
     module.main(artifacts_cfg=artifacts_cfg, overwrite=True)
 
@@ -136,7 +144,7 @@ def test_filter_items_derives_stats_from_items_stem(tmp_path: Path):
         items_path=items_path,
         output_path=output_path,
         stats_path=output_dir / 'statistics' / 'subset.parquet',
-        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
+        items_cfg=ItemsFilterConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
 
@@ -175,7 +183,7 @@ def test_filter_items_supports_sample_exclude_ids(tmp_path: Path):
         items_path=items_path,
         output_path=output_path,
         stats_path=output_dir / 'statistics' / 'all.parquet',
-        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(exclude_ids=['S2'], num_transcripts=200)),
+        items_cfg=ItemsFilterConfig(name='default', filter=ItemsThresholdConfig(exclude_ids=['S2'], num_transcripts=200)),
         overwrite=True,
     )
 
@@ -214,7 +222,7 @@ def test_filter_items_drops_items_with_missing_threshold_stats(tmp_path: Path):
         items_path=items_path,
         output_path=output_path,
         stats_path=output_dir / 'statistics' / 'all.parquet',
-        items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
+        items_cfg=ItemsFilterConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
         overwrite=True,
     )
 
@@ -256,7 +264,7 @@ def test_filter_items_logs_stage_counts(tmp_path: Path):
             items_path=items_path,
             output_path=output_path,
             stats_path=output_dir / 'statistics' / 'all.parquet',
-            items_cfg=ItemsConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
+            items_cfg=ItemsFilterConfig(name='default', filter=ItemsThresholdConfig(num_transcripts=200)),
             overwrite=True,
         )
     finally:

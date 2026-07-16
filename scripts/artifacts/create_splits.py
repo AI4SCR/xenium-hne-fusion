@@ -3,35 +3,22 @@
 import sys
 
 from dotenv import load_dotenv
-from jsonargparse import ArgumentParser
 from loguru import logger
 
 load_dotenv()
 
-from xenium_hne_fusion.metadata import (
+from xenium_hne_fusion.artifacts.splits import (
     build_split_metadata_frame,
     save_split_metadata,
 )
-from xenium_hne_fusion.config import ArtifactsConfig
-from xenium_hne_fusion.processing_cli import build_artifacts_parser, namespace_to_artifacts_config
-from xenium_hne_fusion.utils.getters import get_managed_paths
-
-
-def build_parser() -> ArgumentParser:
-    parser = build_artifacts_parser()
-    parser.add_argument('--with-metadata', type=bool, default=False)
-    return parser
-
-
-def parse_args(argv: list[str] | None = None) -> tuple[ArtifactsConfig, bool, bool]:
-    ns = build_parser().parse_args(argv)
-    return namespace_to_artifacts_config(ns), ns.overwrite, ns.with_metadata
+from xenium_hne_fusion.artifacts.config import ArtifactsConfig, build_artifacts_parser
+from xenium_hne_fusion.utils.getters import ManagedPaths
 
 
 def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False, with_metadata: bool = False) -> None:
-    managed_paths = get_managed_paths(artifacts_cfg.name)
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     split_cfg = artifacts_cfg.split
-    items_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
+    items_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     assert items_path.exists(), f'Items not found: {items_path}'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet'
     split_dir = managed_paths.output_dir / 'splits' / split_cfg.name
@@ -50,8 +37,12 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False, with_metadata:
 
 
 def cli(argv: list[str] | None = None) -> int:
-    artifacts_cfg, overwrite_arg, with_metadata_arg = parse_args(argv)
-    main(artifacts_cfg, overwrite=overwrite_arg, with_metadata=with_metadata_arg)
+    parser = build_artifacts_parser()
+    parser.add_argument('--with-metadata', type=bool, default=False)
+
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    main(init.artifacts, overwrite=init.overwrite, with_metadata=init.with_metadata)
     return 0
 
 

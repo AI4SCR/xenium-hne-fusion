@@ -4,10 +4,11 @@ import sys
 
 from dotenv import load_dotenv
 
-from xenium_hne_fusion.config import ArtifactsConfig
-from xenium_hne_fusion.pipeline import filter_items
-from xenium_hne_fusion.processing_cli import parse_artifacts_args
-from xenium_hne_fusion.utils.getters import get_managed_paths
+from xenium_hne_fusion.artifacts.config import ArtifactsConfig, build_artifacts_parser
+from xenium_hne_fusion.artifacts.filter import filter_items
+from xenium_hne_fusion.artifacts.items import DEFAULT_SOURCE_ITEMS_NAME
+from xenium_hne_fusion.artifacts.stats import default_stats_paths
+from xenium_hne_fusion.utils.getters import ManagedPaths
 
 
 def main(
@@ -15,15 +16,14 @@ def main(
     overwrite: bool = False,
 ) -> None:
     load_dotenv()
-    managed_paths = get_managed_paths(artifacts_cfg.name)
-    items_path = managed_paths.output_dir / 'items' / 'all.json'
-    output_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
-    stats_path = managed_paths.output_dir / 'statistics' / f'{items_path.stem}.parquet'
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
+    items_path = managed_paths.items_dir / f'{DEFAULT_SOURCE_ITEMS_NAME}.json'
+    output_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet' if artifacts_cfg.items.filter.organs is not None else None
     filter_items(
         items_path=items_path,
         output_path=output_path,
-        stats_path=stats_path,
+        stats_path=default_stats_paths(managed_paths, items_path).stats,
         items_cfg=artifacts_cfg.items,
         metadata_path=metadata_path,
         overwrite=overwrite,
@@ -31,8 +31,10 @@ def main(
 
 
 def cli(argv: list[str] | None = None) -> int:
-    artifacts_cfg, overwrite_arg = parse_artifacts_args(argv)
-    main(artifacts_cfg=artifacts_cfg, overwrite=overwrite_arg)
+    parser = build_artifacts_parser()
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    main(artifacts_cfg=init.artifacts, overwrite=init.overwrite)
     return 0
 
 

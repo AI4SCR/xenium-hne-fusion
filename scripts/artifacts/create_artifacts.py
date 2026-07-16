@@ -7,23 +7,28 @@ from loguru import logger
 
 load_dotenv()
 
-from xenium_hne_fusion.config import ArtifactsConfig
-from xenium_hne_fusion.hvg import create_panel
-from xenium_hne_fusion.pipeline import compute_items_stats, create_split_collection, filter_items
-from xenium_hne_fusion.processing_cli import parse_artifacts_args
-from xenium_hne_fusion.utils.getters import get_managed_paths
+from xenium_hne_fusion.artifacts.config import ArtifactsConfig, build_artifacts_parser
+from xenium_hne_fusion.artifacts.items import DEFAULT_SOURCE_ITEMS_NAME, create_items
+from xenium_hne_fusion.artifacts.panel import create_panel
+from xenium_hne_fusion.artifacts.stats import compute_items_stats, default_stats_paths
+from xenium_hne_fusion.artifacts.splits import create_split_collection
+from xenium_hne_fusion.artifacts.filter import filter_items
+from xenium_hne_fusion.utils.getters import ManagedPaths
+
+
+def _get_managed_paths(artifacts_cfg: ArtifactsConfig) -> ManagedPaths:
+    return ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
 
 
 def _filter_items(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
-    managed_paths = get_managed_paths(artifacts_cfg.name)
-    items_path = managed_paths.output_dir / 'items' / 'all.json'
-    output_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
-    stats_path = managed_paths.output_dir / 'statistics' / f'{items_path.stem}.parquet'
+    managed_paths = _get_managed_paths(artifacts_cfg)
+    items_path = managed_paths.items_dir / f'{DEFAULT_SOURCE_ITEMS_NAME}.json'
+    output_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet' if artifacts_cfg.items.filter.organs is not None else None
     filter_items(
         items_path=items_path,
         output_path=output_path,
-        stats_path=stats_path,
+        stats_path=default_stats_paths(managed_paths, items_path).stats,
         items_cfg=artifacts_cfg.items,
         metadata_path=metadata_path,
         overwrite=overwrite,
@@ -34,8 +39,8 @@ def _create_panel(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
     panel_cfg = artifacts_cfg.panel
     assert panel_cfg is not None, 'panel is required'
 
-    managed_paths = get_managed_paths(artifacts_cfg.name)
-    panel_path = managed_paths.output_dir / 'panels' / f'{panel_cfg.name}.yaml'
+    managed_paths = _get_managed_paths(artifacts_cfg)
+    panel_path = managed_paths.panels_dir / f'{panel_cfg.name}.yaml'
     assert panel_cfg.name is not None, 'panel.name is required'
 
     if panel_cfg.n_top_genes is None and panel_cfg.flavor is None:
@@ -51,7 +56,7 @@ def _create_panel(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
         logger.info(f'Panel already exists: {panel_path}')
         return
 
-    items_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
+    items_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     split_metadata_path = panel_cfg.metadata_path
     if not split_metadata_path.is_absolute():
         split_metadata_path = managed_paths.output_dir / 'splits' / split_metadata_path
@@ -69,11 +74,22 @@ def _create_panel(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
 
 
 def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
-    managed_paths = get_managed_paths(artifacts_cfg.name)
-    source_items_path = managed_paths.output_dir / 'items' / 'all.json'
-    assert source_items_path.exists(), f'Source items not found: {source_items_path}'
+    managed_paths = _get_managed_paths(artifacts_cfg)
+    source_items_path = create_items(
+        managed_paths.items_dir,
+        managed_paths.processed_dir,
+        tile_px=artifacts_cfg.tile_px,
+        stride_px=artifacts_cfg.stride_px,
+        overwrite=overwrite,
+    )
+    compute_items_stats(
+        source_items_path,
+        managed_paths,
+        cell_type_col=artifacts_cfg.cell_type_col,
+        overwrite=overwrite,
+    )
 
-    filtered_items_path = managed_paths.output_dir / 'items' / f'{artifacts_cfg.items.name}.json'
+    filtered_items_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     _filter_items(artifacts_cfg=artifacts_cfg, overwrite=overwrite)
     assert filtered_items_path.exists(), f'Filtered items not found: {filtered_items_path}'
     create_split_collection(
@@ -91,15 +107,17 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
 
     compute_items_stats(
         filtered_items_path,
-        managed_paths.output_dir,
+        managed_paths,
         cell_type_col=artifacts_cfg.cell_type_col,
         overwrite=overwrite,
     )
 
 
 def cli(argv: list[str] | None = None) -> int:
-    artifacts_cfg, overwrite_arg = parse_artifacts_args(argv)
-    main(artifacts_cfg=artifacts_cfg, overwrite=overwrite_arg)
+    parser = build_artifacts_parser()
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    main(artifacts_cfg=init.artifacts, overwrite=init.overwrite)
     return 0
 
 
