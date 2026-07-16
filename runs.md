@@ -87,3 +87,16 @@ uv run python scripts/artifacts/compute_items_stats.py \
     --config configs/artifacts/owkin/cells.yaml \
     --items-path cells.json
 ```
+
+### Create filtered artifacts (c_cells / d_cells / g_cells)
+
+Runs the full pipeline (filter `all.json` using the default stats -> split -> panel -> stats on
+the filtered subset) for each per-organ-group config. `items/all.json` and `statistics/all.parquet`
+must already exist (see above) — `create_artifacts.py` skips those two stages if so and goes
+straight to filtering:
+
+```bash
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/c_cells.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/d_cells.yaml
+uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/g_cells.yaml
+```

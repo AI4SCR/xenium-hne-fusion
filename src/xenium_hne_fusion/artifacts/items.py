@@ -75,13 +75,9 @@ def create_items(items_dir: Path, processed_dir: Path, tile_px: int, stride_px: 
 
 
 def load_items_dataframe(items_path: Path) -> pd.DataFrame:
-    items = json.loads(items_path.read_text())
-    if isinstance(items, dict):
-        items = list(items.values())
 
-    items_df = pd.DataFrame(items)
-    if items_df.empty:
-        return pd.DataFrame(columns=['id', 'sample_id', 'tile_id', 'tile_dir'])
+    items_df = pd.read_json(items_path)
+    assert not items_df.empty, f"No items found in {items_path}"
 
     required = {'id', 'sample_id', 'tile_id', 'tile_dir'}
     missing = required - set(items_df.columns)

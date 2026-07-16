@@ -46,12 +46,6 @@ def default_stats_paths(managed_paths: ManagedPaths, items_path: Path) -> StatsP
     )
 
 
-def _unbatch(batch: dict) -> list[dict]:
-    """Convert a collated `{key: tensor_or_list}` batch into one dict per row."""
-    batch = {key: value.tolist() if hasattr(value, "tolist") else value for key, value in batch.items()}
-    return [dict(zip(batch, row, strict=True)) for row in zip(*batch.values(), strict=True)]
-
-
 def _plot_transcript_scatter(stats: pd.DataFrame, output_dir: Path, *, log_axes: bool) -> None:
     scatter = stats[["num_transcripts", "num_unique_transcripts"]].dropna()
     if log_axes:
@@ -186,14 +180,11 @@ def compute_items_stats(
         return stats_path
 
     items_df = load_items_dataframe(items_path)
-    assert not items_df.empty, f"No items found in {items_path}"
 
     ds = TileStatisticsDataset(items_path=items_path, metadata_path=None, id_key="id", cell_type_col=cell_type_col)
     ds.setup()
     dl = DataLoader(ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
-    rows = [row for batch in tqdm(dl, desc="Tiles") for row in _unbatch(batch)]
-
-    stats = pd.DataFrame(rows).set_index("id")[STAT_COLS]
+    stats = pd.concat([pd.DataFrame(batch) for batch in tqdm(dl, desc="Tiles")]).set_index("id")[STAT_COLS]
     assert stats.index.is_unique, "Duplicate item ids in stats"
 
     stats_path.parent.mkdir(parents=True, exist_ok=True)

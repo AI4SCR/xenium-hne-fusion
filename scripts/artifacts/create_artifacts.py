@@ -16,12 +16,8 @@ from xenium_hne_fusion.artifacts.filter import filter_items
 from xenium_hne_fusion.utils.getters import ManagedPaths
 
 
-def _get_managed_paths(artifacts_cfg: ArtifactsConfig) -> ManagedPaths:
-    return ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
-
-
 def _filter_items(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
-    managed_paths = _get_managed_paths(artifacts_cfg)
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     items_path = managed_paths.items_dir / f'{DEFAULT_SOURCE_ITEMS_NAME}.json'
     output_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     metadata_path = managed_paths.processed_dir / 'metadata.parquet' if artifacts_cfg.items.filter.organs is not None else None
@@ -39,7 +35,7 @@ def _create_panel(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
     panel_cfg = artifacts_cfg.panel
     assert panel_cfg is not None, 'panel is required'
 
-    managed_paths = _get_managed_paths(artifacts_cfg)
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     panel_path = managed_paths.panels_dir / f'{panel_cfg.name}.yaml'
     assert panel_cfg.name is not None, 'panel.name is required'
 
@@ -74,7 +70,7 @@ def _create_panel(artifacts_cfg: ArtifactsConfig, *, overwrite: bool) -> None:
 
 
 def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
-    managed_paths = _get_managed_paths(artifacts_cfg)
+    managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     source_items_path = create_items(
         managed_paths.items_dir,
         managed_paths.processed_dir,
