@@ -197,29 +197,52 @@ You are an expert coding assistant for research code in computer vision, followi
 - Do not add broad `try/except` wrappers around data processing. Let the violated assumption surface.
 - Do not use root-level `results/` or ad hoc folders for managed dataset outputs that belong under `DATA_DIR/03_output/<name>/`.
 - Do not run full, expensive data/training pipelines as verification unless requested. Prefer targeted unit tests, parser checks, and small debug/fast-dev-run paths.
-- Do not use `add_class_arguments` with per-nested-key registration and manual namespace assembly. Use `add_class_arguments(Config, None)` with `instantiate_classes` and `Config(**d)` where `d = vars(init)` with `config` popped. (`scripts/train/supervised.py` predated this rule and has been migrated.)
+- Do not fold run-flags (`overwrite`, `stage`) into the config dataclass, and do not flatten the config with `nested_key=None`. Register the config under a domain-noun nested key and keep run-flags as separate `add_argument` flags (see "Entrypoint pattern").
+- Do not call `parser.instantiate_classes(...)` — it is deprecated (jsonargparse v4.49.0). Use `parser.instantiate(...)`. Existing scripts still on `instantiate_classes` should be migrated when touched.
 
-## jsonargparse CLI pattern
+## Entrypoint pattern (three layers)
 
-For scripts that take a single config dataclass, use `add_class_arguments` with `nested_key=None`
-to flatten all fields to the top level. This lets `--config` load the YAML and individual fields
-like `--debug true` override without any prefix:
+Every `scripts/` entrypoint is three explicit layers. Keep them separate:
+
+1. **Pure compute** — takes primitives (arrays, paths, scalars), returns values. No `Config`, no CLI
+   knowledge. Lives in `src/xenium_hne_fusion/` and is unit-testable in isolation.
+2. **`main(config: Config, *, <run_flags>)`** — the orchestration boundary. Receives one typed config
+   dataclass plus any run-flags, does I/O, and calls the pure functions. Testable by constructing the
+   dataclass directly.
+3. **`cli()`** — thin jsonargparse glue only: build parser, parse, instantiate, call `main`.
+
+### jsonargparse CLI
+
+Register the config dataclass under a **domain-noun nested key** (`data`, `train`, `artifacts`) — not
+the verb, and not `None`. Run-flags that describe *how this run executes* (`overwrite`, `stage`) are
+**separate `add_argument` flags**, not fields on the config dataclass. Use `instantiate`, not
+`instantiate_classes` (deprecated in jsonargparse v4.49.0, removed in v5).
 
 ```python
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
     from jsonargparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--config", action="config")
-    parser.add_class_arguments(MILConfig, None)   # None = no prefix
+    parser.add_argument("--config", action="config", required=True)
+    parser.add_class_arguments(DataConfig, nested_key="data")   # domain noun, not the verb
+    parser.add_argument("--overwrite", type=bool, default=False)  # run-flag, kept separate
 
-    cfg = parser.parse_args()
-    init = parser.instantiate_classes(cfg)
-    raise SystemExit(main(init))
+    cfg = parser.parse_args(argv)
+    init = parser.instantiate(cfg)
+    return main(init.data, overwrite=init.overwrite)
+
+
+if __name__ == "__main__":
+    import sys
+    raise SystemExit(cli(sys.argv[1:]))
 ```
 
-`main` receives the instantiated config object directly (e.g. `main(init)` where `init` is already
-a `MILConfig`). Do not use `auto_parser` — it wraps args under a `--cfg.` prefix tied to the
-parameter name, which is confusing and inconsistent with `--config`.
+- `main` receives `init.data` (the instantiated `DataConfig`) plus run-flags as kwargs.
+- YAML nests config fields under the key: `data: {name: owkin, tiles: {...}}`; overrides use the
+  prefix (`--data.name owkin`). Run-flags stay top-level (`--overwrite true`).
+- Make config fields that identify the artifact **required** (no default) so an unset path fails early;
+  do not ship placeholder defaults like `Path("test.tiff")`.
+- `cli()` is a plain function returning an exit code; `raise SystemExit(cli(...))` in `__main__`.
+- Do not use `auto_parser` — it wraps args under a `--cfg.` prefix tied to the parameter name.
 
 ## Preferred tools
 
