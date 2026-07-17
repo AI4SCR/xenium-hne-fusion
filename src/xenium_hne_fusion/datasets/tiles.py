@@ -2,7 +2,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Literal
 
-import numpy as np
 import pandas as pd
 import torch
 from ai4bmr_learn.datasets.items import Items
@@ -111,7 +110,7 @@ class TileDataset(Items):
             elif self.target == 'proteins':
                 proteins = pd.read_parquet(tile_dir / 'proteins.parquet', columns=PROTEIN_PANEL)
                 proteins = proteins.mean()
-                item['proteins'] = torch.tensor(np.arcsinh(proteins.values), dtype=torch.float32)
+                item['proteins'] = torch.tensor(proteins.values, dtype=torch.float32)
             elif self.target in ('rgb', 'conch_class', 'conch_scores'):
                 pass  # handled uniformly below for both cache and non-cache paths
             else:
