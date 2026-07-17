@@ -11,15 +11,10 @@ from tqdm import tqdm
 from xenium_hne_fusion.datasets.tiles import TileDataset
 
 
-def get_common_genes(split_metadata: pd.DataFrame, processed_dir: Path) -> list[str]:
-    assert len(split_metadata) > 0, 'No split metadata provided'
-    assert 'split' in split_metadata.columns, 'Missing split column'
-    assert 'sample_id' in split_metadata.columns, 'Missing sample_id column'
-    fit_metadata = split_metadata.loc[split_metadata['split'] == 'fit']
-    assert len(fit_metadata) > 0, 'No fit items provided'
+def intersect_gene_universes(sample_ids: list[str], processed_dir: Path) -> list[str]:
+    assert sample_ids, 'No sample ids provided'
     gene_orders = [
-        load_feature_universe(processed_dir / sample_id / 'feature_universe.txt')
-        for sample_id in fit_metadata['sample_id'].unique()
+        load_feature_universe(processed_dir / sample_id / 'feature_universe.txt') for sample_id in sample_ids
     ]
 
     common_genes = set(gene_orders[0])
@@ -27,8 +22,17 @@ def get_common_genes(split_metadata: pd.DataFrame, processed_dir: Path) -> list[
         common_genes &= set(gene_order)
 
     canonical_order = [gene for gene in gene_orders[0] if gene in common_genes]
-    assert canonical_order, 'No common genes found across selected fit samples'
+    assert canonical_order, f'No common genes found across samples: {sample_ids}'
     return canonical_order
+
+
+def get_common_genes(split_metadata: pd.DataFrame, processed_dir: Path) -> list[str]:
+    assert len(split_metadata) > 0, 'No split metadata provided'
+    assert 'split' in split_metadata.columns, 'Missing split column'
+    assert 'sample_id' in split_metadata.columns, 'Missing sample_id column'
+    fit_metadata = split_metadata.loc[split_metadata['split'] == 'fit']
+    assert len(fit_metadata) > 0, 'No fit items provided'
+    return intersect_gene_universes(fit_metadata['sample_id'].unique().tolist(), processed_dir)
 
 
 def build_hvg_anndata_from_split(
@@ -93,17 +97,9 @@ def select_highly_variable_genes(adata: AnnData, *, n_top_genes: int, flavor: st
     return adata.var_names[hvg_mask].tolist()
 
 
-def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], overwrite: bool = False) -> Path:
+def _save_panel(output_path: Path, source_panel: list[str], target_panel: list[str], overwrite: bool = False) -> Path:
     if output_path.exists():
         assert overwrite, f'Panel already exists: {output_path}'
-
-    hvg_set = set(hvg_genes)
-    target_panel = [gene for gene in genes if gene in hvg_set]
-    source_panel = [gene for gene in genes if gene not in hvg_set]
-
-    assert target_panel, 'No HVGs selected'
-    assert set(source_panel).isdisjoint(set(target_panel))
-    assert len(source_panel) + len(target_panel) == len(genes)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
@@ -112,8 +108,20 @@ def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], ov
             sort_keys=False,
         )
     )
-    logger.info(f'Saved HVG panel → {output_path}')
+    logger.info(f'Saved panel ({len(source_panel)} source, {len(target_panel)} target genes) -> {output_path}')
     return output_path
+
+
+def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], overwrite: bool = False) -> Path:
+    hvg_set = set(hvg_genes)
+    target_panel = [gene for gene in genes if gene in hvg_set]
+    source_panel = [gene for gene in genes if gene not in hvg_set]
+    assert target_panel, 'No HVGs selected'
+    return _save_panel(output_path, source_panel, target_panel, overwrite=overwrite)
+
+
+def save_source_panel(output_path: Path, source_panel: list[str], overwrite: bool = False) -> Path:
+    return _save_panel(output_path, source_panel, [], overwrite=overwrite)
 
 
 def create_panel(
