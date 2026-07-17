@@ -51,6 +51,7 @@ def validate_task_config(cfg: TrainingConfig) -> None:
     if cfg.task.target == "cell_types":
         assert cfg.head.output_dim is not None, "cfg.head.output_dim"
         assert cfg.lit.target_key == "target", "cfg.lit.target_key"
+        assert cfg.data.cell_type_col is not None, "cfg.data.cell_type_col"
         return
 
     if cfg.task.target == "proteins":

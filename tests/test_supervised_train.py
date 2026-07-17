@@ -28,6 +28,7 @@ def make_cell_type_cfg() -> TrainingConfig:
     cfg.task.target = 'cell_types'
     cfg.head.output_dim = 39
     cfg.lit.target_key = 'target'
+    cfg.data.cell_type_col = 'Level3_grouped'
     return cfg
 
 
@@ -298,6 +299,7 @@ def test_supervised_style_cell_type_dataset_normalizes_image_and_log1p_transform
         include_expr=False,
         target_transform=log1p_transform,
         image_transform=image_transform,
+        cell_type_col="Level3_grouped",
         items_path=items_path,
         split="fit",
         id_key="id",
