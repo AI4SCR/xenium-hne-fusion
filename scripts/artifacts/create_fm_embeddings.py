@@ -45,7 +45,7 @@ def main(cfg: FMEmbeddingsConfig, *, overwrite: bool = False) -> int:
         items_path = output_dir / 'items' / items_path
     assert items_path.exists(), f'items_path not found: {items_path}'
 
-    ds = TileDataset(items_path=items_path, target='cell_types', include_expr=False)
+    ds = TileDataset(items_path=items_path, target=None, include_image=True, include_expr=False)
     ds.setup()
     assert ds[0]['modalities']['image'].dtype == torch.uint8
 

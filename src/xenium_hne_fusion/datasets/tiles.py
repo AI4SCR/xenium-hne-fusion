@@ -20,7 +20,7 @@ class TileDataset(Items):
         cells.parquet               # optional per-cell table for cell type targets
 
     Args:
-        target: prediction target, either tile-level expression or cell type counts.
+        target: prediction target to construct, or None to load modalities only (no target key).
         source_panel: expression genes to load into expr_tokens.
         target_panel: expression genes to aggregate into the target when target='expression'.
         include_image: load tile.pt.
@@ -34,7 +34,7 @@ class TileDataset(Items):
     """
 
     def __init__(self, *,
-                 target: Literal['cell_types', 'expression', 'rgb', 'conch_class', 'conch_scores', 'proteins'],
+                 target: Literal['cell_types', 'expression', 'rgb', 'conch_class', 'conch_scores', 'proteins'] | None = None,
                  source_panel: list[str] | None = None,
                  target_panel: list[str] | None = None,
                  include_image: bool = False,
@@ -59,8 +59,8 @@ class TileDataset(Items):
         self.expr_pool = expr_pool
         self.cell_type_col = cell_type_col
 
-        assert target == 'expression' and target_panel is not None or target in ['cell_types', 'rgb',
-                                                                                 'conch_class', 'conch_scores', 'proteins'], "target_panel must be specified when target is 'expression'"
+        if target == 'expression':
+            assert target_panel is not None, "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
@@ -94,7 +94,9 @@ class TileDataset(Items):
             item['modalities'] = modalities
 
             # construct target
-            if self.target == 'expression':
+            if self.target is None:
+                pass
+            elif self.target == 'expression':
                 assert self.target_panel is not None
                 missing = sorted(set(self.target_panel) - set(expr.columns))
                 assert not missing, f'missing target genes: {missing[:8]}...'
@@ -132,7 +134,7 @@ class TileDataset(Items):
         if self.include_expr and self.expr_pool == 'tile':
             item['modalities']['expr_tokens'] = item['modalities']['expr_tokens'].mean(dim=0)
 
-        if self.target_transform is not None:
+        if self.target is not None and self.target_transform is not None:
             item[self.target] = self.target_transform(item[self.target])
 
         if self.include_image and self.image_transform is not None:
