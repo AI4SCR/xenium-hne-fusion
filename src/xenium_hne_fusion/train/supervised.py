@@ -21,11 +21,12 @@ from lightning.pytorch.loggers import WandbLogger
 from loguru import logger
 from torch.utils.data import DataLoader
 
-from xenium_hne_fusion.datasets.tiles import PROTEIN_PANEL, TileDataset
+from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.models.encoders import EncoderSpec, log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
+from xenium_hne_fusion.targets import CONCH_CLASSES, PROTEIN_PANEL
 from xenium_hne_fusion.train.config import TrainingConfig
 from xenium_hne_fusion.train.lit import ClassificationLit, RegressionLit
 from xenium_hne_fusion.train.utils import (
@@ -39,42 +40,6 @@ from xenium_hne_fusion.train.utils import (
 TaskTarget = Literal["expression", "cell_types"]
 
 CELL_TYPE_COL = "Level3_grouped"
-
-# Index-ordered: conch_class labels (see scribble/create-conch-training.py) are argmax indices into this list.
-CONCH_CLASSES = [
-    "epithelioid nests",
-    "tubulopapillary epithelioid",
-    "solid sheets of epithelioid",
-    "inflamed epithelioid",
-    "cold, epithelioid, solid",
-    "nests and trabeculae, cold",
-    "cuboidal epithelioid",
-    "papillae and micropapillae",
-    "tubulopapillary",  # end of blues
-    "disorderly spindle cells",
-    "dense spindle cells",
-    "desmoplastic sarcomatoid",
-    "inflamed spindle cells",  # end of oranges
-    "inflamed, fibrotic",
-    "inflamed, malignant",  # end of reds
-    "connective tissues",
-    "epithelioid nests in bland stroma",
-    "basket-weave collagen",
-    "collagen, tiny nuclei",
-    "bland spindle cells and collagen",  # end of greens
-    "dense lymphocytes",
-    "skeletal muscle",
-    "muscle, transverse",  # end of pink
-    "inflamed fat",
-    "fat",
-    "fibrotically infiltrated fat",  # end of yellows
-    "diverse necrotic tissues",
-    "diathermy and crush",  # end of turquoises
-    "pleural plaque",
-    "talc reaction",
-    "vessels",
-    "airways",
-]
 
 
 def get_target_names(cfg: TrainingConfig) -> list[str] | None:

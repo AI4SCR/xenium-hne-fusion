@@ -7,11 +7,7 @@ import pandas as pd
 import torch
 from ai4bmr_learn.datasets.items import Items
 
-PROTEIN_PANEL = [
-    'Beta-catenin', 'CD11c', 'CD138', 'CD16', 'CD163-1', 'CD20', 'CD31', 'CD3E-1', 'CD4-1', 'CD45',
-    'CD45RA', 'CD45RO', 'CD68-1', 'CD8A-1', 'E-Cadherin', 'GranzymeB', 'HLA-DR', 'Ki-67', 'LAG-3', 'PCNA',
-    'PD-1', 'PD-L1', 'PTEN-1', 'PanCK', 'VISTA', 'Vimentin', 'alphaSMA',
-]
+from xenium_hne_fusion.targets import PROTEIN_PANEL
 
 
 class TileDataset(Items):
