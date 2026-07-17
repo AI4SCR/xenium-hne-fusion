@@ -72,8 +72,16 @@ def _build_geneformer_encoder(*, expr_encoder_name: str, input_dim: int | None, 
     return EncoderSpec(encoder, log1p_transform, encoder.embed_dim)
 
 
+def _build_residual_mlp_expr_encoder(*, expr_encoder_name: str, input_dim: int | None, output_dim: int | None, source_panel: list[str] | None, **kws) -> EncoderSpec:
+    from xenium_hne_fusion.models.residual_mlp import ResidualMLP
+    output_dim = output_dim or 384
+    encoder = ResidualMLP(input_dim=input_dim, output_dim=output_dim, **kws)
+    return EncoderSpec(encoder, log1p_transform, output_dim)
+
+
 EXPR_ENCODER_REGISTRY: dict[str, Callable[..., EncoderSpec]] = {
     "mlp": _build_mlp_expr_encoder,
+    "resmlp": _build_residual_mlp_expr_encoder,
     "vit_small_patch16_224": _build_timm_expr_encoder,
     "vit_base_patch16_224": _build_timm_expr_encoder,
     "geneformer": _build_geneformer_encoder,
