@@ -58,11 +58,15 @@ class TileDataset(Items):
         self.expr_pool = expr_pool
         self.cell_type_col = cell_type_col
 
+        assert target is not None or include_image or include_expr, \
+            'must request at least one of target/include_image/include_expr'
         if target == 'expression':
             assert target_panel is not None, "target_panel must be specified when target is 'expression'"
         if target == 'expression' and source_panel is not None:
             assert target_panel is not None
             assert set(source_panel).isdisjoint(set(target_panel)), 'source_panel and target_panel must be disjoint'
+        if target == 'cell_types':
+            assert cell_type_col is not None, "cell_type_col must be specified when target is 'cell_types'"
 
     def __getitem__(self, idx) -> dict:
         item = deepcopy(self.items[idx])
@@ -102,7 +106,6 @@ class TileDataset(Items):
                 target = expr[self.target_panel].sum()
                 item['expression'] = torch.tensor(target.values, dtype=torch.float32)
             elif self.target == 'cell_types':
-                assert self.cell_type_col is not None, "cell_type_col is required when target='cell_types'"
                 cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
                 assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
                 target = cell_types[self.cell_type_col].value_counts().sort_index()
