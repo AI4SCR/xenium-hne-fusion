@@ -14,7 +14,6 @@ from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.train.config import TrainingConfig
 from xenium_hne_fusion.train.utils import resolve_training_config
 
-
 def main(cfg: TrainingConfig) -> None:
     cfg = resolve_training_config(cfg)
     # Warmup only needs raw modalities cached, not encoder-specific transforms/pooling —
@@ -51,10 +50,11 @@ def cli(argv: list[str] | None = None) -> int:
 
     cfg = parser.parse_args(argv)
     init = parser.instantiate(cfg)
+
     main(init.train)
     return 0
 
-
+# %%
 if __name__ == "__main__":
     import sys
 
