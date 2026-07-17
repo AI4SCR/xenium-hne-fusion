@@ -5,7 +5,6 @@ from pathlib import Path
 from loguru import logger
 
 from xenium_hne_fusion.metadata import link_structured_metadata
-from xenium_hne_fusion.tiling import save_points_overview, save_sample_overview
 
 
 def symlink(src: Path, dst: Path) -> None:
@@ -21,9 +20,8 @@ def structure_sample(
     structured_dir: Path,
     cells_path: Path | None = None,
     cell_features_dir: Path | None = None,
-    visualize: bool = True,
 ) -> None:
-    """Create canonical sample dir with symlinked sample artifacts and visualizations."""
+    """Create canonical sample dir with symlinked sample artifacts."""
     out = structured_dir / sample_id
     logger.info(f"Structure {sample_id} → {out}")
 
@@ -35,11 +33,6 @@ def structure_sample(
 
     if cell_features_dir is not None:
         symlink(cell_features_dir, out / "cell_features")
-
-    if visualize:
-        save_sample_overview(out / "wsi.tiff", out / "transcripts.parquet", out)
-        if cells_path is not None:
-            save_points_overview(out / "wsi.tiff", out / "cells.parquet", out / "cells.png")
 
 
 def structure_metadata(metadata_path: Path, structured_dir: Path) -> None:

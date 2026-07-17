@@ -1,0 +1,20 @@
+data:
+  name: owkin
+  data_dir: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4
+  raw_dir: /work/PRTNR/CHUV/DIR/rgottar1/owkin_spatial/data/crc_gbm_dlbcl_pilot/xenium_multimodal/results
+  cell_type_col: first_type
+  cell_types_path: /work/FAC/FBM/DBC/mrapsoma/prometex/projects/xenium-hne-fusion/cell_types/owkin/cell_types.json
+  tiles:
+    tile_px: 512
+    stride_px: 256
+    mpp: 0.5
+    img_size: 224
+    kernel_size: 16
+    predicate: within
+  filter:
+    organ: null
+    disease_type: null
+    species: null
+    include_ids: null
+    exclude_ids: null
+overwrite: false

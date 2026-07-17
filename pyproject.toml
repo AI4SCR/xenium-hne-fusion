@@ -35,6 +35,7 @@ dependencies = [
     "wsidata",
     "scikit-bio>=0.7.3",
     "ome-zarr>=0.18.0",
+    "pyvips>=3.1.1",
 ]
 
 [dependency-groups]
