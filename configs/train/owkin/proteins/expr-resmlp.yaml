@@ -8,26 +8,23 @@ train:
     num_hidden_layers: 0
 
   backbone:
-    morph_encoder_name: vit_small_patch16_224
-    morph_encoder_kws:
-      img_size: 224
-    expr_encoder_name: mlp
-    expr_encoder_kws:
-      output_dim: 32
-      num_hidden_layers: 1
-      dropout: 0.1
-    fusion_strategy: add
-    fusion_stage: early
-    use_proj: true
+    morph_encoder_name: null
+    morph_encoder_kws: null
+    expr_encoder_name: resmlp
+    expr_encoder_kws: null
+    fusion_strategy: null
+    fusion_stage: null
+    use_proj: false
     learnable_gate: false
-    global_pool: token
+    expr_token_pool: null
+    global_pool: null
 
   data:
     name: owkin
     data_dir: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4
-    num_workers: 8
+    num_workers: 10
     batch_size: 256
-    expr_pool: token
+    expr_pool: tile
     items_path: c_cells.json
     metadata_path: c_cells/outer=0-inner=0-seed=0.parquet
     panel_path: c_cells.yaml
@@ -40,7 +37,7 @@ train:
 
   wandb:
     project: xe-hne-fus-protein-v1
-    name: early-fusion
+    name: expr-resmlp
     tags: [owkin]
 
   trainer:

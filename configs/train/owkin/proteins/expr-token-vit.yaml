@@ -37,7 +37,7 @@ train:
   wandb:
     project: xe-hne-fus-protein-v1
     name: expr-token-vit
-    tags: [beat, lung]
+    tags: [owkin]
 
   trainer:
     max_time: 00:06:00:00
