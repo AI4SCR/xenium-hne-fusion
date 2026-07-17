@@ -39,12 +39,12 @@ train:
     lr_backbone: 1.0e-5
 
   wandb:
-    project: xe-hne-fus-protein-v0
+    project: xe-hne-fus-protein-v1
     name: early-fusion
     tags: [beat, lung]
 
   trainer:
-    max_time: 00:04:00:00
+    max_time: 00:06:00:00
     max_epochs: 35
     accumulate_grad_batches: 2
     gradient_clip_val: 1.0
