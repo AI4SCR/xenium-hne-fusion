@@ -29,7 +29,8 @@ class TileDataset(Items):
         image_transform: applied to uint8 CHW tensor.
         expr_transform: applied to float expr tensor after optional pooling.
         expr_pool: 'token' keeps (n_tokens, n_genes); 'tile' avg-pools to (n_genes,).
-        cell_type_col: categorical cell type column to count when target='cell_types'.
+        cell_type_col: categorical cell type column to count when target='cell_types'. Required
+            (no fallback default) when target='cell_types'; unused otherwise.
     """
 
     def __init__(self, *,
@@ -42,7 +43,7 @@ class TileDataset(Items):
                  image_transform: Callable | None = None,
                  expr_transform: Callable | None = None,
                  expr_pool: Literal['token', 'tile'] = 'token',
-                 cell_type_col: str = 'Level3_grouped',
+                 cell_type_col: str | None = None,
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -85,7 +86,7 @@ class TileDataset(Items):
             if self.include_expr:
                 assert self.source_panel is not None, 'source_panel must be specified when include_expr=True'
                 missing = sorted(set(self.source_panel) - set(expr.columns))
-                assert not missing, f'missing source genes: {missing[:8]}'
+                assert not missing, f'missing source genes: {missing[:8]}...'
                 source = expr[self.source_panel]
                 source = torch.tensor(source.values, dtype=torch.float32)
                 modalities['expr_tokens'] = source
@@ -96,10 +97,11 @@ class TileDataset(Items):
             if self.target == 'expression':
                 assert self.target_panel is not None
                 missing = sorted(set(self.target_panel) - set(expr.columns))
-                assert not missing, f'missing target genes: {missing[:8]}'
+                assert not missing, f'missing target genes: {missing[:8]}...'
                 target = expr[self.target_panel].sum()
                 item['expression'] = torch.tensor(target.values, dtype=torch.float32)
             elif self.target == 'cell_types':
+                assert self.cell_type_col is not None, "cell_type_col is required when target='cell_types'"
                 cell_types = pd.read_parquet(tile_dir / 'cells.parquet')
                 assert cell_types[self.cell_type_col].dtype == 'category', f"{self.cell_type_col} must be categorical"
                 target = cell_types[self.cell_type_col].value_counts().sort_index()

@@ -27,6 +27,7 @@ def main(cfg: TrainingConfig) -> None:
         target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=cfg.backbone.morph_encoder_name is not None,
         include_expr=cfg.backbone.expr_encoder_name is not None,
+        cell_type_col=cfg.data.cell_type_col,
         target_transform=None,
         image_transform=None,
         expr_transform=None,

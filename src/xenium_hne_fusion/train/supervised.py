@@ -39,18 +39,18 @@ from xenium_hne_fusion.train.utils import (
 )
 TaskTarget = Literal["expression", "cell_types"]
 
-CELL_TYPE_COL = "Level3_grouped"
-
 
 def get_target_names(cfg: TrainingConfig) -> list[str] | None:
     if cfg.task.target == "expression":
         return cfg.data.target_panel
     if cfg.task.target == "cell_types":
+        cell_type_col = cfg.data.cell_type_col
+        assert cell_type_col is not None, "data.cell_type_col is required when task.target == 'cell_types'"
         items = json.loads(cfg.data.items_path.read_text())
         tile_dir = Path(items[0]["tile_dir"])
-        cells = pd.read_parquet(tile_dir / "cells.parquet", columns=[CELL_TYPE_COL])
-        assert cells[CELL_TYPE_COL].dtype == "category", f"{CELL_TYPE_COL} must be categorical"
-        return sorted(cells[CELL_TYPE_COL].cat.categories.tolist())
+        cells = pd.read_parquet(tile_dir / "cells.parquet", columns=[cell_type_col])
+        assert cells[cell_type_col].dtype == "category", f"{cell_type_col} must be categorical"
+        return sorted(cells[cell_type_col].cat.categories.tolist())
     if cfg.task.target == "proteins":
         return PROTEIN_PANEL
     if cfg.task.target in ("conch_class", "conch_scores"):
@@ -195,6 +195,7 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
         target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=cfg.backbone.morph_encoder_name is not None,
         include_expr=cfg.backbone.expr_encoder_name is not None,
+        cell_type_col=cfg.data.cell_type_col,
         target_transform=log1p_transform if cfg.task.target in ("cell_types", "expression") else None,
         image_transform=morph_spec.transform,
         expr_transform=expr_spec.transform,

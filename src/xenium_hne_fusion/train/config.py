@@ -52,6 +52,7 @@ class DataLoaderConfig:
     panel_path: Path | None = None
     source_panel: list[str] | None = None
     target_panel: list[str] | None = None
+    cell_type_col: str | None = None  # required when task.target == 'cell_types'
     # Relative items/metadata/panel paths resolve under DATA_DIR/03_output/<name>/
     # within the items/, splits/, and panels/ subfolders respectively.
     # Cache is disabled when unset. Relative cache paths resolve under
