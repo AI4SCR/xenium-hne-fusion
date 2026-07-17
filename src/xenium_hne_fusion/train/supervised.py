@@ -22,7 +22,7 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from xenium_hne_fusion.datasets.tiles import PROTEIN_PANEL, TileDataset
-from xenium_hne_fusion.models.encoders import log1p_transform
+from xenium_hne_fusion.models.encoders import EncoderSpec, log1p_transform
 from xenium_hne_fusion.models.fusion import FusionModel
 from xenium_hne_fusion.models.mlp import Head
 from xenium_hne_fusion.models.utils import get_expr_encoder_and_transform, get_morph_encoder_and_transform
@@ -104,33 +104,18 @@ L.seed_everything(0)
 torch.set_float32_matmul_precision("high")
 
 
-def build_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike[str] | None = None, target_names: list[str] | None = None) -> RegressionLit | ClassificationLit:
-    num_source_genes = cfg.num_source_genes
+def build_lit(
+    cfg: TrainingConfig,
+    morph_spec: EncoderSpec,
+    expr_spec: EncoderSpec,
+    checkpoint_path: str | os.PathLike[str] | None = None,
+    target_names: list[str] | None = None,
+) -> RegressionLit | ClassificationLit:
     num_outputs = cfg.num_outputs
 
-    morph_encoder_name = cfg.backbone.morph_encoder_name
-    morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
-    expr_encoder_name = cfg.backbone.expr_encoder_name
-    expr_encoder_cfg = cfg.backbone.expr_encoder_kws or {}
-
-    assert morph_encoder_name is not None or expr_encoder_name is not None, "At least one encoder must be specified"
-
-    morph_spec = get_morph_encoder_and_transform(
-        morph_encoder_name=morph_encoder_name,
-        **morph_encoder_kws,
-    )
-    morph_encoder, image_transform, morph_encoder_dim = morph_spec.encoder, morph_spec.transform, morph_spec.dim
-
-    expr_encoder = expr_transform = None
-    expr_encoder_dim = None
-    if expr_encoder_name is not None:
-        kws = {**expr_encoder_cfg, "input_dim": num_source_genes}
-        expr_spec = get_expr_encoder_and_transform(
-            expr_encoder_name=expr_encoder_name,
-            source_panel=cfg.data.source_panel,
-            **kws,
-        )
-        expr_encoder, expr_transform, expr_encoder_dim = expr_spec.encoder, expr_spec.transform, expr_spec.dim
+    morph_encoder, morph_encoder_dim = morph_spec.encoder, morph_spec.dim
+    expr_encoder, expr_encoder_dim = expr_spec.encoder, expr_spec.dim
+    assert morph_encoder is not None or expr_encoder is not None, "At least one encoder must be specified"
 
     backbone = FusionModel(
         expr_encoder=expr_encoder,
@@ -198,46 +183,6 @@ def build_lit(cfg: TrainingConfig, checkpoint_path: str | os.PathLike[str] | Non
     return lit_cls(**lit_kws)
 
 
-def build_dataset_kws(cfg: TrainingConfig) -> dict:
-    morph_encoder_name = cfg.backbone.morph_encoder_name
-    morph_encoder_kws = cfg.backbone.morph_encoder_kws or {}
-    expr_encoder_name = cfg.backbone.expr_encoder_name
-    expr_encoder_cfg = cfg.backbone.expr_encoder_kws or {}
-
-    assert morph_encoder_name is not None or expr_encoder_name is not None, "At least one encoder must be specified"
-
-    image_transform = get_morph_encoder_and_transform(
-        morph_encoder_name=morph_encoder_name,
-        **morph_encoder_kws,
-    ).transform
-
-    expr_transform = None
-    if expr_encoder_name is not None:
-        kws = {**expr_encoder_cfg, "input_dim": cfg.num_source_genes}
-        expr_transform = get_expr_encoder_and_transform(
-            expr_encoder_name=expr_encoder_name,
-            source_panel=cfg.data.source_panel,
-            **kws,
-        ).transform
-
-    return dict(
-        target=cfg.task.target,
-        items_path=cfg.data.items_path,
-        metadata_path=cfg.data.metadata_path,
-        source_panel=cfg.data.source_panel,
-        target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
-        include_image=morph_encoder_name is not None,
-        include_expr=expr_encoder_name is not None,
-        target_transform=log1p_transform if cfg.task.target in ("cell_types", "expression") else None,
-        image_transform=image_transform,
-        expr_transform=expr_transform,
-        expr_pool=cfg.data.expr_pool,
-        cache_dir=cfg.data.cache_dir,
-        drop_nan_columns=True,
-        id_key="id",
-    )
-
-
 def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | None = None):
     debug = debug if debug is not None else cfg.debug
     if debug or cfg.trainer.fast_dev_run:
@@ -255,7 +200,18 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
     )
 
     target_names = get_target_names(cfg)
-    lit = build_lit(cfg, target_names=target_names)
+
+    morph_spec = get_morph_encoder_and_transform(
+        morph_encoder_name=cfg.backbone.morph_encoder_name,
+        **(cfg.backbone.morph_encoder_kws or {}),
+    )
+    expr_spec = get_expr_encoder_and_transform(
+        expr_encoder_name=cfg.backbone.expr_encoder_name,
+        source_panel=cfg.data.source_panel,
+        input_dim=num_source_genes,
+        **(cfg.backbone.expr_encoder_kws or {}),
+    )
+    lit = build_lit(cfg, morph_spec, expr_spec, target_names=target_names)
 
     dataloader_kws = dict(
         batch_size=cfg.data.batch_size,
@@ -266,13 +222,22 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
     if cfg.data.num_workers > 0 and cfg.data.prefetch_factor is not None:
         dataloader_kws["prefetch_factor"] = cfg.data.prefetch_factor
 
-    dataset_kws = build_dataset_kws(cfg)
-
-    if cfg.data.cache_dir is not None:
-        # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
-        kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
-        ds_all = TileDataset(**kws)
-        ds_all.setup()
+    dataset_kws = dict(
+        target=cfg.task.target,
+        items_path=cfg.data.items_path,
+        metadata_path=cfg.data.metadata_path,
+        source_panel=cfg.data.source_panel,
+        target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
+        include_image=cfg.backbone.morph_encoder_name is not None,
+        include_expr=cfg.backbone.expr_encoder_name is not None,
+        target_transform=log1p_transform if cfg.task.target in ("cell_types", "expression") else None,
+        image_transform=morph_spec.transform,
+        expr_transform=expr_spec.transform,
+        expr_pool=cfg.data.expr_pool,
+        cache_dir=cfg.data.cache_dir,
+        drop_nan_columns=True,
+        id_key="id",
+    )
 
     ds_fit = TileDataset(**dataset_kws, split="fit")
     ds_fit.setup()

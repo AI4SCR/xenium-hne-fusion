@@ -12,15 +12,29 @@ Usage:
 """
 from xenium_hne_fusion.datasets.tiles import TileDataset
 from xenium_hne_fusion.train.config import TrainingConfig
-from xenium_hne_fusion.train.supervised import build_dataset_kws
 from xenium_hne_fusion.train.utils import resolve_training_config
 
 
 def main(cfg: TrainingConfig) -> None:
-    dataset_kws = build_dataset_kws(resolve_training_config(cfg))
-    # warmup cache: no transforms and no pooling — both are applied post-cache-load per split dataset.
-    kws = {**dataset_kws, 'target_transform': None, 'image_transform': None, 'expr_transform': None, 'expr_pool': 'token'}
-    ds = TileDataset(**kws)
+    cfg = resolve_training_config(cfg)
+    # Warmup only needs raw modalities cached, not encoder-specific transforms/pooling —
+    # both are applied post-cache-load per split dataset in train().
+    ds = TileDataset(
+        target=cfg.task.target,
+        items_path=cfg.data.items_path,
+        metadata_path=cfg.data.metadata_path,
+        source_panel=cfg.data.source_panel,
+        target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
+        include_image=cfg.backbone.morph_encoder_name is not None,
+        include_expr=cfg.backbone.expr_encoder_name is not None,
+        target_transform=None,
+        image_transform=None,
+        expr_transform=None,
+        expr_pool="token",
+        cache_dir=cfg.data.cache_dir,
+        drop_nan_columns=True,
+        id_key="id",
+    )
     ds.setup()
 
 
