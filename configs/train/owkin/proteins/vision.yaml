@@ -29,8 +29,8 @@ train:
     expr_pool: tile
     items_path: c_cells.json
     metadata_path: c_cells/outer=0-inner=0-seed=0.parquet
-    panel_path: owkin-beat.yaml
-    cache_dir: protein/owkin-beat
+    panel_path: c_cells.yaml
+    cache_dir: protein/c_cells
 
   lit:
     target_key: proteins
