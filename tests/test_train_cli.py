@@ -25,9 +25,9 @@ def test_supervised_parser_reads_yaml_config_into_nested_namespace():
     assert data["debug"] is False
     assert data["train"]["task"]["target"] == "proteins"
     assert data["train"]["backbone"]["morph_encoder_name"] == "vit_small_patch16_224"
-    assert data["train"]["data"]["items_path"] == Path("cells.json")
-    assert data["train"]["data"]["metadata_path"] == Path("cells/outer=0-inner=0-seed=0.parquet")
-    assert data["train"]["data"]["panel_path"] == Path("owkin-beat.yaml")
+    assert data["train"]["data"]["items_path"] == Path("c_cells.json")
+    assert data["train"]["data"]["metadata_path"] == Path("c_cells/outer=0.parquet")
+    assert data["train"]["data"]["panel_path"] == Path("c_cells.yaml")
 
 
 def test_supervised_cli_instantiates_concrete_training_config_and_calls_main(monkeypatch):
@@ -48,7 +48,7 @@ def test_supervised_cli_instantiates_concrete_training_config_and_calls_main(mon
     cfg = captured["cfg"]
     assert isinstance(cfg, TrainingConfig)
     assert cfg.task.target == "proteins"
-    assert cfg.data.items_path == Path("cells.json")
-    assert cfg.data.metadata_path == Path("cells/outer=0-inner=0-seed=0.parquet")
-    assert cfg.data.panel_path == Path("owkin-beat.yaml")
+    assert cfg.data.items_path == Path("c_cells.json")
+    assert cfg.data.metadata_path == Path("c_cells/outer=0.parquet")
+    assert cfg.data.panel_path == Path("c_cells.yaml")
     assert captured["debug"] is False

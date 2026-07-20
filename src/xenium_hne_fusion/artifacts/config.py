@@ -24,16 +24,7 @@ class ItemsFilterConfig:
 @dataclass
 class SplitConfig:
     name: str
-    test_size: float | None = None
-    val_size: float | None = None
-    stratify: bool = False
-    target_column_name: str | None = None
-    encode_targets: bool = False
-    nan_value: int = -1
-    use_filtered_targets_for_train: bool = False
-    include_targets: list[str] | None = None
-    group_column_name: str | None = None
-    random_state: int | None = None
+    path: Path
 
 
 @dataclass
@@ -52,7 +43,7 @@ class ArtifactsConfig:
     tile_px: int
     stride_px: int
     items: ItemsFilterConfig = field(default_factory=lambda: ItemsFilterConfig(name='default'))
-    split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', test_size=0.25, val_size=0.25))
+    split: SplitConfig = field(default_factory=lambda: SplitConfig(name='default', path=Path('splits/owkin.yaml')))
     panel: PanelConfig | None = None
 
 

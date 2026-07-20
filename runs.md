@@ -61,26 +61,18 @@ into `items/all.json` — no transcript/expression file required, so empty tiles
 are needed:
 
 ```bash
-uv run python scripts/artifacts/create_items.py --config configs/artifacts/owkin/cells.yaml
+uv run python scripts/artifacts/build_items.py --config configs/artifacts/owkin/cells.yaml
 ```
 
-### Compute per-tile statistics for `all.json`
-
-Computes `num_transcripts`/`num_unique_transcripts`/`num_cells`/`num_unique_cells` for every item in
-`items/all.json` (needed before `filter_items`/`create_artifacts` can threshold on them). Always
-targets the source `all.json`, independent of the config's `items.name` (which names the *filtered*
-subset, e.g. `cells`):
-
-```bash
-uv run python scripts/artifacts/compute_items_stats.py --config configs/artifacts/owkin/cells.yaml
-```
+`build_items.py` also computes stats on `all.json` by default (`--compute-stats true`); pass
+`--compute-stats false` to skip that (e.g. when only re-tiling and stats already exist).
 
 ### Compute stats for a filtered subset
 
-After `filter_items.py` (or `create_artifacts.py`) produces a filtered `items/<name>.json` (e.g.
-`cells.json`, using the thresholds under `artifacts.items.filter` in `cells.yaml` against the
-default stats above), point `compute_items_stats.py` at it directly via `--items-path` — resolved
-relative to `items/`, or pass an absolute path:
+After `filter_items.py` produces a filtered `items/<name>.json` (e.g. `cells.json`, using the
+thresholds under `artifacts.items.filter` in `cells.yaml` against the default stats above), point
+`compute_items_stats.py` at it directly via `--items-path` — resolved relative to `items/`, or pass
+an absolute path:
 
 ```bash
 uv run python scripts/artifacts/compute_items_stats.py \
@@ -90,22 +82,30 @@ uv run python scripts/artifacts/compute_items_stats.py \
 
 ### Create filtered artifacts (c_cells / d_cells / g_cells)
 
-Runs the full pipeline (filter `all.json` using the default stats -> split -> panel -> stats on
-the filtered subset) for each per-organ-group config. `items/all.json` and `statistics/all.parquet`
-must already exist (see above) — `create_artifacts.py` skips those two stages if so and goes
-straight to filtering:
+Each per-organ-group config goes through the stages below. `items/all.json` and
+`statistics/all.parquet` must already exist first (see `build_items.py` above):
 
 ```bash
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/c_cells.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/d_cells.yaml
-uv run python scripts/artifacts/create_artifacts.py --config configs/artifacts/owkin/g_cells.yaml
+for NAME in c_cells d_cells g_cells; do
+    uv run python scripts/artifacts/filter_items.py --config configs/artifacts/owkin/${NAME}.yaml
+    uv run python scripts/artifacts/build_splits.py --config configs/artifacts/owkin/${NAME}.yaml
+    uv run python scripts/artifacts/build_panel.py --config configs/artifacts/owkin/${NAME}.yaml
+    uv run python scripts/artifacts/compute_items_stats.py \
+        --config configs/artifacts/owkin/${NAME}.yaml --items-path ${NAME}.json
+done
 ```
+
+`build_splits.py` reads sample→split assignments from `splits/owkin.yaml` (hand-authored, checked
+into the repo) and joins them onto the filtered items by `sample_id` — no GroupKFold, no
+`test_size`/`val_size` tuning. Each item-set's `split.name` in its artifacts config must match its
+`items.name`, and `splits/owkin.yaml` must have an entry for that name (a list of
+`{train, val, test}` sample-id folds, materialized to `splits/<name>/outer=<i>.parquet`).
 
 ### Build per-item-set source panels
 
 `panels/owkin/create_panels.py` intersects each sample's `feature_universe.txt` across an
 artifacts config's `items.filter.include_ids` and writes the result to
-`DATA_DIR/03_output/owkin/panels/<items.name>.yaml`. Run once after `create_artifacts.py`
+`DATA_DIR/03_output/owkin/panels/<items.name>.yaml`. Run once after `filter_items.py`
 for a new item-set variant (or after `--overwrite true` to rebuild):
 
 ```bash
@@ -124,7 +124,7 @@ for ITEMS in c_cells d_cells c_d_cells; do
     uv run python scripts/artifacts/warmup_cache.py \
         --config configs/train/owkin/proteins/early-fusion.yaml \
         --train.data.items_path ${ITEMS}.json \
-        --train.data.metadata_path ${ITEMS}/outer=0-inner=0-seed=0.parquet \
+        --train.data.metadata_path ${ITEMS}/outer=0.parquet \
         --train.data.panel_path ${ITEMS}.yaml \
         --train.data.cache_dir protein/${ITEMS}
 done
@@ -143,7 +143,7 @@ for ITEMS in c_cells d_cells c_d_cells; do
         uv run python scripts/train/supervised.py \
             --config configs/train/owkin/proteins/${CONFIG}.yaml \
             --train.data.items_path ${ITEMS}.json \
-            --train.data.metadata_path ${ITEMS}/outer=0-inner=0-seed=0.parquet \
+            --train.data.metadata_path ${ITEMS}/outer=0.parquet \
             --train.data.panel_path ${ITEMS}.yaml \
             --train.data.cache_dir protein/${ITEMS} \
             --train.wandb.tags "[owkin, ${ITEMS}]"
@@ -164,7 +164,7 @@ for ITEMS in c_cells d_cells c_d_cells; do
             --wrap="uv run python scripts/train/supervised.py \
                 --config configs/train/owkin/proteins/${CONFIG}.yaml \
                 --train.data.items_path ${ITEMS}.json \
-                --train.data.metadata_path ${ITEMS}/outer=0-inner=0-seed=0.parquet \
+                --train.data.metadata_path ${ITEMS}/outer=0.parquet \
                 --train.data.panel_path ${ITEMS}.yaml \
                 --train.data.cache_dir protein/${ITEMS} \
                 --train.wandb.tags [owkin,${ITEMS}]"
@@ -180,7 +180,7 @@ to skip caching entirely:
 uv run python scripts/train/supervised.py \
     --config configs/train/owkin/proteins/early-fusion.yaml \
     --train.data.items_path c_cells.json \
-    --train.data.metadata_path c_cells/outer=0-inner=0-seed=0.parquet \
+    --train.data.metadata_path c_cells/outer=0.parquet \
     --train.data.panel_path c_cells.yaml \
     --train.data.cache_dir null \
     --debug true

@@ -13,7 +13,7 @@ artifacts:
         - CH_G_533a_x2
         - CH_G_534a_x1
         - CH_G_535a_x2
-        - CH_G_535a_xr
+#        - CH_G_535a_xr
         - CH_G_536a_x2
       exclude_ids: null
       num_transcripts: 1000
@@ -22,15 +22,6 @@ artifacts:
       num_unique_cells: 5
   split:
     name: g_cells
-    test_size: 0.1667
-    val_size: 0.5
-    stratify: false
-    target_column_name: null
-    encode_targets: false
-    nan_value: -1
-    use_filtered_targets_for_train: false
-    include_targets: null
-    group_column_name: sample_id
-    random_state: 0
+    path: splits/owkin.yaml
   panel:
     name: owkin-beat

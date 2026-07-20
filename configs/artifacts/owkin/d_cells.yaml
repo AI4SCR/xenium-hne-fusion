@@ -20,15 +20,6 @@ artifacts:
       num_unique_cells: 5
   split:
     name: d_cells
-    test_size: 0.3334
-    val_size: 0.5
-    stratify: false
-    target_column_name: null
-    encode_targets: false
-    nan_value: -1
-    use_filtered_targets_for_train: false
-    include_targets: null
-    group_column_name: sample_id
-    random_state: 0
+    path: splits/owkin.yaml
   panel:
     name: owkin-beat
