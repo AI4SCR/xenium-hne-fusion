@@ -259,7 +259,7 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2 3 4; do
         sbatch \
             --account=rgottar1_spatial \
-            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=04:00:00 \
+            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=owkin_proteins_c_cells_${CONFIG}_outer${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
@@ -276,7 +276,7 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2; do
         sbatch \
             --account=rgottar1_spatial \
-            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=04:00:00 \
+            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=owkin_proteins_d_cells_${CONFIG}_outer${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
@@ -293,7 +293,7 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2 3 4; do
         sbatch \
             --account=rgottar1_spatial \
-            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=04:00:00 \
+            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=owkin_proteins_g_cells_${CONFIG}_outer${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
@@ -335,7 +335,7 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2 3 4; do
         sbatch \
             --account=rgottar1_spatial \
-            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=04:00:00 \
+            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=owkin_proteins_c_on_d_${CONFIG}_outer${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
@@ -352,7 +352,7 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2; do
         sbatch \
             --account=rgottar1_spatial \
-            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=04:00:00 \
+            --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
             --output=$HOME/logs/%j.out \
             --job-name=owkin_proteins_d_on_c_${CONFIG}_outer${OUTER} \
             --wrap="uv run python scripts/train/supervised.py \
