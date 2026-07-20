@@ -306,6 +306,142 @@ def test_tile_dataset_ignores_token_index_expr_column(tmp_path: Path):
     assert item["modalities"]["expr_tokens"].tolist() == [[1.0, 0.0], [0.0, 1.0], [2.0, 3.0]]
 
 
+def test_tile_dataset_raises_clear_error_for_missing_source_genes(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(torch.zeros((3, 2, 2), dtype=torch.uint8), tile_dir / "tile.pt")
+    pd.DataFrame(
+        {
+            "A": [1, 0, 2],
+            "C": [4, 5, 6],
+        }
+    ).to_parquet(tile_dir / "expr-kernel_size=16.parquet", index=False)
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target="expression",
+        source_panel=["A", "B"],
+        target_panel=["C"],
+        include_image=False,
+        include_expr=True,
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    with pytest.raises(AssertionError, match="missing source genes"):
+        ds[0]
+
+
+def test_tile_dataset_requires_at_least_one_of_target_include_image_include_expr(tmp_path: Path):
+    items_path = tmp_path / "items.json"
+    items_path.write_text(
+        pd.DataFrame(
+            [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tmp_path / "S1" / "0")}]
+        ).to_json(orient="records")
+    )
+
+    with pytest.raises(AssertionError, match="must request at least one"):
+        TileDataset(
+            target=None,
+            include_image=False,
+            include_expr=False,
+            items_path=items_path,
+            split="fit",
+            id_key="id",
+        )
+
+
+def test_tile_dataset_expr_pool_tile_averages_tokens(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    _write_tile_dir(tile_dir, feature_names=["A"])
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target=None,
+        source_panel=["A", "B"],
+        include_image=False,
+        include_expr=True,
+        expr_pool="tile",
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert item["modalities"]["expr_tokens"].shape == (2,)
+    assert item["modalities"]["expr_tokens"].tolist() == pytest.approx([1.0, 4 / 3])
+
+
+def test_tile_dataset_proteins_target_averages_across_cells(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(torch.zeros((3, 2, 2), dtype=torch.uint8), tile_dir / "tile.pt")
+
+    from xenium_hne_fusion.targets import PROTEIN_PANEL
+
+    pd.DataFrame(
+        {protein: [1.0, 2.0, 3.0] for protein in PROTEIN_PANEL}
+    ).to_parquet(tile_dir / "proteins.parquet")
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target="proteins",
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert item["proteins"].shape == (len(PROTEIN_PANEL),)
+    assert item["proteins"].tolist() == pytest.approx([2.0] * len(PROTEIN_PANEL))
+
+
+def test_tile_dataset_rgb_target_averages_image_channels(tmp_path: Path):
+    tile_dir = tmp_path / "S1" / "0"
+    tile_dir.mkdir(parents=True, exist_ok=True)
+    image = torch.stack(
+        [torch.full((2, 2), 10, dtype=torch.uint8), torch.full((2, 2), 20, dtype=torch.uint8), torch.full((2, 2), 30, dtype=torch.uint8)]
+    )
+    torch.save(image, tile_dir / "tile.pt")
+
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tile_dir)}]
+    ).to_json(items_path, orient="records")
+
+    ds = TileDataset(
+        target="rgb",
+        include_image=False,
+        include_expr=False,
+        items_path=items_path,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert item["rgb"].tolist() == pytest.approx([10.0, 20.0, 30.0])
+    assert "image" not in item["modalities"]
+
+
 def test_tile_dataset_raises_clear_error_for_missing_target_genes(tmp_path: Path):
     tile_dir = tmp_path / "S1" / "0"
     tile_dir.mkdir(parents=True, exist_ok=True)
