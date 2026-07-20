@@ -81,13 +81,13 @@ uv run python scripts/artifacts/compute_items_stats.py \
     --config configs/artifacts/owkin/c_cells.yaml
 ```
 
-### Create filtered artifacts (c_cells / d_cells / g_cells)
+### Create filtered artifacts (c_cells / d_cells / g_cells / c_d_cells)
 
 Each per-organ-group config goes through the same four stages. `items/all.json` and
 `statistics/all.parquet` must already exist first (see `build_items.py` above):
 
 ```bash
-for NAME in c_cells d_cells g_cells; do
+for NAME in c_cells d_cells g_cells c_d_cells; do
     uv run python scripts/artifacts/filter_items.py --config configs/artifacts/owkin/${NAME}.yaml
     uv run python scripts/artifacts/build_splits.py --config configs/artifacts/owkin/${NAME}.yaml
     uv run python scripts/artifacts/build_panel.py --config configs/artifacts/owkin/${NAME}.yaml
@@ -108,6 +108,24 @@ done
   `DATA_DIR/03_output/owkin/panels/${NAME}.yaml` (empty `target_panel`).
 - `compute_items_stats.py` recomputes stats/figures for the filtered item set.
 
+Submit the same four stages as one SLURM job per item-set (each job runs its stages serially,
+one job per `NAME`):
+
+```bash
+for NAME in c_cells d_cells g_cells c_d_cells; do
+#for NAME in d_cells g_cells c_d_cells; do
+    sbatch \
+        --account=rgottar1_spatial \
+        --cpus-per-task=10 --mem=32G --time=04:00:00 \
+        --output=$HOME/logs/%j.out \
+        --job-name=owkin_artifacts_${NAME} \
+        --wrap="uv run python scripts/artifacts/filter_items.py --config configs/artifacts/owkin/${NAME}.yaml && \
+            uv run python scripts/artifacts/build_splits.py --config configs/artifacts/owkin/${NAME}.yaml && \
+            uv run python scripts/artifacts/build_panel.py --config configs/artifacts/owkin/${NAME}.yaml && \
+            uv run python scripts/artifacts/compute_items_stats.py --config configs/artifacts/owkin/${NAME}.yaml"
+done
+```
+
 ### Warm the tile cache
 
 `warmup_cache.py` populates `DATA_DIR/03_output/owkin/cache/protein/<ITEMS>` before
@@ -116,13 +134,31 @@ set/panel/split to warm — must match one of the artifacts configs above (`c_ce
 `d_cells`, `c_d_cells`, `g_cells`):
 
 ```bash
-for ITEMS in c_cells d_cells c_d_cells; do
+for ITEMS in c_cells d_cells g_cells c_d_cells; do
     uv run python scripts/artifacts/warmup_cache.py \
         --config configs/train/owkin/proteins/early-fusion.yaml \
         --train.data.items_path ${ITEMS}.json \
         --train.data.metadata_path ${ITEMS}/outer=0.parquet \
         --train.data.panel_path ${ITEMS}.yaml \
         --train.data.cache_dir protein/${ITEMS}
+done
+```
+
+Submit the same warmup as one SLURM job per item-set:
+
+```bash
+for ITEMS in c_cells d_cells g_cells c_d_cells; do
+    sbatch \
+        --account=rgottar1_spatial \
+        --cpus-per-task=10 --mem=32G --time=02:00:00 \
+        --output=$HOME/logs/%j.out \
+        --job-name=owkin_warmup_${ITEMS} \
+        --wrap="uv run python scripts/artifacts/warmup_cache.py \
+            --config configs/train/owkin/proteins/early-fusion.yaml \
+            --train.data.items_path ${ITEMS}.json \
+            --train.data.metadata_path ${ITEMS}/outer=0.parquet \
+            --train.data.panel_path ${ITEMS}.yaml \
+            --train.data.cache_dir protein/${ITEMS}"
 done
 ```
 
@@ -134,10 +170,11 @@ the item-set/panel/cache to train on. Keep `ITEMS` consistent with whichever cac
 warmed above:
 
 ```bash
-for ITEMS in c_cells d_cells c_d_cells; do
+for ITEMS in c_cells d_cells g_cells c_d_cells; do
     for CONFIG in early-fusion expr-token-vit expr-resmlp late-fusion-tile vision; do
         uv run python scripts/train/supervised.py \
             --config configs/train/owkin/proteins/${CONFIG}.yaml \
+            --debug=True \
             --train.data.items_path ${ITEMS}.json \
             --train.data.metadata_path ${ITEMS}/outer=0.parquet \
             --train.data.panel_path ${ITEMS}.yaml \
@@ -150,7 +187,7 @@ done
 Submit the same sweep as one SLURM job per `(ITEMS, CONFIG)` pair:
 
 ```bash
-for ITEMS in c_cells d_cells c_d_cells; do
+for ITEMS in c_cells d_cells g_cells c_d_cells; do
     for CONFIG in early-fusion expr-token-vit expr-resmlp late-fusion-tile vision; do
         sbatch \
             --account=rgottar1_spatial \
