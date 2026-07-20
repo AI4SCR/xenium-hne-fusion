@@ -4,7 +4,6 @@ import json
 import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import Literal
 
 import pandas as pd
 
@@ -16,7 +15,7 @@ from ai4bmr_learn.callbacks.cache import TestCache
 from ai4bmr_learn.callbacks.log_model_checkpoint_paths import LogCheckpointPathsCallback
 from ai4bmr_learn.callbacks.log_model_stats import LogModelStats
 from ai4bmr_learn.callbacks.log_wandb_run_metadata import LogWandbRunMetadataCallback
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -37,7 +36,6 @@ from xenium_hne_fusion.train.utils import (
     set_fast_dev_run_settings,
     validate_task_config,
 )
-TaskTarget = Literal["expression", "cell_types"]
 
 
 def get_target_names(cfg: TrainingConfig) -> list[str] | None:
@@ -207,41 +205,10 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
 
     ds_fit = TileDataset(**dataset_kws, split="fit")
     ds_fit.setup()
-    fit_item = ds_fit[0]
     ds_val = TileDataset(**dataset_kws, split="val")
     ds_val.setup()
-    val_item = ds_val[0]
     ds_test = TileDataset(**dataset_kws, split="test")
     ds_test.setup()
-    test_item = ds_test[0]
-
-    def print_keys(container: dict):
-        for k, v in container.items():
-            print(k)
-            if isinstance(v, dict):
-                print_keys(v)
-
-    print_keys(fit_item)
-    print_keys(val_item)
-    print_keys(test_item)
-
-    if cfg.wandb.name in ['expr-token', 'expr-tile', 'expr-token-vit', 'expr-resmlp']:
-        assert 'image' not in fit_item['modalities']
-        assert 'image' not in val_item['modalities']
-        assert 'image' not in test_item['modalities']
-    elif cfg.wandb.name in ['early-fusion-vit', 'early-fusion', 'late-fusion-tile', 'late-fusion-token', 'late-fusion-token-vit']:
-        assert 'image' in fit_item['modalities']
-        assert 'image' in val_item['modalities']
-        assert 'image' in test_item['modalities']
-        assert 'expr_tokens' in fit_item['modalities']
-        assert 'expr_tokens' in val_item['modalities']
-        assert 'expr_tokens' in test_item['modalities']
-    elif cfg.wandb.name in ['vision']:
-        assert 'expr_tokens' not in fit_item['modalities']
-        assert 'expr_tokens' not in val_item['modalities']
-        assert 'expr_tokens' not in test_item['modalities']
-    else:
-        raise ValueError(f"Unknown wandb.name: {cfg.wandb.name}")
 
     global_batch_size = cfg.data.batch_size * cfg.trainer.accumulate_grad_batches
     dl_fit = DataLoader(ds_fit, shuffle=True, **dataloader_kws)
@@ -275,7 +242,6 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
         ModelCheckpoint(monitor=monitor, mode=mode, filename="best-{epoch}-{step}", save_last=False),
         ModelCheckpoint(monitor=None, save_last="link"),
         LearningRateMonitor(logging_interval="epoch"),
-        # EarlyStopping(monitor=monitor, mode=mode, patience=15),
         TestCache(exclude_keys=["modalities", "loss", "z"]),
     ]
 
