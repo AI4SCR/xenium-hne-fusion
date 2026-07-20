@@ -22,4 +22,4 @@ artifacts:
     name: d_cells
     path: splits/owkin.yaml
   panel:
-    name: owkin-beat
+    name: d_cells

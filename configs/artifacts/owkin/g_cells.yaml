@@ -24,4 +24,4 @@ artifacts:
     name: g_cells
     path: splits/owkin.yaml
   panel:
-    name: owkin-beat
+    name: g_cells

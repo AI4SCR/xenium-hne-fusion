@@ -29,10 +29,7 @@ class SplitConfig:
 
 @dataclass
 class PanelConfig:
-    name: str | None = None
-    metadata_path: Path | None = None
-    n_top_genes: int | None = None
-    flavor: str | None = None
+    name: str
 
 
 @dataclass

@@ -57,32 +57,33 @@ done
 
 Collects every tile (`tile.pt`) written by `process.py` under `02_processed/owkin/<sample_id>/512_256/`
 into `items/all.json` — no transcript/expression file required, so empty tiles are included too.
-`data_dir`/`tile_px`/`stride_px` live in `configs/artifacts/owkin/cells.yaml`, so no CLI overrides
-are needed:
+`build_items.py` only reads `data_dir`/`tile_px`/`stride_px`/`cell_type_col` from the config and
+always writes to the hardcoded `items/all.json` (never `items.name`), so any of the per-organ-group
+configs below works — it does not filter or produce a named item set:
 
 ```bash
-uv run python scripts/artifacts/build_items.py --config configs/artifacts/owkin/cells.yaml
+uv run python scripts/artifacts/build_items.py --config configs/artifacts/owkin/c_cells.yaml
 ```
 
-`build_items.py` also computes stats on `all.json` by default (`--compute-stats true`); pass
-`--compute-stats false` to skip that (e.g. when only re-tiling and stats already exist).
+`build_items.py` also computes stats on `all.json` by default (`--compute-stats true`), writing
+`statistics/all.parquet`; pass `--compute-stats false` to skip that (e.g. when only re-tiling and
+stats already exist).
 
 ### Compute stats for a filtered subset
 
-After `filter_items.py` produces a filtered `items/<name>.json` (e.g. `cells.json`, using the
-thresholds under `artifacts.items.filter` in `cells.yaml` against the default stats above), point
-`compute_items_stats.py` at it directly via `--items-path` — resolved relative to `items/`, or pass
-an absolute path:
+After `filter_items.py` produces a filtered `items/<name>.json` (e.g. `c_cells.json`, using the
+thresholds under `artifacts.items.filter` in `c_cells.yaml` against the default stats above), run
+`compute_items_stats.py` with the same config — it reads `items/${artifacts.items.name}.json`
+(`items.name` in `c_cells.yaml` is `c_cells`), so no `--items-path` override is needed:
 
 ```bash
 uv run python scripts/artifacts/compute_items_stats.py \
-    --config configs/artifacts/owkin/cells.yaml \
-    --items-path cells.json
+    --config configs/artifacts/owkin/c_cells.yaml
 ```
 
 ### Create filtered artifacts (c_cells / d_cells / g_cells)
 
-Each per-organ-group config goes through the stages below. `items/all.json` and
+Each per-organ-group config goes through the same four stages. `items/all.json` and
 `statistics/all.parquet` must already exist first (see `build_items.py` above):
 
 ```bash
@@ -91,26 +92,21 @@ for NAME in c_cells d_cells g_cells; do
     uv run python scripts/artifacts/build_splits.py --config configs/artifacts/owkin/${NAME}.yaml
     uv run python scripts/artifacts/build_panel.py --config configs/artifacts/owkin/${NAME}.yaml
     uv run python scripts/artifacts/compute_items_stats.py \
-        --config configs/artifacts/owkin/${NAME}.yaml --items-path ${NAME}.json
+        --config configs/artifacts/owkin/${NAME}.yaml
 done
 ```
 
-`build_splits.py` reads sample→split assignments from `splits/owkin.yaml` (hand-authored, checked
-into the repo) and joins them onto the filtered items by `sample_id` — no GroupKFold, no
-`test_size`/`val_size` tuning. Each item-set's `split.name` in its artifacts config must match its
-`items.name`, and `splits/owkin.yaml` must have an entry for that name (a list of
-`{train, val, test}` sample-id folds, materialized to `splits/<name>/outer=<i>.parquet`).
-
-### Build per-item-set source panels
-
-`panels/owkin/create_panels.py` intersects each sample's `feature_universe.txt` across an
-artifacts config's `items.filter.include_ids` and writes the result to
-`DATA_DIR/03_output/owkin/panels/<items.name>.yaml`. Run once after `filter_items.py`
-for a new item-set variant (or after `--overwrite true` to rebuild):
-
-```bash
-uv run python panels/owkin/create_panels.py
-```
+- `filter_items.py` applies the thresholds under `artifacts.items.filter` in `${NAME}.yaml` to
+  `items/all.json` and writes `items/${NAME}.json`.
+- `build_splits.py` reads sample→split assignments from `splits/owkin.yaml` (hand-authored,
+  checked into the repo) and joins them onto the filtered items by `sample_id` — no GroupKFold,
+  no `test_size`/`val_size` tuning. Each item-set's `split.name` in its artifacts config must
+  match its `items.name`, and `splits/owkin.yaml` must have an entry for that name (a list of
+  `{train, val, test}` sample-id folds, materialized to `splits/${NAME}/outer=<i>.parquet`).
+- `build_panel.py` intersects `feature_universe.txt` across the sample IDs present in
+  `items/${NAME}.json` and writes the result as `source_panel` to
+  `DATA_DIR/03_output/owkin/panels/${NAME}.yaml` (empty `target_panel`).
+- `compute_items_stats.py` recomputes stats/figures for the filtered item set.
 
 ### Warm the tile cache
 

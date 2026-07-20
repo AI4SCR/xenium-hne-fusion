@@ -8,7 +8,31 @@ from loguru import logger
 
 from xenium_hne_fusion.artifacts.config import ItemsFilterConfig
 from xenium_hne_fusion.artifacts.items import apply_filter, load_items_dataframe
-from xenium_hne_fusion.config import FilterConfig
+
+
+def select_sample_ids(
+    available_ids: list[str],
+    include_ids: list[str] | None,
+    exclude_ids: list[str] | None,
+) -> list[str]:
+    assert include_ids is None or exclude_ids is None, 'include_ids and exclude_ids are mutually exclusive'
+    available = sorted(available_ids)
+    available_set = set(available)
+
+    if include_ids is not None:
+        missing = sorted(set(include_ids) - available_set)
+        assert not missing, f'Unknown sample_ids in include_ids: {missing}'
+        selected = sorted(include_ids)
+    elif exclude_ids is not None:
+        exclude_set = set(exclude_ids)
+        missing = sorted(exclude_set - available_set)
+        assert not missing, f'Unknown sample_ids in exclude_ids: {missing}'
+        selected = [sample_id for sample_id in available if sample_id not in exclude_set]
+    else:
+        selected = available
+
+    assert selected, f'No samples match filter: include_ids={include_ids}, exclude_ids={exclude_ids}'
+    return selected
 
 
 def filter_items(
@@ -46,10 +70,11 @@ def filter_items(
         )
     if items_cfg.filter.include_ids is not None or items_cfg.filter.exclude_ids is not None:
         before = len(items_df)
-        selected_sample_ids = FilterConfig(
-            include_ids=items_cfg.filter.include_ids,
-            exclude_ids=items_cfg.filter.exclude_ids,
-        ).select(sorted(items_df["sample_id"].unique().tolist()))
+        selected_sample_ids = select_sample_ids(
+            items_df["sample_id"].unique().tolist(),
+            items_cfg.filter.include_ids,
+            items_cfg.filter.exclude_ids,
+        )
         items_df = items_df[items_df["sample_id"].isin(selected_sample_ids)]
         logger.info(
             f"Sample filter include_ids={items_cfg.filter.include_ids} exclude_ids={items_cfg.filter.exclude_ids}: "

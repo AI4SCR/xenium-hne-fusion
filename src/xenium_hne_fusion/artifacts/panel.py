@@ -2,13 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
-from anndata import AnnData
 from loguru import logger
-from scipy import sparse
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
-from xenium_hne_fusion.datasets.tiles import TileDataset
+from xenium_hne_fusion.artifacts.items import load_items_dataframe
 
 
 def intersect_gene_universes(sample_ids: list[str], processed_dir: Path) -> list[str]:
@@ -26,77 +22,6 @@ def intersect_gene_universes(sample_ids: list[str], processed_dir: Path) -> list
     return canonical_order
 
 
-def get_common_genes(split_metadata: pd.DataFrame, processed_dir: Path) -> list[str]:
-    assert len(split_metadata) > 0, 'No split metadata provided'
-    assert 'split' in split_metadata.columns, 'Missing split column'
-    assert 'sample_id' in split_metadata.columns, 'Missing sample_id column'
-    fit_metadata = split_metadata.loc[split_metadata['split'] == 'fit']
-    assert len(fit_metadata) > 0, 'No fit items provided'
-    return intersect_gene_universes(fit_metadata['sample_id'].unique().tolist(), processed_dir)
-
-
-def build_hvg_anndata_from_split(
-    *,
-    items_path: Path,
-    split_metadata_path: Path,
-    genes: list[str],
-    batch_size: int = 256,
-    num_workers: int = 10,
-) -> AnnData:
-    ds = TileDataset(
-        target='expression',
-        source_panel=None,
-        target_panel=genes,
-        include_image=False,
-        include_expr=False,
-        expr_pool='tile',
-        items_path=items_path,
-        metadata_path=split_metadata_path,
-        split='fit',
-        id_key='id',
-    )
-    ds.setup()
-    assert len(ds) > 0, f'No fit items found for {items_path} and {split_metadata_path}'
-
-    dl = DataLoader(ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
-
-    rows = []
-    obs_rows = []
-    for batch in tqdm(dl, desc='HVG'):
-        target = batch['target']
-        rows.append(sparse.csr_matrix(target.numpy()))
-        obs_rows.extend(
-            {
-                'id': item_id,
-                'sample_id': sample_id,
-                'tile_id': int(tile_id),
-            }
-            for item_id, sample_id, tile_id in zip(batch['id'], batch['sample_id'], batch['tile_id'], strict=True)
-        )
-
-    matrix = sparse.vstack(rows, format='csr')
-    obs = pd.DataFrame(obs_rows).set_index('id', drop=True)
-    var = pd.DataFrame(index=pd.Index(genes, name='gene'))
-    return AnnData(X=matrix, obs=obs, var=var)
-
-
-def select_highly_variable_genes(adata: AnnData, *, n_top_genes: int, flavor: str) -> list[str]:
-    import scanpy as sc
-
-    assert n_top_genes > 0, 'n_top_genes must be positive'
-    assert n_top_genes <= adata.n_vars, f'n_top_genes={n_top_genes} exceeds available genes={adata.n_vars}'
-
-    sc.pp.highly_variable_genes(
-        adata,
-        n_top_genes=n_top_genes,
-        flavor=flavor,
-        batch_key='sample_id',
-        inplace=True,
-    )
-    hvg_mask = adata.var['highly_variable'].fillna(False).astype(bool)
-    return adata.var_names[hvg_mask].tolist()
-
-
 def _save_panel(output_path: Path, source_panel: list[str], target_panel: list[str], overwrite: bool = False) -> Path:
     if output_path.exists():
         assert overwrite, f'Panel already exists: {output_path}'
@@ -112,49 +37,15 @@ def _save_panel(output_path: Path, source_panel: list[str], target_panel: list[s
     return output_path
 
 
-def save_hvg_panel(output_path: Path, genes: list[str], hvg_genes: list[str], overwrite: bool = False) -> Path:
-    hvg_set = set(hvg_genes)
-    target_panel = [gene for gene in genes if gene in hvg_set]
-    source_panel = [gene for gene in genes if gene not in hvg_set]
-    assert target_panel, 'No HVGs selected'
-    return _save_panel(output_path, source_panel, target_panel, overwrite=overwrite)
-
-
 def save_source_panel(output_path: Path, source_panel: list[str], overwrite: bool = False) -> Path:
     return _save_panel(output_path, source_panel, [], overwrite=overwrite)
 
 
-def create_panel(
-    *,
-    items_path: Path,
-    split_metadata_path: Path,
-    processed_dir: Path,
-    output_path: Path,
-    n_top_genes: int,
-    flavor: str = 'seurat_v3',
-    batch_size: int = 256,
-    num_workers: int = 10,
-    overwrite: bool = False,
-) -> Path:
-    split_metadata = pd.read_parquet(split_metadata_path)
-    common_genes = get_common_genes(split_metadata, processed_dir)
-    num_common_genes = len(common_genes)
-    assert 'sample_id' in split_metadata.columns, 'Missing sample_id column'
-    num_fit_samples = split_metadata.loc[split_metadata['split'] == 'fit', 'sample_id'].nunique()
-    logger.info(f'Found {num_common_genes} common genes across {num_fit_samples} fit samples')
-    assert num_common_genes >= n_top_genes, (
-        f'n_top_genes={n_top_genes} exceeds common genes={num_common_genes}'
-    )
-
-    adata = build_hvg_anndata_from_split(
-        items_path=items_path,
-        split_metadata_path=split_metadata_path,
-        genes=common_genes,
-        batch_size=batch_size,
-        num_workers=num_workers,
-    )
-    hvg_genes = select_highly_variable_genes(adata, n_top_genes=n_top_genes, flavor=flavor)
-    return save_hvg_panel(output_path, adata.var_names.tolist(), hvg_genes, overwrite=overwrite)
+def build_panel(items_path: Path, processed_dir: Path, output_path: Path, overwrite: bool = False) -> Path:
+    sample_ids = load_items_dataframe(items_path)['sample_id'].unique().tolist()
+    source_panel = intersect_gene_universes(sample_ids, processed_dir)
+    logger.info(f'Found {len(source_panel)} common genes across {len(sample_ids)} samples')
+    return save_source_panel(output_path, source_panel, overwrite=overwrite)
 
 
 def load_transcript_gene_categories(transcripts_path: Path) -> list[str]:
