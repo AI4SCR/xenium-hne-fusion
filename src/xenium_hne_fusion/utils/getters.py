@@ -53,11 +53,3 @@ class ManagedPaths:
     def resolve_statistics_path(self, path: Path) -> Path:
         path = Path(os.path.expandvars(path))
         return path if path.is_absolute() else self.statistics_dir / path
-
-
-def get_hest_metadata_path(raw_dir: Path) -> Path:
-    from xenium_hne_fusion.download import download_hest_metadata
-    metadata_path = raw_dir / "HEST_v1_3_0.csv"
-    if metadata_path.exists():
-        return metadata_path
-    return download_hest_metadata(raw_dir)
