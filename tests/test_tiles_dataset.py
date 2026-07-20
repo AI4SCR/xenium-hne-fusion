@@ -115,6 +115,83 @@ def test_tile_dataset_transforms_are_applied(tmp_path: Path):
     assert item["modalities"]["expr_tokens"].tolist() == [[2.0, 0.0], [0.0, 2.0], [4.0, 6.0]]
 
 
+def _write_cache_entry(cache_dir: Path, iid: str) -> None:
+    # Simulates what a real build-from-disk pass would have cached: both modalities present,
+    # `include_image`/`include_expr` are expected to filter this down post-cache-load, not the
+    # cache write itself (matches warmup_cache.py, which always caches the union of modalities).
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "id": iid,
+            "modalities": {
+                "image": torch.arange(12, dtype=torch.uint8).reshape(3, 2, 2),
+                "expr_tokens": torch.tensor([[1.0, 0.0], [0.0, 1.0], [2.0, 3.0]]),
+            },
+            "expression": torch.tensor([15.0]),
+        },
+        cache_dir / f"{iid}.pt",
+    )
+
+
+def test_tile_dataset_cache_hit_respects_include_flags(tmp_path: Path):
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tmp_path / "S1" / "0")}]
+    ).to_json(items_path, orient="records")
+
+    cache_dir = tmp_path / "cache"
+    _write_cache_entry(cache_dir, "S1_0")
+
+    ds = TileDataset(
+        target="expression",
+        source_panel=["A", "B"],
+        target_panel=["C"],
+        include_image=False,
+        include_expr=True,
+        items_path=items_path,
+        cache_dir=cache_dir,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert "image" not in item["modalities"]
+    assert item["modalities"]["expr_tokens"].tolist() == [[1.0, 0.0], [0.0, 1.0], [2.0, 3.0]]
+    assert item["expression"].tolist() == [15.0]
+
+
+def test_tile_dataset_cache_hit_transforms_are_applied(tmp_path: Path):
+    items_path = tmp_path / "items.json"
+    pd.DataFrame(
+        [{"id": "S1_0", "sample_id": "S1", "tile_id": 0, "tile_dir": str(tmp_path / "S1" / "0")}]
+    ).to_json(items_path, orient="records")
+
+    cache_dir = tmp_path / "cache"
+    _write_cache_entry(cache_dir, "S1_0")
+
+    ds = TileDataset(
+        target="expression",
+        source_panel=["A", "B"],
+        target_panel=["C"],
+        include_image=True,
+        include_expr=True,
+        target_transform=lambda x: x + 10,
+        image_transform=lambda x: x + 1,
+        expr_transform=lambda x: x * 2,
+        items_path=items_path,
+        cache_dir=cache_dir,
+        split="fit",
+        id_key="id",
+    )
+    ds.setup()
+
+    item = ds[0]
+    assert item["expression"].tolist() == [25.0]
+    assert torch.equal(item["modalities"]["image"], torch.arange(12, dtype=torch.uint8).reshape(3, 2, 2) + 1)
+    assert item["modalities"]["expr_tokens"].tolist() == [[2.0, 0.0], [0.0, 2.0], [4.0, 6.0]]
+
+
 def test_tile_dataset_respects_cell_type_col(tmp_path: Path):
     tile_dir = tmp_path / "S1" / "0"
     tile_dir.mkdir(parents=True, exist_ok=True)
