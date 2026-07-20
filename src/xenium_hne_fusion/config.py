@@ -45,6 +45,3 @@ class DataConfig:
     cell_type_col: str
     tiles: TilesConfig
     filter: FilterConfig = field(default_factory=FilterConfig)
-
-
-ProcessingConfig = DataConfig
