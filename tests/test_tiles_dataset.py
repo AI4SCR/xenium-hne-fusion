@@ -61,7 +61,7 @@ def test_tile_dataset_include_flags_control_modalities(tmp_path: Path):
     item = ds[0]
     assert "image" not in item["modalities"]
     assert "expr_tokens" not in item["modalities"]
-    assert item["target"].tolist() == [15.0]
+    assert item["expression"].tolist() == [15.0]
 
 
 def test_tile_dataset_rejects_overlapping_source_and_target_panels(tmp_path: Path):
@@ -110,7 +110,7 @@ def test_tile_dataset_transforms_are_applied(tmp_path: Path):
     ds.setup()
 
     item = ds[0]
-    assert item["target"].tolist() == [25.0]
+    assert item["expression"].tolist() == [25.0]
     assert torch.equal(item["modalities"]["image"], torch.arange(12, dtype=torch.uint8).reshape(3, 2, 2) + 1)
     assert item["modalities"]["expr_tokens"].tolist() == [[2.0, 0.0], [0.0, 2.0], [4.0, 6.0]]
 
@@ -219,7 +219,7 @@ def test_tile_dataset_respects_cell_type_col(tmp_path: Path):
     ds.setup()
 
     item = ds[0]
-    assert item["target"].tolist() == [2.0, 1.0]
+    assert item["cell_types"].tolist() == [2.0, 1.0]
     assert "modalities" in item
     assert item["modalities"] == {}
 
@@ -302,7 +302,7 @@ def test_tile_dataset_ignores_token_index_expr_column(tmp_path: Path):
     ds.setup()
 
     item = ds[0]
-    assert item["target"].tolist() == [15.0]
+    assert item["expression"].tolist() == [15.0]
     assert item["modalities"]["expr_tokens"].tolist() == [[1.0, 0.0], [0.0, 1.0], [2.0, 3.0]]
 
 
