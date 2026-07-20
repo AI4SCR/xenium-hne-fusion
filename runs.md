@@ -133,13 +133,13 @@ done
 ### Train protein-prediction models
 
 Each config under `configs/train/owkin/proteins/` (`early-fusion`, `expr-token-vit`,
-`late-fusion-tile`, `vision`) fixes an architecture; override `--train.data.*` to pick
+`expr-resmlp`, `late-fusion-tile`, `vision`) fixes an architecture; override `--train.data.*` to pick
 the item-set/panel/cache to train on. Keep `ITEMS` consistent with whichever cache you
 warmed above:
 
 ```bash
 for ITEMS in c_cells d_cells c_d_cells; do
-    for CONFIG in early-fusion expr-token-vit late-fusion-tile vision; do
+    for CONFIG in early-fusion expr-token-vit expr-resmlp late-fusion-tile vision; do
         uv run python scripts/train/supervised.py \
             --config configs/train/owkin/proteins/${CONFIG}.yaml \
             --train.data.items_path ${ITEMS}.json \
@@ -155,7 +155,7 @@ Submit the same sweep as one SLURM job per `(ITEMS, CONFIG)` pair:
 
 ```bash
 for ITEMS in c_cells d_cells c_d_cells; do
-    for CONFIG in early-fusion expr-token-vit late-fusion-tile vision; do
+    for CONFIG in early-fusion expr-token-vit expr-resmlp late-fusion-tile vision; do
         sbatch \
             --account=rgottar1_spatial \
             --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=08:00:00 \

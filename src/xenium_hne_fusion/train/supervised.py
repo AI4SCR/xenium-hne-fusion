@@ -225,7 +225,7 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
     print_keys(val_item)
     print_keys(test_item)
 
-    if cfg.wandb.name in ['expr-token', 'expr-tile', 'expr-token-vit']:
+    if cfg.wandb.name in ['expr-token', 'expr-tile', 'expr-token-vit', 'expr-resmlp']:
         assert 'image' not in fit_item['modalities']
         assert 'image' not in val_item['modalities']
         assert 'image' not in test_item['modalities']
