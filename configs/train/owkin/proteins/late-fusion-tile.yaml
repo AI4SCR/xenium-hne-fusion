@@ -16,7 +16,7 @@ train:
       output_dim: 32
       num_hidden_layers: 1
       dropout: 0.1
-    fusion_strategy: add
+    fusion_strategy: concat
     fusion_stage: late
     use_proj: true
     learnable_gate: false
@@ -46,7 +46,7 @@ train:
     tags: [owkin]
 
   trainer:
-    max_time: 00:06:00:00
+    max_time: 00:03:00:00
     max_epochs: 35
     accumulate_grad_batches: 2
     gradient_clip_val: 1.0

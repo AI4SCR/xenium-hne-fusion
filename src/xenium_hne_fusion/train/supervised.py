@@ -38,6 +38,16 @@ from xenium_hne_fusion.train.utils import (
 )
 
 
+TARGET_TRANSFORMS = {
+    "expression": log1p_transform,
+    "cell_types": log1p_transform,
+    "proteins": log1p_transform,
+    "conch_class": None,
+    "conch_scores": None,
+    "rgb": None,
+}
+
+
 def get_target_names(cfg: TrainingConfig) -> list[str] | None:
     if cfg.task.target == "expression":
         return cfg.data.target_panel
@@ -194,7 +204,7 @@ def train(cfg: TrainingConfig, debug: bool | None = None, config_path: str | Non
         include_image=cfg.backbone.morph_encoder_name is not None,
         include_expr=cfg.backbone.expr_encoder_name is not None,
         cell_type_col=cfg.data.cell_type_col,
-        target_transform=log1p_transform if cfg.task.target in ("cell_types", "expression") else None,
+        target_transform=TARGET_TRANSFORMS[cfg.task.target],
         image_transform=morph_spec.transform,
         expr_transform=expr_spec.transform,
         expr_pool=cfg.data.expr_pool,

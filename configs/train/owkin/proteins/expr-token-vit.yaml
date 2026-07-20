@@ -40,7 +40,7 @@ train:
     tags: [owkin]
 
   trainer:
-    max_time: 00:06:00:00
+    max_time: 00:03:00:00
     max_epochs: 35
     accumulate_grad_batches: 2
     gradient_clip_val: 1.0

@@ -39,51 +39,96 @@ c_cells:
   - CH_C_526a_x1
   val:
   - CH_C_523a_x2
-c_d_cells:
+c_on_d:
 - test:
-  - CH_C_525a_x2
-  - CH_D_530a_x2
-  train:
-  - CH_C_518a_x2
-  - CH_C_523a_x2
-  - CH_C_527a_x2
-  - CH_D_529a_x2
-  val:
-  - CH_C_526a_x1
-  - CH_D_531a_x2
-- test:
-  - CH_C_523a_x2
-  - CH_D_531a_x2
-  train:
-  - CH_C_518a_x2
-  - CH_C_525a_x2
-  - CH_C_527a_x2
-  - CH_D_529a_x2
-  val:
-  - CH_C_526a_x1
-  - CH_D_530a_x2
-- test:
-  - CH_C_518a_x2
-  - CH_C_526a_x1
-  train:
-  - CH_C_523a_x2
-  - CH_C_525a_x2
   - CH_D_529a_x2
   - CH_D_530a_x2
-  val:
-  - CH_C_527a_x2
   - CH_D_531a_x2
-- test:
-  - CH_C_527a_x2
-  - CH_D_529a_x2
   train:
   - CH_C_518a_x2
   - CH_C_523a_x2
   - CH_C_526a_x1
-  - CH_D_530a_x2
+  - CH_C_527a_x2
   val:
   - CH_C_525a_x2
+- test:
+  - CH_D_529a_x2
+  - CH_D_530a_x2
   - CH_D_531a_x2
+  train:
+  - CH_C_518a_x2
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_527a_x2
+  val:
+  - CH_C_526a_x1
+- test:
+  - CH_D_529a_x2
+  - CH_D_530a_x2
+  - CH_D_531a_x2
+  train:
+  - CH_C_518a_x2
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  val:
+  - CH_C_527a_x2
+- test:
+  - CH_D_529a_x2
+  - CH_D_530a_x2
+  - CH_D_531a_x2
+  train:
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  - CH_C_527a_x2
+  val:
+  - CH_C_518a_x2
+- test:
+  - CH_D_529a_x2
+  - CH_D_530a_x2
+  - CH_D_531a_x2
+  train:
+  - CH_C_518a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  - CH_C_527a_x2
+  val:
+  - CH_C_523a_x2
+d_on_c:
+- test:
+  - CH_C_518a_x2
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  - CH_C_527a_x2
+  train:
+  - CH_D_529a_x2
+  - CH_D_531a_x2
+  val:
+  - CH_D_530a_x2
+- test:
+  - CH_C_518a_x2
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  - CH_C_527a_x2
+  train:
+  - CH_D_529a_x2
+  - CH_D_530a_x2
+  val:
+  - CH_D_531a_x2
+- test:
+  - CH_C_518a_x2
+  - CH_C_523a_x2
+  - CH_C_525a_x2
+  - CH_C_526a_x1
+  - CH_C_527a_x2
+  train:
+  - CH_D_530a_x2
+  - CH_D_531a_x2
+  val:
+  - CH_D_529a_x2
 d_cells:
 - test:
   - CH_D_531a_x2

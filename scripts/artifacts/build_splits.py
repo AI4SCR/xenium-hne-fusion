@@ -13,7 +13,6 @@ def main(artifacts_cfg: ArtifactsConfig, overwrite: bool = False) -> None:
     managed_paths = ManagedPaths(data_dir=artifacts_cfg.data_dir, name=artifacts_cfg.name)
     items_path = managed_paths.items_dir / f'{artifacts_cfg.items.name}.json'
     assert items_path.exists(), f'Filtered items not found: {items_path}'
-    assert artifacts_cfg.split.name == artifacts_cfg.items.name, 'split.name must match items.name'
     write_split_collection(
         items_path=items_path,
         splits_yaml_path=artifacts_cfg.split.path,

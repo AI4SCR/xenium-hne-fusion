@@ -25,7 +25,7 @@ artifacts:
       num_cells: 10
       num_unique_cells: 5
   split:
-    name: c_d_cells
+    name: c_on_d
     path: splits/owkin.yaml
   panel:
     name: c_d_cells

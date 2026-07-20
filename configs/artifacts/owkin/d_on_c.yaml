@@ -1,0 +1,31 @@
+artifacts:
+  name: owkin
+  data_dir: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4
+  cell_type_col: first_type
+  tile_px: 512
+  stride_px: 256
+  items:
+    name: c_d_cells
+    filter:
+      organs: null
+      include_ids:
+        - CH_C_518a_x2
+        - CH_C_525a_x2
+        - CH_C_527a_x2
+        - CH_C_523a_x2
+        - CH_C_526a_x1
+#        - CH_C_527a_xr
+        - CH_D_529a_x2
+        - CH_D_531a_x2
+        - CH_D_530a_x2
+#        - CH_D_531a_xr
+      exclude_ids: null
+      num_transcripts: 1000
+      num_unique_transcripts: null
+      num_cells: 10
+      num_unique_cells: 5
+  split:
+    name: d_on_c
+    path: splits/owkin.yaml
+  panel:
+    name: c_d_cells
