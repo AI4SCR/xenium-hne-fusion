@@ -1,0 +1,9 @@
+boxplot:
+  entity: chuv
+  project: xe-hne-fus-protein-v1
+  name: owkin
+  data_dir: /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4
+  plot:
+    metric: test/spearman_mean
+    setting_pattern: (?P<setting>.+)/outer=\d+\.parquet$
+    run_names: [vision, early-fusion, late-fusion-tile, expr-resmlp, expr-token-vit]
