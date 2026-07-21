@@ -16,3 +16,7 @@ This mismatch does **not** apply to the `c_cells`/`d_cells` item sets — their
 Do not blanket-fix `PROTEIN_PANEL` to the g_cells naming — that would break c_cells/d_cells.
 Needs a per-item-set resolution (e.g. verify actual column names per item set before deciding
 whether to normalize upstream at data-generation time or branch the column list per `data.name`).
+
+## Splits
+- Use the `xr` samples for validation
+- 
