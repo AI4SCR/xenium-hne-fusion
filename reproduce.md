@@ -41,7 +41,7 @@ for CONFIG in vision expr-token-vit late-fusion-tile early-fusion; do
             --train.data.panel_path owkin-beat.yaml \
             --train.data.cache_dir v0_cells \
             --train.wandb.project xe-hne-fus-protein-v0 \
-            --train.wandb.tags "[owkin, v0, reproduce]"
+            --train.wandb.tags "[owkin, v0, reproduce, c_d_cells]"
     done
 done
 ```
@@ -66,7 +66,7 @@ for CONFIG in vision expr-token-vit late-fusion-tile early-fusion; do
                 --train.data.panel_path owkin-beat.yaml \
                 --train.data.cache_dir v0_cells \
                 --train.wandb.project xe-hne-fus-protein-v0 \
-                --train.wandb.tags [owkin,v0,reproduce]"
+                --train.wandb.tags [owkin,v0,reproduce,c_d_cells]"
     done
 done
 ```
