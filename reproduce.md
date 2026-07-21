@@ -48,7 +48,7 @@ Submit one dedicated sbatch loop, sweeping `CONFIG` and every outer fold (0-3):
 
 ```bash
 PARTITION=gpu-l40
-for CONFIG in vision expr-token-vit late-fusion-tile early-fusion; do
+for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2 3; do
         sbatch \
             --account=rgottar1_spatial \
