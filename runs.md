@@ -379,3 +379,19 @@ uv run python scripts/train/supervised.py \
     --train.data.cache_dir null \
     --debug true
 ```
+
+## Re-run v0
+```bash
+sbatch \
+    --account=rgottar1_spatial \
+    --cpus-per-task=10 --mem=32G --time=02:00:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=owkin_warmup_c_d_cells \
+    --wrap="uv run python scripts/artifacts/warmup_cache.py \
+        --config configs/train/owkin/proteins/early-fusion.yaml \
+        --train.data.items_path c_d_cells.json \
+        --train.data.metadata_path cells/outer=0.parquet \
+        --train.data.panel_path owkin-beat.yaml \
+        --train.data.cache_dir protein/v0_c_d_cells"
+        
+```
