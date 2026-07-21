@@ -21,7 +21,7 @@ def main(cfg: TrainingConfig) -> None:
     ds = TileDataset(
         target=cfg.task.target,
         items_path=cfg.data.items_path,
-        metadata_path=cfg.data.metadata_path,
+        metadata_path=None,  # we don't need and don't want to filter out items without metadata, cfg.data.metadata_path
         source_panel=cfg.data.source_panel,
         target_panel=cfg.data.target_panel if cfg.task.target == "expression" else None,
         include_image=cfg.backbone.morph_encoder_name is not None,
