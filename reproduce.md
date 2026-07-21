@@ -24,12 +24,10 @@ uv run python scripts/artifacts/warmup_cache.py \
 
 `cells/outer=<N>-inner=0-seed=0.parquet` matches the original v0 run configs (commit `a5fd135`),
 which fixed `inner=0`. The `cells` split has 4 outer folds (0-3, see
-`03_output/owkin/splits/cells/`). The original v0 sweep only had 4 run configs — no `expr-resmlp`
-yet (added later, commit `10aae7f`) — so reproduce with `vision`, `expr-token-vit`,
-`late-fusion-tile`, `early-fusion` only:
+`03_output/owkin/splits/cells/`).
 
 ```bash
-for CONFIG in vision expr-token-vit late-fusion-tile early-fusion; do
+for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
     for OUTER in 0 1 2 3; do
         uv run python scripts/train/supervised.py \
             --config configs/train/owkin/proteins/${CONFIG}.yaml \
