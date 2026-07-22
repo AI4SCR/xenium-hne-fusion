@@ -63,8 +63,23 @@ for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
                 --train.data.metadata_path cells/outer=${OUTER}-inner=0-seed=0.parquet \
                 --train.data.panel_path owkin-beat.yaml \
                 --train.data.cache_dir v0_cells \
-                --train.wandb.project xe-hne-fus-protein-v0 \
                 --train.wandb.tags [owkin,v0,reproduce,c_d_cells]"
     done
 done
+```
+
+## Plot boxplots (v0)
+
+`setting_pattern` is overridden because the `cells` split files are named
+`outer=<N>-inner=0-seed=0.parquet`, not the script's default `outer=<N>.parquet`.
+`filter.tags reproduce` restricts to this reproduce sweep's runs so older/unrelated
+runs logged to the same W&B project don't get mixed into the boxplot.
+
+```bash
+uv run python scripts/eval/boxplot.py \
+    --boxplot.project xe-hne-fus-protein-v0 \
+    --boxplot.name owkin \
+    --boxplot.data_dir /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4 \
+    --boxplot.plot.setting_pattern '(?P<setting>.+)/outer=\d+-inner=\d+-seed=\d+\.parquet$' \
+    --boxplot.filter.tags '[reproduce]'
 ```

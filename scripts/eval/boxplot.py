@@ -28,6 +28,7 @@ from xenium_hne_fusion.utils.getters import ManagedPaths
 @dataclass
 class FilterConfig:
     state: str = "finished"
+    tags: list[str] | None = None
 
 
 @dataclass
@@ -81,9 +82,16 @@ def plot_setting_boxplot(df_setting: pd.DataFrame, metric: str, run_names: list[
     plt.close(ax.figure)
 
 
+def build_wandb_filters(filter_cfg: FilterConfig) -> dict:
+    filters = {"state": filter_cfg.state}
+    if filter_cfg.tags:
+        filters["tags"] = {"$in": filter_cfg.tags}
+    return filters
+
+
 def main(cfg: BoxplotConfig) -> int:
     api = wandb.Api()
-    runs = api.runs(f"{cfg.entity}/{cfg.project}", filters={"state": cfg.filter.state})
+    runs = api.runs(f"{cfg.entity}/{cfg.project}", filters=build_wandb_filters(cfg.filter))
 
     df = build_dataframe(runs, cfg.name, cfg.plot.metric, cfg.plot.setting_pattern)
 
