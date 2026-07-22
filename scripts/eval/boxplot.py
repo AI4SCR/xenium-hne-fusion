@@ -2,15 +2,18 @@
 Fetch test scores for supervised training runs from W&B and plot per-setting boxplots.
 
 Runs are grouped into "settings" (e.g. c_cells, d_cells, c_on_d, d_on_c) by matching
-`data.metadata_path` against `plot.setting_pattern`. For each setting, one figure is
-saved with a boxplot + black swarm overlay of `plot.metric`, one box per run name in
-`plot.run_names`, pooling all outer folds together.
+`data.metadata_path` against `plot.setting_pattern`. For each metric in `plot.metrics`,
+one subdir (the metric name with "/" replaced by "_") is created, and within it one
+figure per setting is saved with a boxplot + black swarm overlay, one box per run name
+in `plot.run_names`, pooling all outer folds together. Output layout:
+`boxplot/<project>/<metric>/<setting>.png`.
 
 Usage:
     uv run python scripts/eval/boxplot.py \\
         --boxplot.project xe-hne-fus-expr-v0 \\
         --boxplot.name owkin \\
-        --boxplot.data_dir $DATA_DIR
+        --boxplot.data_dir $DATA_DIR \\
+        --boxplot.plot.metrics '[test/pearson_mean, test/spearman_mean]'
 """
 
 import re
@@ -33,7 +36,7 @@ class FilterConfig:
 
 @dataclass
 class PlotConfig:
-    metric: str = "test/spearman_mean"
+    metrics: list[str] = field(default_factory=lambda: ["test/spearman_mean"])
     setting_pattern: str = r"(?P<setting>.+)/outer=\d+\.parquet$"
     run_names: list[str] = field(default_factory=lambda: ["vision", "early-fusion", "expr-resmlp", "expr-token-vit"])
 
@@ -91,17 +94,20 @@ def build_wandb_filters(filter_cfg: FilterConfig) -> dict:
 
 def main(cfg: BoxplotConfig) -> int:
     api = wandb.Api()
-    runs = api.runs(f"{cfg.entity}/{cfg.project}", filters=build_wandb_filters(cfg.filter))
-
-    df = build_dataframe(runs, cfg.name, cfg.plot.metric, cfg.plot.setting_pattern)
+    runs = list(api.runs(f"{cfg.entity}/{cfg.project}", filters=build_wandb_filters(cfg.filter)))
 
     managed = ManagedPaths(data_dir=cfg.data_dir, name=cfg.name)
-    out_dir = managed.figures_dir / "boxplot" / cfg.project
-    out_dir.mkdir(parents=True, exist_ok=True)
+    project_dir = managed.figures_dir / "boxplot" / cfg.project
 
-    df.to_parquet(out_dir / "runs.parquet")
-    for setting, df_setting in df.groupby("setting"):
-        plot_setting_boxplot(df_setting, cfg.plot.metric, cfg.plot.run_names, out_dir / f"{setting}.png")
+    for metric in cfg.plot.metrics:
+        df = build_dataframe(runs, cfg.name, metric, cfg.plot.setting_pattern)
+
+        out_dir = project_dir / metric.replace("/", "_")
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        df.to_parquet(out_dir / "runs.parquet")
+        for setting, df_setting in df.groupby("setting"):
+            plot_setting_boxplot(df_setting, metric, cfg.plot.run_names, out_dir / f"{setting}.png")
 
     return 0
 

@@ -75,11 +75,20 @@ done
 `filter.tags reproduce` restricts to this reproduce sweep's runs so older/unrelated
 runs logged to the same W&B project don't get mixed into the boxplot.
 
+Each entry in `plot.metrics` gets its own output subdir (`/` replaced by `_`), so
+output lands at `figures/boxplot/<project>/<metric>/<setting>.png`. Besides the
+overall `_mean` metrics, this also plots per-protein pearson/spearman for the 5
+proteins considered most clinically relevant in this panel — PD-1, PD-L1, Ki-67,
+CD8A-1, HLA-DR (checkpoint inhibition, proliferation, cytotoxic T-cell infiltration,
+antigen presentation) — out of the full 27-protein panel in
+`src/xenium_hne_fusion/targets.py`.
+
 ```bash
 uv run python scripts/eval/boxplot.py \
     --boxplot.project xe-hne-fus-protein-v0 \
     --boxplot.name owkin \
     --boxplot.data_dir /work/PRTNR/CHUV/DIR/rgottar1/spatial/data/mesothelioma/xenium-hne-fusion-v4 \
     --boxplot.plot.setting_pattern '(?P<setting>.+)/outer=\d+-inner=\d+-seed=\d+\.parquet$' \
-    --boxplot.filter.tags '[reproduce]'
+    --boxplot.filter.tags '[reproduce]' \
+    --boxplot.plot.metrics '[test/pearson_mean, test/spearman_mean, test/pearson/PD-1, test/pearson/PD-L1, test/pearson/Ki-67, test/pearson/CD8A-1, test/pearson/HLA-DR, test/spearman/PD-1, test/spearman/PD-L1, test/spearman/Ki-67, test/spearman/CD8A-1, test/spearman/HLA-DR]'
 ```
