@@ -4,9 +4,9 @@ Fetch test scores for supervised training runs from W&B and plot per-setting box
 Runs are grouped into "settings" (e.g. c_cells, d_cells, c_on_d, d_on_c) by matching
 `data.metadata_path` against `plot.setting_pattern`. For each metric in `plot.metrics`,
 one subdir (the metric name with "/" replaced by "_") is created, and within it one
-figure per setting is saved with a boxplot + black swarm overlay, one box per run name
-in `plot.run_names`, pooling all outer folds together. Output layout:
-`boxplot/<project>/<metric>/<setting>.png`.
+figure per setting is saved with a boxplot + swarm overlay (swarm points colored by
+outer split), one box per run name in `plot.run_names`, pooling all outer folds
+together. Output layout: `boxplot/<project>/<metric>/<setting>.png`.
 
 Usage:
     uv run python scripts/eval/boxplot.py \\
@@ -56,15 +56,21 @@ def extract_setting(metadata_path: str, pattern: str) -> str:
     return Path(setting).name
 
 
+def extract_outer(metadata_path: str) -> int:
+    return int(re.search(r"outer=(?P<outer>\d+)", metadata_path)["outer"])
+
+
 def build_dataframe(runs, name: str, metric: str, pattern: str) -> pd.DataFrame:
     records = []
     for run in runs:
         if run.config["data"]["name"] != name:
             continue
+        metadata_path = run.config["data"]["metadata_path"]
         records.append({
             "run_id": run.id,
             "run_name": run.config["wandb"]["name"],
-            "setting": extract_setting(run.config["data"]["metadata_path"], pattern),
+            "setting": extract_setting(metadata_path, pattern),
+            "outer": extract_outer(metadata_path),
             "metric_value": run.summary[metric],
         })
     df = pd.DataFrame.from_records(records)
@@ -75,11 +81,16 @@ def build_dataframe(runs, name: str, metric: str, pattern: str) -> pd.DataFrame:
 def plot_setting_boxplot(df_setting: pd.DataFrame, metric: str, run_names: list[str], out_path: Path) -> None:
     df_setting = df_setting[df_setting["run_name"].isin(run_names)]
     order = [r for r in run_names if r in set(df_setting["run_name"])]
+    outer_order = sorted(df_setting["outer"].unique())
 
     _, ax = plt.subplots(figsize=(max(6, len(order) * 1.5), 6))
     sns.boxplot(data=df_setting, x="run_name", y="metric_value", order=order, ax=ax)
-    sns.swarmplot(data=df_setting, x="run_name", y="metric_value", order=order, color="black", ax=ax)
+    sns.swarmplot(
+        data=df_setting, x="run_name", y="metric_value", order=order,
+        hue="outer", hue_order=outer_order, dodge=False, ax=ax,
+    )
     ax.set_ylabel(metric)
+    ax.legend(title="outer split", bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.figure.tight_layout()
     ax.figure.savefig(out_path, dpi=150)
     plt.close(ax.figure)
