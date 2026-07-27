@@ -60,7 +60,8 @@ def extract_outer(metadata_path: str) -> int:
     return int(re.search(r"outer=(?P<outer>\d+)", metadata_path)["outer"])
 
 
-def build_dataframe(runs, name: str, metric: str, pattern: str) -> pd.DataFrame:
+def select_runs(runs, name: str, pattern: str) -> pd.DataFrame:
+    """One row per run matching `data.name`, with setting/outer parsed once and the `run` object kept."""
     records = []
     for run in runs:
         if run.config["data"]["name"] != name:
@@ -68,13 +69,19 @@ def build_dataframe(runs, name: str, metric: str, pattern: str) -> pd.DataFrame:
         metadata_path = run.config["data"]["metadata_path"]
         records.append({
             "run_id": run.id,
+            "run": run,
             "run_name": run.config["wandb"]["name"],
             "setting": extract_setting(metadata_path, pattern),
             "outer": extract_outer(metadata_path),
-            "metric_value": run.summary[metric],
         })
     df = pd.DataFrame.from_records(records)
     assert not df.empty, f"no runs matched data.name={name!r}"
+    return df
+
+
+def build_dataframe(selected: pd.DataFrame, metric: str) -> pd.DataFrame:
+    df = selected.drop(columns="run")
+    df["metric_value"] = [run.summary[metric] for run in selected["run"]]
     return df
 
 
@@ -110,8 +117,9 @@ def main(cfg: BoxplotConfig) -> int:
     managed = ManagedPaths(data_dir=cfg.data_dir, name=cfg.name)
     project_dir = managed.figures_dir / "boxplot" / cfg.project
 
+    selected = select_runs(runs, cfg.name, cfg.plot.setting_pattern)
     for metric in cfg.plot.metrics:
-        df = build_dataframe(runs, cfg.name, metric, cfg.plot.setting_pattern)
+        df = build_dataframe(selected, metric)
 
         out_dir = project_dir / metric.replace("/", "_")
         out_dir.mkdir(parents=True, exist_ok=True)
