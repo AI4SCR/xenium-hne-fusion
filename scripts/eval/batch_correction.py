@@ -33,6 +33,7 @@ Candidates considered: Harmony, ComBat, Scanorama, BBKNN, scVI.
 
 ## Metrics
 - batch_asw: 1 - |silhouette score| on batch labels in the embedding (near 1 = well mixed).
+  Computed on a bounded random subsample (`asw_sample_size`) since silhouette_score is O(n^2).
 - batch_knn_entropy: mean Shannon entropy of batch composition within each cell's k nearest
   neighbors, normalized by log(n_batches) (near 1 = well mixed).
 - batch_pcr: mean R^2 of a linear regression of each embedding dimension on one-hot batch
@@ -75,6 +76,9 @@ class BatchCorrectionConfig:
     random_state: int = 0
     debug: bool = False
     debug_cells_per_batch: int = 500
+    # silhouette_score is O(n^2); bound it via sklearn's own subsampling rather than
+    # computing it on the full embedding (infeasible beyond a few thousand cells).
+    asw_sample_size: int = 20_000
 
 
 def load_cell_proteins(structured_dir: Path, sample_ids: list[str], proteins: list[str]) -> pd.DataFrame:
@@ -98,8 +102,9 @@ def build_adata(cells: pd.DataFrame, proteins: list[str]) -> AnnData:
     return adata
 
 
-def batch_asw(embedding: np.ndarray, batch: pd.Series) -> float:
-    return 1 - abs(silhouette_score(embedding, batch))
+def batch_asw(embedding: np.ndarray, batch: pd.Series, sample_size: int, random_state: int) -> float:
+    sample_size = min(sample_size, len(embedding))
+    return 1 - abs(silhouette_score(embedding, batch, sample_size=sample_size, random_state=random_state))
 
 
 def batch_knn_entropy(embedding: np.ndarray, batch: pd.Series, n_neighbors: int) -> float:
@@ -121,9 +126,9 @@ def batch_pcr(embedding: np.ndarray, batch: pd.Series) -> float:
     return float(LinearRegression().fit(dummies, embedding).score(dummies, embedding))
 
 
-def evaluate_embedding(embedding: np.ndarray, batch: pd.Series, n_neighbors: int) -> dict:
+def evaluate_embedding(embedding: np.ndarray, batch: pd.Series, n_neighbors: int, asw_sample_size: int, random_state: int) -> dict:
     return {
-        "batch_asw": batch_asw(embedding, batch),
+        "batch_asw": batch_asw(embedding, batch, asw_sample_size, random_state),
         "batch_knn_entropy": batch_knn_entropy(embedding, batch, n_neighbors),
         "batch_pcr": batch_pcr(embedding, batch),
     }
@@ -175,7 +180,7 @@ def main(cfg: BatchCorrectionConfig) -> int:
         "scanorama": "X_scanorama",
     }
     metrics = {
-        method: evaluate_embedding(adata.obsm[obsm_key], adata.obs["sample_id"], cfg.n_neighbors)
+        method: evaluate_embedding(adata.obsm[obsm_key], adata.obs["sample_id"], cfg.n_neighbors, cfg.asw_sample_size, cfg.random_state)
         for method, obsm_key in embeddings.items()
     }
 

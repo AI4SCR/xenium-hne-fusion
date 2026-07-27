@@ -34,7 +34,7 @@ def test_batch_asw_lower_for_separated_batches(module):
     separated, batch = _separated_batches(rng, 100, offset=10.0)
     mixed = rng.normal(size=(200, 3))
 
-    assert module.batch_asw(separated, batch) < module.batch_asw(mixed, batch)
+    assert module.batch_asw(separated, batch, sample_size=200, random_state=0) < module.batch_asw(mixed, batch, sample_size=200, random_state=0)
 
 
 def test_batch_knn_entropy_lower_for_separated_batches(module):

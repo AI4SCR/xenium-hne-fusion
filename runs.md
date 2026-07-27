@@ -395,3 +395,24 @@ sbatch \
         --train.data.cache_dir protein/v0_c_d_cells"
         
 ```
+
+### Batch-effect correction comparison
+
+`scripts/eval/batch_correction.py` runs on whole-sample cell-level protein data (no
+tile-level subsampling), so `c_cells` alone is ~2.3M cells — do not run the full
+(non-debug) sweep on the login node; submit it as an sbatch job:
+
+```bash
+sbatch \
+    --account=rgottar1_spatial \
+    --cpus-per-task=10 --mem=64G --time=04:00:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=owkin_batch_correction_c_cells \
+    --wrap="uv run python scripts/eval/batch_correction.py \
+        --batch_correction.name owkin \
+        --batch_correction.data_dir \$DATA_DIR \
+        --batch_correction.items_path c_cells.json \
+        --batch_correction.debug false"
+```
+
+Use `--batch_correction.debug true` (small per-sample subsample) to iterate locally first.
