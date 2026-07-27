@@ -421,3 +421,8 @@ Each method's embedding is checkpointed to `<out_dir>/<run_name>_checkpoints/*.n
 computed, so if a job is OOM-killed or hits the time limit, resubmitting the same command
 resumes from whichever methods already finished (Scanorama uses sketching for exactly this
 reason — see script docstring for the OOM this fixed).
+
+Observed full-scale runtime on `c_cells` (~2.26M cells, 5 samples, 10 CPUs, 64G): Harmony
+~5.5min, ComBat ~9s, Scanorama ~2h13min (the sketch-to-full-data extension step dominates at
+~450k cells/sample — budget `--time` accordingly; 4h was enough with headroom, 1-1.5h would
+not have been).
