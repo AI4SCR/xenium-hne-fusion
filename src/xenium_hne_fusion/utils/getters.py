@@ -46,6 +46,10 @@ class ManagedPaths:
     def figures_dir(self) -> Path:
         return self.output_dir / 'figures'
 
+    @property
+    def anndata_dir(self) -> Path:
+        return self.output_dir / 'anndata'
+
     def resolve_items_path(self, path: Path) -> Path:
         path = Path(os.path.expandvars(path))
         return path if path.is_absolute() else self.items_dir / path

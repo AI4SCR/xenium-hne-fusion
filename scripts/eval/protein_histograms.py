@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from xenium_hne_fusion.targets import PROTEIN_PANEL, protein_base_name, protein_base_to_panel
+from xenium_hne_fusion.targets import PROTEIN_PANEL, load_sample_proteins
 from xenium_hne_fusion.utils.getters import ManagedPaths
 
 
@@ -40,17 +40,12 @@ def sample_cancer_type(sample_id: str) -> str:
 
 
 def load_cell_proteins(structured_dir: Path, proteins: list[str]) -> pd.DataFrame:
-    base_to_panel = protein_base_to_panel(proteins)
-
     sample_dirs = sorted(p for p in structured_dir.iterdir() if p.is_dir())
     assert sample_dirs, f"no sample directories under {structured_dir}"
 
     frames = []
     for sample_dir in sample_dirs:
-        df = pd.read_parquet(sample_dir / "proteins.parquet")
-        df = df.drop(columns="geometry")
-        rename = {c: base_to_panel[protein_base_name(c)] for c in df.columns}
-        df = df.rename(columns=rename)[proteins]
+        df = load_sample_proteins(structured_dir, sample_dir.name, proteins)
         df["cancer_type"] = sample_cancer_type(sample_dir.name)
         frames.append(df)
     return pd.concat(frames, ignore_index=True)

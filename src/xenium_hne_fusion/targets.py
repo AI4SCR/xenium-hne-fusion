@@ -1,6 +1,10 @@
 """Fixed target-label vocabularies shared across datasets and training."""
 
 import re
+from pathlib import Path
+
+import pandas as pd
+import pyarrow.parquet as pq
 
 PROTEIN_PANEL = [
     'Beta-catenin', 'CD11c', 'CD138', 'CD16', 'CD163-1', 'CD20', 'CD31', 'CD3E-1', 'CD4-1', 'CD45',
@@ -23,6 +27,19 @@ def protein_base_to_panel(proteins: list[str]) -> dict[str, str]:
     base_to_panel = {protein_base_name(p): p for p in proteins}
     assert len(base_to_panel) == len(proteins), "panel has ambiguous base names"
     return base_to_panel
+
+
+def load_sample_proteins(structured_dir: Path, sample_id: str, proteins: list[str]) -> pd.DataFrame:
+    """Read a sample's structured `proteins.parquet`, normalized onto `proteins` columns.
+
+    Skips the "geometry" column at read time rather than loading and dropping it.
+    """
+    base_to_panel = protein_base_to_panel(proteins)
+    path = structured_dir / sample_id / "proteins.parquet"
+    columns = [c for c in pq.ParquetFile(path).schema.names if c != "geometry"]
+    df = pd.read_parquet(path, columns=columns)
+    rename = {c: base_to_panel[protein_base_name(c)] for c in df.columns}
+    return df.rename(columns=rename)[proteins]
 
 # Index-ordered: conch_class labels (see scribble/create-conch-training.py) are argmax indices into this list.
 CONCH_CLASSES = [
