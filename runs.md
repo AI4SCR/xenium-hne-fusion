@@ -416,3 +416,8 @@ sbatch \
 ```
 
 Use `--batch_correction.debug true` (small per-sample subsample) to iterate locally first.
+
+Each method's embedding is checkpointed to `<out_dir>/<run_name>_checkpoints/*.npy` as it's
+computed, so if a job is OOM-killed or hits the time limit, resubmitting the same command
+resumes from whichever methods already finished (Scanorama uses sketching for exactly this
+reason — see script docstring for the OOM this fixed).
