@@ -23,7 +23,11 @@ Candidates considered: Harmony, ComBat, Scanorama, BBKNN, scVI.
   for exactly this data type, and already available via `scanpy.pp.combat`.
 - Scanorama: MNN-based, algorithmically distinct from Harmony (soft clustering) and ComBat
   (linear model); scIB found it integrates across strong batch effects while retaining
-  biological variation.
+  biological variation. Uses `scanorama.integrate(..., sketch=True)` directly rather than
+  `scanpy.external.pp.scanorama_integrate` -- the scanpy wrapper calls the lower-level
+  `scanorama.assemble()`, which doesn't support sketching-based acceleration; at c_cells
+  scale (~450k cells/sample) unsketched matching is prohibitively slow (Scanorama's own docs
+  recommend sketching above ~100k cells/dataset).
 - Not selected: BBKNN only corrects the neighbor graph, not the expression/embedding matrix,
   so it can't be scored with the same embedding-based metrics or reused downstream, and scIB
   found it collapses fine-grained biological variation. scVI assumes (zero-inflated)
@@ -38,6 +42,10 @@ Candidates considered: Harmony, ComBat, Scanorama, BBKNN, scVI.
   neighbors, normalized by log(n_batches) (near 1 = well mixed).
 - batch_pcr: mean R^2 of a linear regression of each embedding dimension on one-hot batch
   labels (near 0 = batch effect removed).
+
+Each method's embedding is checkpointed to `<out_dir>/<run_name>_checkpoints/*.npy` as soon
+as it's computed, so a rerun (e.g. after a SLURM timeout) resumes from whichever methods
+already finished instead of recomputing them.
 
 Usage:
     uv run python scripts/eval/batch_correction.py \\
@@ -145,6 +153,30 @@ def run_harmony(embedding: np.ndarray, batch: pd.Series, random_state: int) -> n
     return z
 
 
+def run_scanorama(cells: pd.DataFrame, sample_ids: list[str], proteins: list[str], dimred: int, random_state: int) -> np.ndarray:
+    import scanorama
+
+    # cells is ordered by sample_id (see load_cell_proteins/subsample_per_batch), matching
+    # adata's row order, so concatenating per-sample_id subsets in this order aligns 1:1 with it.
+    datasets = [np.log1p(cells.loc[cells["sample_id"] == s, proteins].to_numpy(dtype=np.float64)) for s in sample_ids]
+    genes_list = [proteins] * len(sample_ids)
+
+    integrated, _ = scanorama.integrate(
+        datasets, genes_list, ds_names=sample_ids,
+        dimred=dimred, sketch=True, sketch_max=10_000, seed=random_state,
+    )
+    return np.concatenate(integrated)
+
+
+def checkpointed(path: Path, compute_fn):
+    if path.exists():
+        logger.info(f"Loading checkpoint: {path}")
+        return np.load(path)
+    result = compute_fn()
+    np.save(path, result)
+    return result
+
+
 def main(cfg: BatchCorrectionConfig) -> int:
     managed = ManagedPaths(data_dir=cfg.data_dir, name=cfg.name)
     items_path = managed.resolve_items_path(cfg.items_path)
@@ -158,20 +190,34 @@ def main(cfg: BatchCorrectionConfig) -> int:
         cells = subsample_per_batch(cells, cfg.debug_cells_per_batch, cfg.random_state)
     logger.info(f"Loaded {len(cells)} cells")
 
+    out_dir = managed.anndata_dir / "batch_correction"
+    run_name = f"{items_path.stem}{'_debug' if cfg.debug else ''}"
+    checkpoint_dir = out_dir / f"{run_name}_checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
     adata = build_adata(cells, cfg.proteins)
     sc.pp.scale(adata)
     sc.pp.pca(adata, n_comps=cfg.n_pca_comps, random_state=cfg.random_state)
 
     logger.info("Running Harmony...")
-    adata.obsm["X_pca_harmony"] = run_harmony(adata.obsm["X_pca"], adata.obs["sample_id"], cfg.random_state)
+    adata.obsm["X_pca_harmony"] = checkpointed(
+        checkpoint_dir / "harmony.npy",
+        lambda: run_harmony(adata.obsm["X_pca"], adata.obs["sample_id"], cfg.random_state),
+    )
 
     logger.info("Running ComBat...")
-    combat_x = sc.pp.combat(adata, key="sample_id", inplace=False)
+    combat_x = checkpointed(checkpoint_dir / "combat.npy", lambda: sc.pp.combat(adata, key="sample_id", inplace=False))
     adata.layers["combat"] = combat_x
-    adata.obsm["X_pca_combat"] = PCA(n_components=cfg.n_pca_comps, random_state=cfg.random_state).fit_transform(combat_x)
+    adata.obsm["X_pca_combat"] = checkpointed(
+        checkpoint_dir / "combat_pca.npy",
+        lambda: PCA(n_components=cfg.n_pca_comps, random_state=cfg.random_state).fit_transform(combat_x),
+    )
 
     logger.info("Running Scanorama...")
-    sc.external.pp.scanorama_integrate(adata, "sample_id")
+    adata.obsm["X_scanorama"] = checkpointed(
+        checkpoint_dir / "scanorama.npy",
+        lambda: run_scanorama(cells, sample_ids, cfg.proteins, cfg.n_pca_comps, cfg.random_state),
+    )
 
     embeddings = {
         "uncorrected": "X_pca",
@@ -188,10 +234,8 @@ def main(cfg: BatchCorrectionConfig) -> int:
     logger.info(f"Batch-correction metrics:\n{metrics_df}")
     adata.uns["batch_correction_metrics"] = metrics_df.to_dict(orient="index")
 
-    out_dir = managed.anndata_dir / "batch_correction"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    adata.write_zarr(out_dir / f"{items_path.stem}.zarr")
-    metrics_df.to_csv(out_dir / f"{items_path.stem}_metrics.csv")
+    adata.write_zarr(out_dir / f"{run_name}.zarr")
+    metrics_df.to_csv(out_dir / f"{run_name}_metrics.csv")
 
     return 0
 
