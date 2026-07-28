@@ -475,3 +475,8 @@ sbatch \
 Output: `<DATA_DIR>/03_output/owkin/anndata/batch_correction/<run_name>[_debug]_adtnorm.parquet`
 (normalized cell x marker matrix, plus `cell_id`/`sample_id` columns; `cell_id` is
 sample-prefixed since Xenium per-run barcodes collide across samples).
+
+Observed full-scale runtime on `c_cells` (~2.26M cells, 5 samples, 10 CPUs, 64G): ~8m45s total
+— per-marker landmark registration is univariate (no all-pairs cell matching), so it scales
+far better with cell count than Harmony/ComBat/Scanorama (`--time=04:00:00` has large headroom;
+30min would likely be enough).
