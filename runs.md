@@ -426,3 +426,52 @@ Observed full-scale runtime on `c_cells` (~2.26M cells, 5 samples, 10 CPUs, 64G)
 ~5.5min, ComBat ~9s, Scanorama ~2h13min (the sketch-to-full-data extension step dominates at
 ~450k cells/sample — budget `--time` accordingly; 4h was enough with headroom, 1-1.5h would
 not have been).
+
+### ADTnorm (R, self-contained)
+
+ADTnorm (github.com/yezhengSTAT/ADTnorm) normalizes each protein marker independently via
+landmark registration (aligns density peaks/valleys across samples) — a different approach
+from the joint-embedding methods above, purpose-built for ADT/protein-panel data. It's an R
+package (depends on Bioconductor `flowCore`/`flowStats`/`EMDomics` plus `fda`), so it lives in
+`rscripts/` as a self-contained R-only pipeline — no rpy2/Python bridge, reads
+`proteins.parquet` directly.
+
+One-time setup (installs into a project-local `rscripts/.Rlibs`, not tracked in git):
+
+```bash
+module load r-light/4.5.2
+Rscript rscripts/install.R
+```
+
+Debug run (small per-sample subsample, for local iteration):
+
+```bash
+module load r-light/4.5.2
+Rscript rscripts/batch_correct.R \
+    --data_dir $DATA_DIR \
+    --name owkin \
+    --sample_ids CH_C_518a_x2,CH_C_523a_x2,CH_C_525a_x2,CH_C_526a_x1,CH_C_527a_x2 \
+    --run_name c_cells \
+    --debug true
+```
+
+Full-scale run — submit as an sbatch job (same login-node hazard as batch_correction.py: this
+is whole-sample cell-level data, ~2.3M cells for `c_cells`):
+
+```bash
+sbatch \
+    --account=rgottar1_spatial \
+    --cpus-per-task=10 --mem=64G --time=04:00:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=owkin_batch_correct_adtnorm_c_cells \
+    --wrap="module load r-light/4.5.2 && Rscript rscripts/batch_correct.R \
+        --data_dir $DATA_DIR \
+        --name owkin \
+        --sample_ids CH_C_518a_x2,CH_C_523a_x2,CH_C_525a_x2,CH_C_526a_x1,CH_C_527a_x2 \
+        --run_name c_cells \
+        --debug false"
+```
+
+Output: `<DATA_DIR>/03_output/owkin/anndata/batch_correction/<run_name>[_debug]_adtnorm.parquet`
+(normalized cell x marker matrix, plus `cell_id`/`sample_id` columns; `cell_id` is
+sample-prefixed since Xenium per-run barcodes collide across samples).

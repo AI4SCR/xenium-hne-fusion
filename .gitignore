@@ -166,3 +166,6 @@ checkpoints/
 kaiko-ca-bundle.pem
 ray/runtime_envs/runtime_env.yml
 ray/other_modules
+
+# R package library for rscripts/ (installed by rscripts/install.R)
+rscripts/.Rlibs/
