@@ -427,6 +427,17 @@ Observed full-scale runtime on `c_cells` (~2.26M cells, 5 samples, 10 CPUs, 64G)
 ~450k cells/sample — budget `--time` accordingly; 4h was enough with headroom, 1-1.5h would
 not have been).
 
+**Correction**: the "~2h13min Scanorama" figure above was misattributed. There was no logging
+between "Running Scanorama..." and the final metrics table, so that whole gap got credited to
+Scanorama — but `batch_knn_entropy`'s unbounded `NearestNeighbors` self-query (>10min at this
+scale/dimensionality, degrading toward brute-force above ~15 dims) ran once per method
+immediately afterward and was actually the dominant cost, not Scanorama itself. Fixed by
+bounding it via `knn_entropy_sample_size` (same pattern as `asw_sample_size`). A rerun with all
+5 methods' checkpoints cached (only the now-fixed metrics loop had to run) took **1m44s total**
+— confirms Scanorama's own checkpointed runtime was never the multi-hour cost once metrics are
+bounded correctly. Re-verify actual Scanorama-alone timing next time this needs to be rerun from
+scratch (checkpoints deleted).
+
 ### ADTnorm (R, self-contained)
 
 ADTnorm (github.com/yezhengSTAT/ADTnorm) normalizes each protein marker independently via

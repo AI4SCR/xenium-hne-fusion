@@ -60,11 +60,12 @@ load_sample_proteins <- function(structured_dir, sample_id, proteins) {
   out
 }
 
-subsample_per_batch <- function(df, n, seed) {
-  set.seed(seed)
-  parts <- lapply(split(df, df$sample_id), function(g) {
-    g[sample.int(nrow(g), min(nrow(g), n)), , drop = FALSE]
-  })
+# Deterministic (first n rows per sample, by parquet row order) rather than random, so this
+# matches scripts/eval/batch_correction.py's debug subsample cell-for-cell -- the two pipelines
+# read the same proteins.parquet files but can't share a random seed across R/Python RNGs, and
+# batch_correction.py's ADTnorm merge needs both sides to have picked the identical debug cells.
+subsample_per_batch <- function(df, n) {
+  parts <- lapply(split(df, df$sample_id), function(g) head(g, n))
   do.call(rbind, parts)
 }
 
@@ -86,7 +87,6 @@ main <- function(args) {
   run_name <- args[["run_name"]]
   debug <- isTRUE(as.logical(args[["debug"]]))
   debug_cells_per_batch <- as.integer(if (is.null(args[["debug_cells_per_batch"]])) 500 else args[["debug_cells_per_batch"]])
-  seed <- as.integer(if (is.null(args[["seed"]])) 0 else args[["seed"]])
 
   stopifnot(!is.null(data_dir), !is.null(name), !is.null(run_name), length(sample_ids) > 0)
 
@@ -96,7 +96,7 @@ main <- function(args) {
   cells <- do.call(rbind, lapply(sample_ids, load_sample_proteins, structured_dir = structured_dir, proteins = PROTEIN_PANEL))
 
   if (debug) {
-    cells <- subsample_per_batch(cells, debug_cells_per_batch, seed)
+    cells <- subsample_per_batch(cells, debug_cells_per_batch)
   }
   cat(sprintf("Loaded %d cells\n", nrow(cells)))
 

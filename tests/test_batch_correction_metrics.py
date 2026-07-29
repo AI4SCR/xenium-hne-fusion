@@ -42,7 +42,8 @@ def test_batch_knn_entropy_lower_for_separated_batches(module):
     separated, batch = _separated_batches(rng, 100, offset=10.0)
     mixed = rng.normal(size=(200, 3))
 
-    assert module.batch_knn_entropy(separated, batch, n_neighbors=10) < module.batch_knn_entropy(mixed, batch, n_neighbors=10)
+    kwargs = dict(n_neighbors=10, sample_size=200, random_state=0)
+    assert module.batch_knn_entropy(separated, batch, **kwargs) < module.batch_knn_entropy(mixed, batch, **kwargs)
 
 
 def test_batch_pcr_higher_for_separated_batches(module):
@@ -55,7 +56,7 @@ def test_batch_pcr_higher_for_separated_batches(module):
 
 def test_subsample_per_batch_caps_group_size(module):
     df = pd.DataFrame({"sample_id": ["a"] * 50 + ["b"] * 10, "value": range(60)})
-    out = module.subsample_per_batch(df, n=20, random_state=0)
+    out = module.subsample_per_batch(df, n=20)
 
     counts = out["sample_id"].value_counts()
     assert counts["a"] == 20
