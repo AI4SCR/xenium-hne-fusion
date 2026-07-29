@@ -1,13 +1,15 @@
 """
-Plot per-protein histograms of cell-level protein expression, split by cancer type.
+Plot per-protein histograms of cell-level protein expression, split by cancer type and by sample.
 
 Reads whole-sample, per-cell protein intensities from `01_structured/<name>/<sample_id>/proteins.parquet`
 (pre-tiling, i.e. not aggregated over tiles). Samples are grouped into cancer types by the second
-underscore-separated token of their sample ID (e.g. `CH_C_518a_x2` -> `C`). For each protein in the
-panel, one figure is saved with an overlaid histogram per cancer type, pooling all cells across all
-samples of that type.
+underscore-separated token of their sample ID (e.g. `CH_C_518a_x2` -> `C`).
 
-Output layout: `<output_dir>/figures/protein_histograms/<protein>.png`
+Produces two views per protein:
+- One figure with an overlaid histogram per cancer type, pooling all cells across all samples of
+  that type: `<output_dir>/figures/protein_histograms/<protein>.png`
+- One figure per sample (single distribution, no pooling) -- useful for spotting per-sample
+  outliers that a cancer-type-pooled view can hide: `<output_dir>/figures/protein_histograms/<sample_id>/<protein>.png`
 
 Usage:
     uv run python scripts/eval/protein_histograms.py \\
@@ -46,6 +48,7 @@ def load_cell_proteins(structured_dir: Path, proteins: list[str]) -> pd.DataFram
     frames = []
     for sample_dir in sample_dirs:
         df = load_sample_proteins(structured_dir, sample_dir.name, proteins)
+        df["sample_id"] = sample_dir.name
         df["cancer_type"] = sample_cancer_type(sample_dir.name)
         frames.append(df)
     return pd.concat(frames, ignore_index=True)
@@ -67,6 +70,16 @@ def plot_protein_histogram(df: pd.DataFrame, protein: str, bins: int, out_path: 
     plt.close(ax.figure)
 
 
+def plot_sample_protein_histogram(df: pd.DataFrame, sample_id: str, protein: str, bins: int, out_path: Path) -> None:
+    _, ax = plt.subplots(figsize=(7, 5))
+    sns.histplot(data=df, x=protein, stat="density", log_scale=True, bins=bins, ax=ax)
+    ax.set_title(f"{sample_id} -- {protein}")
+    ax.set_xlabel("cell-level intensity (log scale)")
+    ax.figure.tight_layout()
+    ax.figure.savefig(out_path, dpi=150)
+    plt.close(ax.figure)
+
+
 def main(cfg: HistogramsConfig) -> int:
     managed = ManagedPaths(data_dir=cfg.data_dir, name=cfg.name)
     df = load_cell_proteins(managed.structured_dir, cfg.proteins)
@@ -76,6 +89,12 @@ def main(cfg: HistogramsConfig) -> int:
 
     for protein in cfg.proteins:
         plot_protein_histogram(df, protein, cfg.bins, out_dir / f"{protein}.png")
+
+    for sample_id, df_sample in df.groupby("sample_id"):
+        sample_dir = out_dir / sample_id
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        for protein in cfg.proteins:
+            plot_sample_protein_histogram(df_sample, sample_id, protein, cfg.bins, sample_dir / f"{protein}.png")
 
     return 0
 
