@@ -522,3 +522,63 @@ Use `--batch_correction_umap.debug true` (2,000-cell subsample) to iterate local
 
 Output: `<output_dir>/figures/batch_correction_umap/<run_name>/<method>_{sample_id,cell_type}.png`,
 one pair per method present in the zarr.
+
+## Single-sample tile splits
+
+`scripts/artifacts/build_single_sample_splits.py` splits ONE sample's own tiles into
+fit/val/test via `sklearn.model_selection.train_test_split` (unlike `splits/owkin.yaml`'s
+whole-sample assignment) -- for experiments that train/val/test entirely within one sample,
+isolating within-sample structure from cross-sample batch effects. Draws from the existing
+`items/c_cells.json` (QC-filtered), filtered to the one target sample. Writes `n_folds`
+independent random draws to `splits/<sample_id>/outer=<i>.parquet`, same shape as the existing
+cross-sample splits (`id` index, `sample_id`, `tile_id`, `tile_dir`, `split` ∈
+`{fit,val,test}`), so `scripts/train/supervised.py` needs no changes.
+
+Build 3 folds for each `c_cells` sample (0.6/0.1/0.3 fit/val/test):
+
+```bash
+for SAMPLE in CH_C_518a_x2 CH_C_523a_x2 CH_C_525a_x2 CH_C_526a_x1 CH_C_527a_x2; do
+    uv run python scripts/artifacts/build_single_sample_splits.py \
+        --split.name owkin --split.data_dir $DATA_DIR \
+        --split.items_path c_cells.json --split.sample_id $SAMPLE \
+        --split.n_folds 3
+done
+```
+
+Debug smoke test:
+
+```bash
+uv run python scripts/train/supervised.py \
+    --config configs/train/owkin/proteins/early-fusion.yaml \
+    --debug=True \
+    --train.data.items_path c_cells.json \
+    --train.data.metadata_path CH_C_518a_x2/outer=0.parquet \
+    --train.data.panel_path c_cells.yaml \
+    --train.data.cache_dir protein/c_cells \
+    --train.wandb.tags "[owkin, single_sample, CH_C_518a_x2]"
+```
+
+Full sweep — 4 architectures × 5 samples × 3 folds, same `protein/c_cells` cache (identical
+underlying tiles, only the split differs), tagged by `sample_id`:
+
+```bash
+PARTITION=gpu-l40
+for CONFIG in vision expr-token-vit expr-resmlp early-fusion; do
+    for SAMPLE in CH_C_518a_x2 CH_C_523a_x2 CH_C_525a_x2 CH_C_526a_x1 CH_C_527a_x2; do
+        for OUTER in 0 1 2; do
+            sbatch \
+                --account=rgottar1_spatial \
+                --partition=$PARTITION --gres=gpu:1 --cpus-per-task=10 --mem=64G --time=04:00:00 \
+                --output=$HOME/logs/%j.out \
+                --job-name=owkin_proteins_single_sample_${SAMPLE}_${CONFIG}_outer${OUTER} \
+                --wrap="uv run python scripts/train/supervised.py \
+                    --config configs/train/owkin/proteins/${CONFIG}.yaml \
+                    --train.data.items_path c_cells.json \
+                    --train.data.metadata_path ${SAMPLE}/outer=${OUTER}.parquet \
+                    --train.data.panel_path c_cells.yaml \
+                    --train.data.cache_dir protein/c_cells \
+                    --train.wandb.tags [owkin,single_sample,${SAMPLE}]"
+        done
+    done
+done
+```
