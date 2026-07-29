@@ -99,17 +99,32 @@ class BatchCorrectionConfig:
     # scale (millions of cells) -- kd_tree fit is fast but a full self-query took >10min at
     # c_cells scale. Bound to a random subsample, same rationale as asw_sample_size.
     knn_entropy_sample_size: int = 20_000
+    # Maps raw first_type labels (e.g. per-sample "Tu_CH_C_518") onto a shared vocabulary (e.g.
+    # "tumor") -- see scripts/data/owkin/construct_cell_type_mapping.py.
+    cell_types_path: Path = Path("cell_types/owkin/cell_types.json")
 
 
-def load_cell_proteins(structured_dir: Path, sample_ids: list[str], proteins: list[str]) -> pd.DataFrame:
+def load_cell_type_mapping(cell_types_path: Path) -> dict[str, str]:
+    import json
+
+    return json.loads(cell_types_path.read_text())
+
+
+def load_cell_proteins(structured_dir: Path, sample_ids: list[str], proteins: list[str], cell_type_mapping: dict[str, str]) -> pd.DataFrame:
     frames = []
     for sample_id in sample_ids:
         df = load_sample_proteins(structured_dir, sample_id, proteins)
         # cell_id is a pandas index (not a column) on proteins.parquet, and only unique within a
         # sample (Xenium per-run barcodes collide across samples) -- same prefixing convention
         # as rscripts/batch_correct.R, needed to join ADTnorm's output back onto these rows.
-        cell_ids = pd.read_parquet(structured_dir / sample_id / "proteins.parquet", columns=[]).index
-        df["cell_id"] = sample_id + "_" + cell_ids.to_numpy()
+        raw_cell_id = pd.read_parquet(structured_dir / sample_id / "proteins.parquet", columns=[]).index.to_numpy()
+
+        cell_types = pd.read_parquet(structured_dir / sample_id / "cells.parquet", columns=["cell_id", "first_type"]).set_index("cell_id")
+        raw_first_type = cell_types.loc[raw_cell_id, "first_type"]
+        df["cell_type"] = raw_first_type.map(cell_type_mapping).to_numpy()
+        assert not pd.isna(df["cell_type"]).any(), f"first_type value missing from cell_types_path mapping for {sample_id}"
+
+        df["cell_id"] = sample_id + "_" + raw_cell_id
         df["sample_id"] = sample_id
         frames.append(df)
     return pd.concat(frames, ignore_index=True)
@@ -128,6 +143,7 @@ def build_adata(cells: pd.DataFrame, proteins: list[str]) -> AnnData:
     adata = AnnData(X=np.log1p(cells[proteins].to_numpy(dtype=np.float32)))
     adata.var_names = proteins
     adata.obs["sample_id"] = pd.Categorical(cells["sample_id"].to_numpy())
+    adata.obs["cell_type"] = pd.Categorical(cells["cell_type"].to_numpy())
     adata.obs["cell_id"] = cells["cell_id"].to_numpy()
     return adata
 
@@ -238,7 +254,8 @@ def main(cfg: BatchCorrectionConfig, *, methods: tuple[str, ...] = ALL_METHODS) 
     sample_ids = sorted(items_df["sample_id"].unique())
     logger.info(f"Loading proteins for {len(sample_ids)} samples: {sample_ids}")
 
-    cells = load_cell_proteins(managed.structured_dir, sample_ids, cfg.proteins)
+    cell_type_mapping = load_cell_type_mapping(cfg.cell_types_path)
+    cells = load_cell_proteins(managed.structured_dir, sample_ids, cfg.proteins, cell_type_mapping)
     if cfg.debug:
         cells = subsample_per_batch(cells, cfg.debug_cells_per_batch)
     logger.info(f"Loaded {len(cells)} cells")

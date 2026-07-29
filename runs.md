@@ -491,3 +491,34 @@ Observed full-scale runtime on `c_cells` (~2.26M cells, 5 samples, 10 CPUs, 64G)
 — per-marker landmark registration is univariate (no all-pairs cell matching), so it scales
 far better with cell count than Harmony/ComBat/Scanorama (`--time=04:00:00` has large headroom;
 30min would likely be enough).
+
+### UMAP of the corrected embeddings
+
+`scripts/eval/batch_correction_umap.py` reads the zarr written by `batch_correction.py` (no
+recomputation), fits one UMAP per method on a shared random subsample, and plots it twice: by
+`sample_id` (batch mixing) and by `cell_type` (biological signal — `first_type` from each
+sample's structured `cells.parquet`, mapped through `cell_types/owkin/cell_types.json` to
+consolidate per-sample tumor labels like `Tu_CH_C_518` into `tumor`; requires
+`batch_correction.py` to have been run after `cell_type` was added to `build_adata`, otherwise
+that half is silently skipped). Each `umap.UMAP.fit_transform` call pays ~15-20s of numba JIT
+warmup on top of the fit itself, which made login-node smoke tests with short timeouts look
+stuck when they weren't — but the full run at `sample_size=20_000` (well below `c_cells`'
+~2.3M cells) does take a genuine ~1.5min/method (~7min total for 5 methods), so still submit as
+an sbatch job rather than running interactively:
+
+```bash
+sbatch \
+    --account=rgottar1_spatial \
+    --cpus-per-task=4 --mem=16G --time=00:30:00 \
+    --output=$HOME/logs/%j.out \
+    --job-name=owkin_batch_correction_umap_c_cells \
+    --wrap="uv run python scripts/eval/batch_correction_umap.py \
+        --batch_correction_umap.name owkin \
+        --batch_correction_umap.data_dir \$DATA_DIR \
+        --batch_correction_umap.run_name c_cells"
+```
+
+Use `--batch_correction_umap.debug true` (2,000-cell subsample) to iterate locally first.
+
+Output: `<output_dir>/figures/batch_correction_umap/<run_name>/<method>_{sample_id,cell_type}.png`,
+one pair per method present in the zarr.
