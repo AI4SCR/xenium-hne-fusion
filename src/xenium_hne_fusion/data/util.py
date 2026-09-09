@@ -34,3 +34,17 @@ def to_pyramidal(
         **kwargs,
     )
     logger.info(f"Saved pyramidal TIFF to: {save_path}")
+
+
+def is_pyramidal_tiff(path: Path) -> bool:
+    """Check whether `path` is already a tiled, multi-resolution (pyramidal) TIFF.
+
+    Opens with `is_ome=False`: some OME-TIFFs (e.g. per-channel Xenium morphology images)
+    declare sibling files as companions in their OME-XML and get stitched into a bogus
+    multi-file series by tifffile's default OME parsing.
+    """
+    import tifffile
+
+    with tifffile.TiffFile(path, is_ome=False) as tf:
+        page = tf.pages[0]
+        return bool(page.is_tiled) and len(tf.series[0].levels) > 1
