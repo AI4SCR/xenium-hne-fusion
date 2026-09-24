@@ -148,7 +148,7 @@ Rules for a run to be kept:
 | `expr-token` MLP-32 (`ee=mlp`) | 4 per task | Weak expr-only baseline (kept in the report, not in this comparison) |
 | `expr-token` ViT-B (`mlbrojzj`) | 1 (fold 0) | Only one fold; different capacity |
 
-Selected run IDs (fold 0..3) are hard-coded in `scripts/eval/compare_linear_expr.py`:
+Legacy run IDs (fold 0..3), kept as `LEGACY` in `scripts/eval/compare_linear_expr.py`:
 
 | Task | early MLP-32 | expr-only ViT-S | early linear (new) |
 |---|---|---|---|
@@ -156,25 +156,62 @@ Selected run IDs (fold 0..3) are hard-coded in `scripts/eval/compare_linear_expr
 | HVG-100 (`expr-v0`) | uaepyp93, hdkim0ma, z2shyn16, 5a6crdzl | 3nh0f2lw, fk4lzu7l, buzc1v5e, juonbqiu | yougc371, c44l6rqk, 42sp5wbq, fhd8ooec |
 | HVG-50 (`expr-v0`) | gl0w9chl, 6361tn0m, bngpxrkn, 4nwbprmb | not run | n0c3o6fr, jihqpk5k, otx0gemw, dt030tk6 |
 
-Caveats:
-- Expr-only ViT-S runs stopped early (epochs 8–20). The MLP-32 HVG runs ran all 35 epochs. Metrics are for the best
-  checkpoint (by val), so this is fine, but do not compare "last epoch" values.
-- The MLP-32 baselines ran on older commits (Apr–May) than the expr-only ViT-S runs (Jun) and the new runs (`c1759b4`).
-  The loader semantics are the same (same caches, `target` key), but this is not bit-identical code.
+**The legacy baselines above are NOT the final comparison.** Early stopping is commented out in `supervised.py`, so a
+run with fewer than 35 epochs was killed by `trainer.max_time`:
+
+| Legacy baseline | Epochs reached | Runtime | `max_time` | Commit |
+|---|---|---|---|---|
+| expr-only ViT-S, cell types | 13, 13, 18, 20 | 6.3–6.5 h | 6 h | `3cd1157` |
+| expr-only ViT-S, HVG-100 | 8, 9, 9, 16 | 4.3 h | 4 h | `3cd1157` / `da3885a` |
+| early MLP-32, cell types | 27, 23, 32, 23 | 4.1–4.2 h | 4 h | `7a96d48` |
+| early MLP-32, HVG-100 / HVG-50 | 35 | 1.6–2.8 h | 4 h | `e4aab33` etc. |
+
+Because they were undertrained and ran on older commits, **both baselines were rerun from `c1759b4`** (2026-09-24,
+`gpu-rtx` / `dcsr`, `trainer.max_time` 12 h, W&B group `c1759b4-baseline`, tags `[beat, lung, c1759b4-baseline]`). Stock
+configs were used: `configs/train/beat/{cell_types,expression}/{early-fusion,expr-token-vit}.yaml`, with the same splits,
+panels and caches as the linear runs. All three arms of the final comparison therefore share code, hardware and a full
+35-epoch budget. The new linear runs project to 35 epochs in ~2.5–3.5 h, inside their 6 h limit.
+
+| Rerun | Slurm jobs (fold 0..3) |
+|---|---|
+| early MLP-32, cell types | 65123205 65123206 65123207 65123208 |
+| early MLP-32, HVG-100 | 65123209 65123210 65123211 65123212 |
+| early MLP-32, HVG-50 | 65123213 65123214 65123215 65123216 |
+| expr-only ViT-S, cell types | 65123217 65123218 65123219 65123220 |
+| expr-only ViT-S, HVG-100 | 65123221 65123222 65123223 65123224 |
+| expr-only ViT-S, HVG-50 | 65123225 65123226 65123227 65123228 |
+
+Resubmit loop (from `../xenium-hne-fusion-c1759b4`):
+
+```bash
+OVR="--trainer.max_time 00:12:00:00 --wandb.group c1759b4-baseline --wandb.tags '[beat, lung, c1759b4-baseline]'"
+for MODEL in early-fusion expr-token-vit; do for SETTING in cell_types hvg100 hvg50; do for OUTER in 0 1 2 3; do
+  SPLIT_NAME="outer=${OUTER}-inner=0-seed=0"
+  case $SETTING in cell_types) TASK=cell_types; PANEL_PATH=default.yaml;;
+    hvg100) TASK=expression; PANEL_PATH="hvg-100/cells/${SPLIT_NAME}.yaml";;
+    hvg50) TASK=expression; PANEL_PATH="hvg-50/cells/${SPLIT_NAME}.yaml";; esac
+  sbatch --chdir=$PWD --partition=gpu-rtx --qos=dcsr --gres=gpu:1 --cpus-per-task=12 --mem=64G --time=12:30:00 \
+    --output=$HOME/logs/%j.out --job-name=base-${MODEL}-${SETTING}-${OUTER} \
+    --wrap="UV_ENV_FILE=.env uv run python scripts/train/supervised.py --config configs/train/beat/${TASK}/${MODEL}.yaml \
+      --data.items_path cells.json --data.metadata_path cells/${SPLIT_NAME}.parquet \
+      --data.panel_path ${PANEL_PATH} --data.cache_dir=${TASK}/${PANEL_PATH%.yaml} ${OVR}"
+done; done; done
+```
 
 ### When the runs finish
 
-1. Run `UV_ENV_FILE=.env uv run python scripts/eval/compare_linear_expr.py` (needs network). It prints per-fold
-   test/val Pearson and paired deltas `early_linear − {early_mlp32, expr_vit_s}`, and writes `compare_linear_expr.csv` to the cwd.
-   Add the HVG-50 expr-only ViT-S run IDs to `BASELINES` once they exist.
+1. Run `UV_ENV_FILE=.env uv run python scripts/eval/compare_linear_expr.py` (needs network). It selects runs by W&B group
+   (`early-fusion-linear`, `c1759b4-baseline`) and classifies each run from its config, with assertions on panel, encoder,
+   fusion and freeze settings. It also loads the legacy runs as `source=legacy` for reference. It prints per-fold
+   test/val Pearson (finished runs only), paired deltas `early_linear − {early_mlp32, expr_vit_s}` over the c1759b4 runs,
+   and writes `compare_linear_expr.csv` to the cwd. Use the **c1759b4** rows for conclusions. Check that every run reached 35 epochs.
 2. Update the report artifact (sections "A stronger expression-only baseline", "Open questions", "Next steps").
    Replace the wording "early fusion with the ViT transcript encoder" with the bottleneck confound described here.
 
 ## 5. Open items / next steps
 
-- [ ] **HVG-50 expr-only ViT-S baseline** (4 folds), still missing. Use `configs/train/beat/expression/expr-token-vit.yaml`
-      (its `wandb.name` is `expr-token`) from the `c1759b4` worktree, with panel `hvg-50/cells/...`, `max_time` 6 h. Not submitted; awaiting user OK.
-- [ ] Evaluate the 12 runs above and update the report.
+- [ ] Wait for the 12 linear runs and the 24 `c1759b4-baseline` reruns (includes the previously missing HVG-50 expr-only ViT-S).
+      Evaluate them with the script and update the report.
 - [ ] Optional stronger check: early-linear with ViT-B on cell types vs expr-only ViT-B (only 1 fold exists).
 - [ ] Fix `main` HEAD's loader or re-cache (§3). Fix the CLAUDE.md `.env` claim (§2).
 - [ ] Remove `../xenium-hne-fusion-main` worktree if unused.
